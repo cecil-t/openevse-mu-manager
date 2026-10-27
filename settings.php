@@ -306,7 +306,6 @@ function chk($v){ return $v ? ' checked' : ''; }
 <div class="slidebox set">
 <div class="tabs">
 <?php foreach (array('units' => 'Units', 'groups' => 'Load groups', 'prefs' => 'Preferences', 'users' => 'Users', 'link' => 'View-only link', 'system' => 'System status') as $k => $t) echo '<a href="settings.php?s=' . $k . '"' . ($k === $sec ? ' class="on"' : '') . '>' . $t . '</a>'; ?>
-<a href="help.php">Help</a>
 </div>
 <?php if (isset($_GET['msg'])) echo '<div class="msg">' . h($_GET['msg']) . '</div>'; ?>
 <?php
