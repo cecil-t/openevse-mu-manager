@@ -1,8 +1,8 @@
 body{
 	font-family: Arial, "sans-serif";
 	background: url("media/circuit-bg-bw.jpg");
-	background-color: rgba(255, 255, 255, 0.85);
-	background-blend-mode: lighten;
+	background-color: rgba(32, 32, 32, 0.92);
+	background-blend-mode: darken;
 	color: #666;
 	/* border: 1px solid turquoise;  */
 	}
@@ -12,8 +12,6 @@ body{
 		/* transform: scale(1.5);  this widens the body and creates a horizontal scroll bar 
 		transform-origin: top center;  */
 		zoom: 150%;  /* this is non-standard, but works as expected, unlike scale */
-		background-color: rgba(32, 32, 32, 0.92);
-		background-blend-mode: darken;
 	}
 }
 a{
