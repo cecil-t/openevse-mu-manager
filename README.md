@@ -16,6 +16,21 @@ during setup and stays there (see `.gitignore`).
   <img src="docs/screenshots/unit.png" alt="Unit page: live details for one charger" width="300">
 </p>
 
+## How it fits together
+
+You can start with just the web app and add the other parts when you need them.
+
+- **Web app.** The site you use to watch and control your OpenEVSE units from one place. You can make it public or keep it on your home network, and you can share a view-only link. It works without the other parts, but then it has no session history, reports or load balancing, and it reads each unit directly every time a page loads.
+- **Collector.** Records charging sessions for history, reports and email alerts. Each unit's Emoncms output points at this server and sends readings every 30 seconds. Units that don't send data get read once a minute instead. With the collector running, pages show this recent data instead of querying the units every time. The app can set up Emoncms on each unit for you.
+- **Coordinator.** The load balancer. It decides how much of your shared supply each unit can use, based on what's plugged in and charging, and it changes those limits as cars start and finish. It runs in Docker and starts in dry-run mode, where it only shows what it would do.
+- **Broker.** An MQTT message server (Mosquitto, in Docker) that connects the coordinator and the units. The units report their status through it and get their current limits back. The app sets up MQTT on units that are in a load group.
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="Diagram: a remote user reaches the web app over HTTPS through the router; on the home network the server runs the web app, collector, SQLite database, and in Docker the MQTT broker and coordinator; the OpenEVSE units talk to the web app over HTTP, send readings to the collector, and exchange status and current limits with the broker" width="900">
+</p>
+
+Only the web site (the web app and the collector's receiver) needs to be reachable from the internet, and only if you want to use it away from home. The broker and coordinator stay on your home network.
+
 License: MIT (see LICENSE). The bundled PHPMailer keeps its own license (LGPL 2.1).
 
 OpenEVSE's own API documents: the [HTTP developer guide (WiFi 2.x, PDF)](https://github.com/OpenEVSE/ESP8266_WiFi_v2.x/raw/master/Developers_Guides/Developers%20Guide_HTTP.pdf)
