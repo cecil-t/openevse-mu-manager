@@ -1,0 +1,38 @@
+# OpenEVSE MU Manager: never publish anything made on the server.
+# Databases (units, users, settings, readings) and their side files
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+# Site config and secrets
+loadbalancer/.env
+loadbalancer/secrets/
+phpliteadmin.config.php
+# Kept on the owner's site, not part of the package
+_phpliteadmin.php
+phpliteadmin.config*.php
+media/OpenEVSE-Developers-Guide-HTTP.pdf
+_Contactor-Low-Power-Hold-Settings.txt
+private/key/
+private/status/
+private/firmware/
+private/unit_passwords*.txt
+*.key
+*.plain
+# Copies made before changes
+backups/
+*.bak
+*.bak-*
+# Logs, locks and run-time state
+*.log
+*.log.*
+*.lock
+collector/notify_state.json
+loadbalancer/run/
+loadbalancer/mosquitto/data/
+loadbalancer/mosquitto/log/
+# NAS and OS clutter
+@eaDir/
+.DS_Store
+Thumbs.db

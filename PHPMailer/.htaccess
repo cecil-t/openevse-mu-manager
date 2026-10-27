@@ -1,0 +1,2 @@
+# PHPMailer is a library used by mail_lib.php: never served over the web.
+Require all denied

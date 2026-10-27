@@ -1,0 +1,15 @@
+# Emoncms-compatible push receiver for the OpenEVSE 2.x WiFi modules (see receiver.php).
+# The 2.8.2 firmware posts by plain HTTP GET (its only HTTPS mode pins a SHA1 cert
+# fingerprint, which would break at every certificate renewal), so this folder's own
+# rewrite rules replace the site-wide HTTP->HTTPS redirect for these URLs only.
+RewriteEngine On
+RewriteRule ^input/(post|bulk)(\.json)?$ receiver.php [L,QSA]
+RewriteRule ^$ receiver.php [L,QSA]
+# Plain body with Content-Length (no gzip/chunking): the v5 WiFi's HTTP client
+# doesn't de-chunk, so a chunked "ok" counts as a failed post on the unit.
+# Apache >= 2.4.59 drops a PHP-FPM Content-Length unless ap_trust_cgilike_cl is set.
+<IfModule mod_env.c>
+	SetEnv ap_trust_cgilike_cl 1
+	SetEnv no-gzip 1
+	SetEnv dont-vary 1
+</IfModule>

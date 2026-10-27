@@ -1,0 +1,10 @@
+# OpenEVSE load balancer (coordinator, MQTT broker data, logins): never served over the web.
+# Apache 2.4
+<IfModule mod_authz_core.c>
+	Require all denied
+</IfModule>
+# Apache 2.2 fallback
+<IfModule !mod_authz_core.c>
+	Order allow,deny
+	Deny from all
+</IfModule>

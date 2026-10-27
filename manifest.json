@@ -1,0 +1,14 @@
+{
+	"short_name": "OpenEVSE",
+	"name": "OpenEVSE MU Manager",
+	"icons": [
+		{
+			"src": "media/openevse-icon.png",
+			"type": "image/png",
+			"sizes": "256x256"
+		}
+	],
+	"start_url": "./?",
+	"scope": "./",
+	"display": "standalone"
+}

@@ -1,0 +1,39 @@
+# OpenEVSE load balancer: Mosquitto (MQTT broker) + the coordinator.
+# Site-specific values are in .env (copy env.example); logins are in secrets/ (not in this file).
+# OEV_NAME (default "openevse") names the project and the containers, so a second copy
+# (a test site) can run next to the first one with its own OEV_NAME and MQTT_PORT.
+name: ${OEV_NAME:-openevse}-lb
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ${OEV_NAME:-openevse}-mosquitto
+    restart: unless-stopped
+    ports:
+      - "${MQTT_BIND}:${MQTT_PORT:-1883}:1883"        # LAN address only
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./secrets/mosquitto_passwd:/mosquitto/passwd:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+  coordinator:
+    build: ./coordinator
+    image: openevse-lb-coordinator:1
+    container_name: ${OEV_NAME:-openevse}-lb-coordinator
+    restart: unless-stopped
+    user: "${RUN_UID}:${RUN_GID}"     # same user as the web site, so it can read openevse.db
+    depends_on: [mosquitto]
+    env_file: [./secrets/coordinator.env]
+    environment:
+      - LB_CONFIG=/app/lb.ini
+      - OPENEVSE_SITE=${OPENEVSE_SITE}   # the site folder (from .env)
+      - LB_RUN_DIR=/run-lb
+      - LB_DRY_RUN=${LB_DRY_RUN:-}       # 1 = only log, 0 = live; blank = dry_run in lb.ini
+    volumes:
+      - "${OPENEVSE_SITE}:${OPENEVSE_SITE}:ro"   # PHP helpers + openevse.db, read-only
+      - ./coordinator:/app:ro
+      - ./run:/run-lb
+    healthcheck:
+      test: ["CMD", "php", "/app/health.php"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

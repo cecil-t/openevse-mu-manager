@@ -1,0 +1,7 @@
+# Each unit logs in as u<id> and may only use its own topic tree openevse/u<id>/...
+# (status it publishes, rapi/in it listens to). The coordinator (user lb) sees all.
+pattern readwrite openevse/%u/#
+pattern write openevse/announce/#
+
+user lb
+topic readwrite openevse/#

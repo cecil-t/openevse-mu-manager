@@ -1,0 +1,17 @@
+# OpenEVSE: library files are only included by the pages, never opened directly.
+<FilesMatch "^(include|include_v5|include_lb|connection|volts_lib|evse_prefs|sessions_lib|lbstatus_render|mail_lib|util_lib|auth_lib|settings_lib|secret_lib|sys_lib|_head|phpliteadmin\.config)\.php$">
+	Require all denied
+</FilesMatch>
+# Notes, logs, keys, scripts, the databases (and their -wal/-shm/-journal files), config files.
+<FilesMatch "\.(txt|md|bak|log|lock|key|sh|db|db-wal|db-shm|db-journal|sqlite|sqlite3|env|ini|example|yml|tar|gz|xz|zip)$">
+	Require all denied
+</FilesMatch>
+# Dot files (.gitignore, .env, ...). Apache already hides .htaccess itself.
+<FilesMatch "^\.">
+	Require all denied
+</FilesMatch>
+# A .git folder, if the site was cloned with git (no rewrite rules here on purpose:
+# they would replace a parent folder's rewrite rules, such as an HTTP -> HTTPS redirect).
+<IfModule mod_alias.c>
+	RedirectMatch 404 /\.git(/|$)
+</IfModule>
