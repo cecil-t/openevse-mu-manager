@@ -35,6 +35,7 @@ function btn($action, $label, $extra = array(), $confirm = '', $small = false){
 <script>var liveOK = false, loadedAt = Date.now();
 // full reload every 60 s, or every 5 min while the live update (below) is working; never while a popup is open
 function autoRefresh(){ var open = [].some.call(document.querySelectorAll('.slidecontainer'), function(x){ return x.style.display == 'block'; }); if (open || (liveOK && Date.now() - loadedAt < 300000)) setTimeout(autoRefresh, 10000); else location.href = <?=json_encode($self)?>; } setTimeout(autoRefresh, 60000);</script>
+<div class="slidebox" id="ucard"><?php /* the page's card: the same rounded .slidebox as index.php (style.css); the popups below stay outside it */ ?>
 <div style="text-align:center;">
 	<form method="get" id="unit">
 	Select Unit:
@@ -54,28 +55,32 @@ form.inl button.chip:hover{background:#ccc}
 table.stats td:first-child form.inl button.chip{margin:0 0 0 8px}
 /* 310px phones: tighter cells so the longest state (Error: Over Temperature + plug) still fits on one line */
 @media (max-width:359px){table.stats td{padding:2px 3px;font-size:14px}table.stats td:first-child form.inl button.chip{margin-left:3px;padding:0 4px}}
-.slidebox .pt{font-weight:bold;margin-bottom:6px}
-.slidebox{box-sizing:border-box;max-width:calc(100vw - 24px);overflow-wrap:anywhere;word-wrap:break-word}
-.slidebox .pl{white-space:normal;line-height:1.4;margin-bottom:2px}
-.slidebox .slider{margin:2px 0}
-.slidebox .pn{margin-top:6px;font-size:85%;font-style:italic;color:#666}
-.slidebox .pclose{margin-top:8px;font-size:80%}
-.slidebox .pclose a{color:#999}
-.slidebox .pbtns{margin-top:10px}
-.slidebox button.pbtn{margin:4px 4px 0 4px;padding:1px 10px;font-size:13px;line-height:18px;color:#000;background:#fff;border:1px solid #bbb;border-radius:3px;cursor:pointer}
-.slidebox button.pbtn:hover{background:#ddd}
+.slidecontainer .slidebox .pt{font-weight:bold;margin-bottom:6px}
+.slidecontainer .slidebox{box-sizing:border-box;max-width:calc(100vw - 24px);overflow-wrap:anywhere;word-wrap:break-word}
+.slidecontainer .slidebox .pl{white-space:normal;line-height:1.4;margin-bottom:2px}
+.slidecontainer .slidebox .slider{margin:2px 0}
+.slidecontainer .slidebox .pn{margin-top:6px;font-size:85%;font-style:italic;color:#666}
+.slidecontainer .slidebox .pclose{margin-top:8px;font-size:80%}
+.slidecontainer .slidebox .pclose a{color:#999}
+.slidecontainer .slidebox .pbtns{margin-top:10px}
+.slidecontainer .slidebox button.pbtn{margin:4px 4px 0 4px;padding:1px 10px;font-size:13px;line-height:18px;color:#000;background:#fff;border:1px solid #bbb;border-radius:3px;cursor:pointer}
+.slidecontainer .slidebox button.pbtn:hover{background:#ddd}
 #pop_info .slidebox,#pop_ask .slidebox{max-width:300px}
 /* every popup but Pilot (its slider needs the room) is exactly the stats table's width
    (300px, or the screen on 310px phones; popFit() sets the table's measured width when it opens) */
 .slidecontainer:not(#setpilot) .slidebox{width:300px;max-width:calc(100vw - 24px);padding:10px 12px}
-.slidebox input,.slidebox select{max-width:100%;box-sizing:border-box;font-size:14px}
-.slidebox form{margin:4px 0}
-.slidebox .pf{display:inline-block;white-space:nowrap;margin:3px 2px}
-.slidebox .pf input[type=time]{width:7.5em}
-.slidebox .pf input[type=number]{width:4.5em}
-.slidebox .pf select{max-width:9em}
-.slidebox .pf button.pbtn{margin:0 0 0 4px}
+.slidecontainer .slidebox input,.slidecontainer .slidebox select{max-width:100%;box-sizing:border-box;font-size:14px}
+.slidecontainer .slidebox form{margin:4px 0}
+.slidecontainer .slidebox .pf{display:inline-block;white-space:nowrap;margin:3px 2px}
+.slidecontainer .slidebox .pf input[type=time]{width:7.5em}
+.slidecontainer .slidebox .pf input[type=number]{width:4.5em}
+.slidecontainer .slidebox .pf select{max-width:9em}
+.slidecontainer .slidebox .pf button.pbtn{margin:0 0 0 4px}
 #pop_info .slidebox{text-align:left}
+/* page card: index.php's card; the table keeps its own width (max 300px) centred in it */
+#ucard table.stats{margin-top:7px;text-align:left}
+/* phones under 360px: a little less card padding so the longest state still fits on one line */
+@media (max-width:359px){#ucard{padding:10px 4px}}
 table.stats tr.g td{border-top:2px solid #9a9a9a}
 table.stats tr.g2 td{background-color:#e3e7ec}
 .lbdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:5px;vertical-align:middle;background:#bbb}
@@ -83,7 +88,7 @@ table.stats tr.g2 td{background-color:#e3e7ec}
 </style>
 <?php
 $e = evse_status($unit);
-if (!is_array($e)) die('Can\'t connect to ' . h($unit['evseurl']) . ', response code: ' . h($e) . '</div></div></body></html>');
+if (!is_array($e)) die('Can\'t connect to ' . h($unit['evseurl']) . ', response code: ' . h($e) . '</div></div></div></body></html>');
 $plugimg = $e['connected'] ? '<img src="media/plug.svg" alt="EV Connected" title="EV Connected" class="plug" /> ' : '';
 // both buttons are on the page; the live update shows the one that fits the current state
 $asl = evse_sleep_class($e['statecode']) == 'asleep';
@@ -200,7 +205,7 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 	?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>
 </table>
-<br />
+</div><?php /* #ucard */ ?>
 
 <?php
 $pmin = isset($e['min_current_hard']) ? (int)$e['min_current_hard'] : 6;

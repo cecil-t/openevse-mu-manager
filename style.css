@@ -52,7 +52,7 @@ a span:hover{
     font-weight: bold;
     color: #000;
     user-select: none;
-    text-shadow: 1px 1px #888;
+    text-shadow: 2px 2px #888;
 }
 .header h3 {
     padding-top: -5px;
