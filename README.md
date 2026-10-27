@@ -10,6 +10,12 @@ that has a web server with PHP, and Docker for the load balancer.
 No passwords or keys are kept in this repository. Everything secret is made on your server
 during setup and stays there (see `.gitignore`).
 
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Home page: units grouped by load group with live status" width="380">
+  &nbsp;
+  <img src="docs/screenshots/unit.png" alt="Unit page: live details for one charger" width="300">
+</p>
+
 License: MIT (see LICENSE). The bundled PHPMailer keeps its own license (LGPL 2.1).
 
 OpenEVSE's own API documents: the [HTTP developer guide (WiFi 2.x, PDF)](https://github.com/OpenEVSE/ESP8266_WiFi_v2.x/raw/master/Developers_Guides/Developers%20Guide_HTTP.pdf)
