@@ -95,7 +95,7 @@
   <path d="M808,280 H672" fill="none" stroke="#2e7d32" stroke-width="2.2" marker-end="url(#g)"/>
   <text x="738" y="273" text-anchor="middle" font-size="11" fill="#2e7d32">readings</text>
   <text x="738" y="296" text-anchor="middle" font-size="10" fill="#2e7d32">every 30 s</text>
-  <path d="M870,374 V423 H672" fill="none" stroke="#e65100" stroke-width="2.2" marker-end="url(#o)" marker-start="url(#o)"/>
+  <path d="M674,423 H870 V374" fill="none" stroke="#e65100" stroke-width="2.2" marker-end="url(#o)" marker-start="url(#o)"/>
   <text x="803" y="441" text-anchor="start" font-size="11" fill="#e65100">MQTT: status in,</text>
   <text x="803" y="456" text-anchor="start" font-size="11" fill="#e65100">current limits out</text>
 
