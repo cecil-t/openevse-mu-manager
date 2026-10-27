@@ -31,6 +31,15 @@ You can start with just the web app and add the other parts when you need them.
 
 Only the web site (the web app and the collector's receiver) needs to be reachable from the internet, and only if you want to use it away from home. The broker and coordinator stay on your home network.
 
+## More than one garage
+
+It's built for a home with a few chargers, but the same setup works for a small fleet, a shared building or a campus:
+
+- **Several load groups.** Each group shares its own supply, such as one panel, feeder or building, and is balanced on its own. A group with a capacity of 999 isn't limited, so you can use it just to organize units and decide who sees them.
+- **Several locations.** The units can be anywhere the server can reach over the network, for example through a VPN between sites.
+- **Several users.** Each login is an admin, who can see and change everything, or a viewer, who can only look. You can limit a viewer to the units in chosen load groups.
+- **View-only links.** Share a status page without giving out a login.
+
 License: MIT (see LICENSE). The bundled PHPMailer keeps its own license (LGPL 2.1).
 
 OpenEVSE's own API documents: the [HTTP developer guide (WiFi 2.x, PDF)](https://github.com/OpenEVSE/ESP8266_WiFi_v2.x/raw/master/Developers_Guides/Developers%20Guide_HTTP.pdf)
