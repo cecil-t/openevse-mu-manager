@@ -78,7 +78,10 @@ table.stats td:first-child form.inl button.chip{margin:0 0 0 8px}
 .slidecontainer .slidebox .pf button.pbtn{margin:0 0 0 4px}
 #pop_info .slidebox{text-align:left}
 /* page card: index.php's card; the table keeps its own width (max 300px) centred in it */
-#ucard table.stats{margin-top:7px;text-align:left}
+#ucard table.stats{margin-top:7px;text-align:left;max-width:320px}
+#ucard table.stats th{text-align:center}
+/* desktop / Tesla (style.css zooms these to 150%): the table fills the card */
+@media screen and (min-width:1024px){#ucard table.stats{max-width:none}}
 /* phones under 360px: a little less card padding so the longest state still fits on one line */
 @media (max-width:359px){#ucard{padding:10px 4px}}
 table.stats tr.g td{border-top:2px solid #9a9a9a}
