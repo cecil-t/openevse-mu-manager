@@ -38,7 +38,7 @@ It's built for a home with a few chargers, but the same setup works for a small 
 - **Several load groups.** Each group shares its own supply, such as one panel, feeder or building, and is balanced on its own. A group with a capacity of 999 isn't limited, so you can use it just to organize units and decide who sees them.
 - **Several locations.** The units can be anywhere the server can reach over the network, for example through a VPN between sites.
 - **Several users.** Each login is an admin, who can see and change everything, or a viewer, who can only look. You can limit a viewer to the units in chosen load groups.
-- **View-only links.** Share a status page without giving out a login.
+- **View-only links.** Share a status page without giving out a login, for example on a status monitor display.
 
 License: MIT (see LICENSE). The bundled PHPMailer keeps its own license (LGPL 2.1).
 
