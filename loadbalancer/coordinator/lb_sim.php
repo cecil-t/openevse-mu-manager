@@ -3,8 +3,8 @@
  * Second-by-second simulation of units + cars + the coordinator's decisions
  * (same lb_plan / lb_write_order / lb_hr_step / lb_pause_* as the live coordinator).
  * Used by tests.php only; touches nothing.
- * Model: saved = full rating (opt 'saved' to start from other values); all shares are
- * temporary; a 'full' write saves the rating and re-applies the share at once.
+ * Model: saved = full rating (opt 'saved' for the user's own lower values); all shares are
+ * temporary and capped at the saved value, which is never written (as the coordinator).
  * Car: draws min(own demand, active value); ramps UP at ramp_aps (default 1.5 A/s);
  * follows a LOWER value after lag_s (default 3 s; J1772 allows 5 s).
  * Coordinator: full read every 20 s and 2 s after a state change (MQTT), amps every 5 s
@@ -71,7 +71,7 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 		$in = []; $pausable = [];
 		foreach ($ratings as $id => $r) {
 			$pausable[$id] = !$plugged[$id] && $awake[$id];
-			$in[] = ['id'=>$id, 'rating'=>$r, 'plugged'=>lb_effective_plugged($plugged[$id], $paused[$id] ? 255 : ($awake[$id] ? 1 : 254), $paused[$id]), 'plug_since'=>$plugSince[$id] ?? null, 'prio'=>null, 'setting'=>$live[$id], 'cap'=>$hr[$id]['cap'] ?? null, 'charging'=>$charging[$id]];
+			$in[] = ['id'=>$id, 'rating'=>min($r, $saved[$id]), 'plugged'=>lb_effective_plugged($plugged[$id], $paused[$id] ? 255 : ($awake[$id] ? 1 : 254), $paused[$id]), 'plug_since'=>$plugSince[$id] ?? null, 'prio'=>null, 'setting'=>$live[$id], 'cap'=>$hr[$id]['cap'] ?? null, 'charging'=>$charging[$id]];
 		}
 		$sf = lb_sleep_free(array_keys(array_filter($awake, function($a){ return !$a; })), $limit, !empty($opt['sleep_free']));
 		foreach ($in as $k => $u) $in[$k]['sleepfree'] = in_array($u['id'], $sf, true);

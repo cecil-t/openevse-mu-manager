@@ -7,8 +7,8 @@
  * over the web with the site's checked helpers (tagged RAPI with retries on WiFi
  * 2.x, the JSON API on v4/v5). Works out each group's split (lb_core.php) and,
  * in live mode, sets each unit's share as a TEMPORARY current (2.x '$SC N V',
- * v5 our claim) with every unit's SAVED current at its full rating (OpenEVSE as
- * designed). Lower values first, each write confirmed by a
+ * v5 our claim), never above the unit's SAVED current, which is the user's
+ * (unit page) and never written here. Lower values first, each write confirmed by a
  * read of the active value. A unit that restarted (MQTT "connected", or its
  * active value back at saved while its share is lower) gets its share again at
  * once. Idle pause: see lb_core.php. In dry-run mode it only logs.
@@ -81,7 +81,6 @@ function lb_load_config(){
 // write guards: every write the coordinator makes goes through one of these
 function lb_claim_send($unit, $props){ if (!lb_write_allowed($unit)) { lb_log("REFUSED claim for u{$unit['id']} (monitored only, not in a load group)"); return ['ok'=>false, 'msg'=>'refused (monitor only)']; } return evse_claim($unit, $props); }
 function lb_claim_release($unit){ if (!lb_write_allowed($unit)) { lb_log("REFUSED claim release for u{$unit['id']} (monitored only)"); return ['ok'=>false, 'msg'=>'refused (monitor only)']; } return evse_release_claim($unit); }
-function lb_save_current($unit, $a){ if (!lb_write_allowed($unit)) { lb_log("REFUSED saved current for u{$unit['id']} (monitored only)"); return ['ok'=>false, 'msg'=>'refused (monitor only)']; } return evse_set_current($unit, $a); }
 
 // One unit's read as a generator for evse_par_run (all units in parallel).
 // -> ['ok','api','plugged','state','charging','amps','setting']
@@ -167,8 +166,9 @@ function lb_read_saved($unit){
 	if (!is_string($gc) || $gc === 'Error') return null;
 	$t = preg_split('/\s+/', trim($gc)); return count($t) == 4 ? (int)$t[3] : null;
 }
-// unit's rating for the split: its breaker, never above its hardware max
-function lb_rating($id){ global $units, $state; $b = (int)$units[$id]['breaker']; $h = (int)($state['units'][$id]['hmax'] ?? 0); return $h > 0 ? min($b ?: $h, $h) : $b; }
+// unit's rating for the split: its Max current (Settings), never above its hardware max or the
+// user's saved current on the unit (unit page). The saved current is never written here.
+function lb_rating($id){ global $units, $state; $b = (int)$units[$id]['breaker']; $h = (int)($state['units'][$id]['hmax'] ?? 0); $r = $h > 0 ? min($b ?: $h, $h) : $b; $s = (int)($state['units'][$id]['saved'] ?? 0); return $s >= 6 ? min($r ?: $s, $s) : $r; }
 
 // ---------------------------------------------------------------- main
 $mq = null; $mqTopics = [];
@@ -342,7 +342,7 @@ while (true) {
 			unset($us);
 		}
 		if ($DRY) continue;
-		// LIVE writes: lowers first; raises (and 'full' = save the rating, then the share again at once)
+		// LIVE writes (temporary only, never the saved current): lowers first, then raises
 		// wait 5 s after the last lower, a raise at most every 30 s per unit
 		$lowered = false; $skipped = false;
 		foreach ($p['writes'] as [$id, $from, $to, $kind]) {
@@ -353,9 +353,7 @@ while (true) {
 			if (evse_is_http($u)) {
 				$props = (!empty($state['units'][$id]['lb_paused']) ? ['state'=>'disabled'] : []) + ['charge_current'=>(int)$to, 'max_current'=>(int)$to, 'auto_release'=>false];
 				$res1 = lb_claim_send($u, $props); $msg = $res1['msg'];
-				if ($kind === 'full' && !empty($res1['ok'])) { $res2 = lb_save_current($u, $R); $msg .= '; saved ' . $R . ' A: ' . $res2['msg']; }
 			} else {
-				if ($kind === 'full') { $res2 = lb_rapi_send($u, '$SC ' . $R, 'Save current'); $msg = $res2['msg'] . '; '; }
 				$res1 = lb_rapi_send($u, '$SC ' . (int)$to . ' V', 'Set current (temporary)'); $msg .= $res1['msg'];
 			}
 			$conf = lb_read_setting($u, (int)$to);
@@ -410,8 +408,13 @@ function lb_hr_feed($id, $now){
 	$alloc = $us['plan_target'] ?? null;          // dry run: what we WOULD have set
 	if (!$DRY && isset($us['setting'])) $alloc = $us['setting'];   // live: the unit's confirmed current
 	$charging = !empty($r['charging']) && !empty($r['plugged']);
-	if (!$charging && empty($us['hr'])) return null;
-	[$us['hr'], $ev] = lb_hr_step($us['hr'] ?? [], ['charging'=>$charging, 'amps'=>$r['amps'], 'alloc'=>$alloc], $now);
+	// a car plugged in but not asking for current (full / waiting) is fed as drawing 0 A, so the
+	// normal low-draw rule caps it and frees its share; it claws back when it starts drawing.
+	// Not for units asleep/disabled on their schedule (254/255) or paused by us.
+	$idlePlug = !$charging && !empty($r['plugged']) && !in_array((int)($r['state'] ?? 0), [254, 255], true) && empty($us['lb_paused']);
+	$feed = $charging || $idlePlug;
+	if (!$feed && empty($us['hr'])) return null;
+	[$us['hr'], $ev] = lb_hr_step($us['hr'] ?? [], ['charging'=>$feed, 'amps'=>$charging ? $r['amps'] : (float)($r['amps'] ?? 0), 'alloc'=>$alloc], $now);
 	if ($ev) lb_log(($DRY ? 'test mode: ' : '') . lb_hr_event_text($id, $units[$id]['name'], $ev));
 	return $ev;
 }

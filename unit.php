@@ -226,7 +226,7 @@ $CAN = oev_can_control();   // false: view only (no popups that change things)
 	<div class="pt">Saved current</div><form method="post" action="action.php"><?=$hidden?><input type="hidden" name="action" value="current">
 	<span>Saved:</span> <span id="pilotValue" style="font-weight:bold;color:red"><?=h($pcur)?></span> A &middot; <span id="pilotkW"></span> kW<br /><br />
 	<input type="range" min="<?=$pmin?>" max="<?=$pmax?>" value="<?=h($pcur)?>" class="slider" id="pilotRange" name="amps" /><br />
-	<?=$sbtn?></form><div class="pn">Saved in the unit (kept after a restart).<?=$inlg ? ' In a load group: the balancer sets a temporary value below it, shown in parentheses, and keeps this at the unit\'s rating.' : ''?></div><div class="pclose"><a href="javascript:void(0);" onclick="closePop(this)">Close</a></div>
+	<?=$sbtn?></form><div class="pn">Saved in the unit (kept after a restart). This is the most this unit will charge at, up to its Max current in Settings (<?=(int)$unit['breaker']?> A).<?=$inlg ? ' In a load group, the balancer may set a lower temporary value, shown in parentheses.' : ''?></div><div class="pclose"><a href="javascript:void(0);" onclick="closePop(this)">Close</a></div>
 </div></div>
 <div id="settimer" class="slidecontainer" onclick="closePop(this);"><div class="slidebox" onclick="event.stopPropagation();">
 	<div class="pt">Start / Stop schedule</div><form method="post" action="action.php"><?=$hidden?><input type="hidden" name="action" value="timer">
@@ -271,7 +271,7 @@ function askForm(f, msg){ ask('Confirm', [msg], function(){ f.submit(); }); retu
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
 // Same light as the home page: green live, amber late or a failed fetch, red load balancer down (values from page load)
 (function(){
-	var V = <?=(int)$e['volts']?>, dot = OEVLive.dot;
+	var V = <?=(int)$e['volts']?>, dot = OEVLive.dot, pageAt = <?=time()?>;   // this page read the unit itself at pageAt
 	if (document.getElementById('lbdot').className.indexOf(' x') >= 0) return;   // no load balancer data for this unit
 	function $(id){ return document.getElementById(id); }
 	function ago(s){ return s === null ? '\u2014' : (s < 120 ? s + ' s ago' : (s < 7200 ? Math.round(s / 60) + ' min ago' : (s / 3600).toFixed(1) + ' h ago')); }
@@ -282,11 +282,15 @@ function askForm(f, msg){ ask('Confirm', [msg], function(){ f.submit(); }); retu
 		if (!j.fresh) { dot('r', 'Load balancer down: values from page load'); return; }
 		if (!u.ok) { dot('a', 'The load balancer has no reply from this unit: values from page load'); return; }
 		liveOK = true;
+		// the load balancer's last read of this unit is older than this page's own read (e.g. right after a save): keep the page's state and pilot until it reads again
+		var newer = u.read !== null && u.read !== undefined && j.now - u.read >= pageAt;
+		if (newer) {
 		var st = $('v_st'); st.textContent = u.pill; $('v_state').title = u.pill_title;
 		$('v_plug').style.display = u.plugged ? '' : 'none';
 		document.querySelectorAll('#r_head th').forEach(function(th){ th.className = u.paused ? 's254' : u.pill_cls; });
 		var asl = u.code == 254 || u.code == 255; $('b_wake').style.display = asl ? '' : 'none'; $('b_sleep').style.display = asl ? 'none' : '';
 		if (u.label) { var t = u.label + ((u.saved !== null && u.setting < u.saved) ? ' / ' + u.saved + ' A' : '') + ' \u00b7 ' + (u.setting * V / 1000).toFixed(1) + ' kW'; $('v_pilot').textContent = t; $('v_pilot').title = u.label_title; }
+		}
 		if (u.amps !== null) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
 		$('v_age').textContent = ago(u.checkin);
 		if (u.stale) dot('a', 'No MQTT check-in for ' + ago(u.checkin).replace(' ago', ''));

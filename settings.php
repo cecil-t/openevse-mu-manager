@@ -135,6 +135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$em = in_array($P('emon'), array('none', 'internal', 'external'), true) ? $P('emon') : 'internal';
 		if ($name === '' || $url === '') back('units', 'Each unit needs a name and an address that works (for example 192.168.1.120).', $id ? "u$id" : 'add');
 		if ($brk < 6 || $brk > 80) back('units', 'Max current must be between 6 and 80 A.', $id ? "u$id" : 'add');
+		if ($hw && $brk > $hw && $old && $en) {   // the stored hardware max may be stale (the unit moved to another circuit): ask the unit
+			require_once __DIR__ . '/include_v5.php'; require_once __DIR__ . '/cap_lib.php';
+			$x = oev_cap_read(oev_unit_row($old)); if ($x['ok'] && $x['hw']) $hw = $x['hw'];
+		}
 		if ($hw && $brk > $hw) back('units', "Max current can't be more than the unit's own maximum ($hw A).", $id ? "u$id" : 'add');
 		$user = $P('username');
 		$pass = $old ? (string)$old['password'] : '';
@@ -147,6 +151,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($old) { $db->prepare('UPDATE evses SET name=?, evseurl=?, breaker=?, username=?, password=?, enabled=?, loadgroupid=?, emon_mode=?, emon_ext_server=?, emon_ext_node=?, emon_ext_key=?, voltmeter=?, hw_max=? WHERE id = ?')->execute(array_merge($f, array($id))); }
 		else { $db->prepare('INSERT INTO evses (name, evseurl, breaker, username, password, enabled, loadgroupid, emon_mode, emon_ext_server, emon_ext_node, emon_ext_key, voltmeter, hw_max) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($f); $id = (int)$db->lastInsertId(); }
 		$msgs = array('Saved.');
+		// the unit's own saved current is never above Max current; also refreshes hw_max (cap_lib.php)
+		if ($en) {
+			require_once __DIR__ . '/include_v5.php'; require_once __DIR__ . '/cap_lib.php';
+			$st = $db->prepare('SELECT * FROM evses WHERE id = ?'); $st->execute(array($id));
+			$cx = oev_cap_enforce(oev_unit_row($st->fetch()), $db);
+			if ($cx['from'] === null) $msgs[] = "Couldn't reach the unit to check its saved current. The site checks it again within 10 minutes.";
+			elseif ($cx['msg'] !== '') $msgs[] = $cx['msg'];
+		}
 		$og = $old ? (int)$old['loadgroupid'] : 0;
 		if (!$og && $gid) { queue('mqtt_on', $id); $msgs[] = 'Joining a load group: MQTT will be set up on the unit within a minute.'; }
 		elseif ($og && !$gid) { queue('mqtt_off', $id); $msgs[] = 'Leaving the load group: MQTT will be turned off on the unit within a minute.'; }

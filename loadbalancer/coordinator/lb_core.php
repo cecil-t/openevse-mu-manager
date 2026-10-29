@@ -2,8 +2,9 @@
 /******************************************************************************
  * Load-balance split + headroom + idle pause (pure functions, no I/O - tested in tests.php).
  *
- * OpenEVSE as designed: every unit's SAVED (EEPROM) current
- * is its full rating; all balancing is TEMPORARY: WiFi 2.x / RAPI '$SC N V'
+ * OpenEVSE as designed: every unit's SAVED (EEPROM) current is the user's max
+ * (unit page, never above Max current in Settings) and is never written by the
+ * balancer; a unit's rating = min(saved, Max current, hw max); all balancing is TEMPORARY: WiFi 2.x / RAPI '$SC N V'
  * (the controller won't take a temporary value above the saved one, $GC shows
  * min / hw max / active / saved), v5 a claim (charge_current = max_current = N).
  * Accepted risk: a controller that restarts (power cut) comes back at its saved
@@ -142,7 +143,7 @@ function lb_plan($limit, array $units){
 	$rt = []; foreach ($units as $u) $rt[$u['id']] = max(LB_MIN_AMPS, (int)$u['rating']);
 	foreach ($sp['units'] as $id => $x) {
 		$x += ['lbpause'=>false, 'sleepfree'=>false];
-		$x['saved'] = $rt[$id];                                          // saved = full rating, always
+		$x['saved'] = $rt[$id];                                          // the unit's cap (rating, which includes its saved current)
 		$x['temp'] = ($x['target'] !== null && $x['target'] < $rt[$id]); // active value below the saved one
 		$saved += $rt[$id];
 		$plan[$id] = $x;
@@ -186,19 +187,15 @@ function lb_pause_arm(array $h, $want, $now){
 
 // Writes to reach the plan: lower values first, then raises. All shares are temporary.
 // $live = active value per unit, $saved = saved value (null = unknown), $rating, $charging.
-// A unit whose saved value is below its rating gets one 'full' op (save the rating, then
-// re-apply its share at once); done with the raises, and on a charging unit only when its
-// share needs more than the saved value (on 2.x saving sets the active value too, ~0.1 s).
-// Returns [[id, from, to, 'temp'|'full'], ...].
+// The saved value is the user's (unit page) and is never written here: $rating already
+// includes it (lb_rating), so every share is at or below it. $saved/$charging are unused.
+// Returns [[id, from, to, 'temp'], ...].
 function lb_write_order(array $plan, array $live, array $saved = [], array $rating = [], array $charging = []){
 	$down = []; $up = [];
 	foreach ($plan['units'] as $id => $p) {
 		if ($p['target'] === null || !array_key_exists($id, $live) || $live[$id] === null) continue;
 		$cur = (int)$live[$id]; $t = (int)$p['target'];
-		$sv = $saved[$id] ?? null; $r = $rating[$id] ?? null;
-		$full = ($sv !== null && $r !== null && (int)$sv < (int)$r && ($t > (int)$sv || empty($charging[$id])));
 		if ($t < $cur) $down[] = [$id, $cur, $t, 'temp'];
-		if ($full) $up[] = [$id, min($cur, $t), $t, 'full'];
 		elseif ($t > $cur) $up[] = [$id, $cur, $t, 'temp'];
 	}
 	return array_merge($down, $up);

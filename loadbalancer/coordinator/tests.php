@@ -34,9 +34,9 @@ $o = lb_write_order(lb_plan(80, [u(1,true,1,48,34,null,7),u(3,true,2),u(4,false)
 check('write order: cut first, then raises (all temporary)', $o == [[1,34,7,'temp'],[3,34,48,'temp'],[4,6,12,'temp'],[5,6,13,'temp']], json_encode($o));
 $o = lb_write_order(lb_plan(80, [u(1,true,1,48,48),u(3,true,2,48,6),u(4,false,null,48,48)]), [1=>48,3=>6,4=>48], [1=>48,3=>48,4=>48], [1=>48,3=>48,4=>48]);
 check('write order lowers first', $o == [[1,48,37,'temp'],[4,48,6,'temp'],[3,6,37,'temp']], json_encode($o));
-// going to "saved = full rating" from example saved shares (unit 1 34, unit 3 27, unit 4 6, unit 5 6): shares first, saved raised with the raises
+// user saved values below the rating (unit 1 34, unit 3 27, unit 4 6, unit 5 6): the balancer never raises them
 $o = lb_write_order(lb_plan(80, [u(1,true,1,48,34),u(3,true,2,48,27),u(4,false,null,24,6),u(5,false,null,48,6)]), [1=>34,3=>27,4=>6,5=>6], [1=>34,3=>27,4=>6,5=>6], [1=>48,3=>48,4=>24,5=>48], [1=>true,3=>true]);
-check('to full saved: idle units saved at once, charging ones only when their share needs it; lowers first', $o == [[3,27,34,'full'],[4,6,6,'full'],[5,6,6,'full']], json_encode($o));
+check('saved values below the rating are never raised (no write ops for them)', !array_filter($o, function($w){ return $w[3] !== 'temp'; }), json_encode($o));
 $o = lb_write_order(lb_plan(80, [u(1,true,1,48,34),u(3,true,2,48,34),u(4,false,null,24,6),u(5,false,null,48,6)]), [1=>34,3=>34,4=>6,5=>6], [1=>34,3=>48,4=>24,5=>48], [1=>48,3=>48,4=>24,5=>48], [1=>true,3=>true]);
 check('charging unit whose share fits under its saved value: saved left for later (no 0.1 s pilot jump)', $o == [], json_encode($o));
 echo "== headroom state machine\n";
@@ -137,7 +137,8 @@ check('one car leaves: condition ends, idle units resumed (after 60 s), car alon
 $p3 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['sleep'=>[5=>99999]]);
 check('a unit asleep on its schedule is never paused', !in_array(5, $p3['final_paused']) && in_array(4, $p3['final_paused']), 'paused ' . json_encode($p3['final_paused']));
 $p4 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 600, ['saved'=>[1=>34, 3=>27, 4=>6, 5=>6], 'start'=>[1=>34, 3=>27, 4=>6, 5=>6]]);
-check('from example saved shares to full saved: never over 80 A, saved end at 48', $p4['over_s'] == 0 && $p4['max_live'] <= 80 && $p4['final_saved'] == [1=>48, 3=>48, 4=>48, 5=>48], 'saved ' . json_encode($p4['final_saved']) . ' live ' . json_encode($p4['final_live']));
+$capd = true; foreach ($p4['final_live'] as $id => $v) if ($v > [1=>34, 3=>27, 4=>6, 5=>6][$id]) $capd = false;
+check('user saved values (34/27/6/6) are kept and every share stays at or below them, never over 80 A', $p4['over_s'] == 0 && $p4['max_live'] <= 80 && $p4['final_saved'] == [1=>34, 3=>27, 4=>6, 5=>6] && $capd, 'saved ' . json_encode($p4['final_saved']) . ' live ' . json_encode($p4['final_live']));
 echo "== monitored units (not in a load group): reads only\n";
 $mu = ['id'=>2, 'monitor'=>true]; $gu = ['id'=>1];
 $bad = array_filter(['$SC 12', '$SC 12 V', '$FD', '$FE', '$FS', '$ST 0 0 8 30', '$FR'], function($c) use ($mu){ return lb_cmd_allowed_for($mu, $c); });
@@ -145,7 +146,7 @@ check('monitored unit: every write refused ($SC, $SC V, $FD, $FE, ...)', !$bad &
 check('monitored unit: reads allowed ($GE $GS $GG $GC)', lb_cmd_allowed_for($mu, '$GE') && lb_cmd_allowed_for($mu, '$GS') && lb_cmd_allowed_for($mu, '$GG') && lb_cmd_allowed_for($mu, '$GC'));
 check('grouped unit: writes still allowed ($SC 20 V, $FD)', lb_write_allowed($gu) && lb_cmd_allowed_for($gu, '$SC 20 V') && lb_cmd_allowed_for($gu, '$FD'));
 $src = file_get_contents(__DIR__ . '/coordinator.php');
-check('coordinator: claim / release / saved-current only inside the write guards', substr_count($src, 'evse_claim(') == 1 && substr_count($src, 'evse_release_claim(') == 1 && substr_count($src, 'evse_set_current(') == 1 && substr_count($src, 'lb_rapi_send(') >= 2 && !preg_match('/\brapi\(\$u(nit)?, *.\$(SC|FD|FE|FS)/', $src));
+check('coordinator: claim / release only inside the write guards; never writes the saved current', substr_count($src, 'evse_claim(') == 1 && substr_count($src, 'evse_release_claim(') == 1 && substr_count($src, 'evse_set_current(') == 0 && !preg_match('/\'\$SC \' \. \$R\b/', $src) && substr_count($src, 'lb_rapi_send(') >= 2 && !preg_match('/\brapi\(\$u(nit)?, *.\$(SC|FD|FE|FS)/', $src));
 echo "== sleep-free (asleep on its schedule: holds 6 A, not counted, while MQTT is up; max 10 % of the limit)\n";
 $sfu = function($id, $chg, $sf = false){ return ['id'=>$id,'rating'=>48,'plugged'=>$chg,'plug_since'=>$chg ? $id : null,'prio'=>null,'setting'=>20,'cap'=>null,'charging'=>$chg,'sleepfree'=>$sf]; };
 t('car A + car B (heater) capped 28, unit 5 asleep free, unit 4 paused: car A 48 (was 46)', 80, [$sfu(1,true), array_merge($sfu(3,true), ['cap'=>28]), $sfu(4,false)+['lbpause'=>true], $sfu(5,false,true)], [1=>48,3=>28,4=>'P6',5=>6]);
@@ -162,5 +163,13 @@ check('worst case (car draws the second its unit wakes): over at most 6 A for a 
 $zb = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 900, ['sleep'=>[5=>99999], 'sleep_free'=>true]);
 check('2 cars, unit 5 asleep (free), unit 4 paused: cars get 40/40 (was 37/37)', $zb['final_live'][1] + $zb['final_live'][3] == 80 && $zb['over_s'] == 0, json_encode($zb['final_live']) . ' paused ' . json_encode($zb['final_paused']));
 if ($V) { echo "\n-- simulated dry-run log (taper + sudden ramp-up):\n"; foreach ($s2['log'] as $l) echo "  $l\n"; echo "\n-- outage:\n"; foreach ($s3['log'] as $l) echo "  $l\n"; echo "\n-- schedule wake 00:00 / 00:05 (sim 00:30:00 = midnight):\n"; foreach ($s6['log'] as $l) echo "  $l\n"; echo "\n-- both wake in the same second:\n"; foreach ($s7['log'] as $l) echo "  $l\n"; echo "\n-- staggered 40/32/28:\n"; foreach ($a5['log'] as $l) echo "  $l\n"; }
+// plugged in but not charging: fed as 0 A -> capped at 6 A after grace/2 min, lifted when it starts drawing
+$h = []; $cutAt = null; $clawAt = null;
+for ($s = 0; $s <= 600; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'amps'=>0.0, 'alloc'=>37], $s); if ($ev && $ev[0] == 'cut' && $cutAt === null) $cutAt = $s; }
+check('plugged, not charging: capped at 6 A after timeout', $h['cap'] === 6 && $cutAt !== null && $cutAt >= 120 && $cutAt <= 200, "cap {$h['cap']} at {$cutAt}s");
+for ($s = 605; $s <= 700; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'amps'=>5.8, 'alloc'=>6], $s); if ($ev && $ev[0] == 'claw' && $clawAt === null) $clawAt = $s; }
+check('plugged, starts charging: cap lifted promptly', $h['cap'] === null && $clawAt !== null && $clawAt - 605 <= 30, "lifted at +" . ($clawAt - 605) . "s");
+$sp = lb_split(80, [['id'=>1,'rating'=>48,'plugged'=>true,'cap'=>null,'setting'=>37], ['id'=>3,'rating'=>48,'plugged'=>true,'cap'=>6,'setting'=>37], ['id'=>5,'rating'=>48,'plugged'=>false,'setting'=>6]], true);
+check('idle plugged car capped at 6: charging car gets its 48 A saved', $sp['units'][1]['target'] == 48 && $sp['units'][3]['target'] == 6 && $sp['total'] <= 80, json_encode(array_map(function($u){return $u['target'];}, $sp['units'])));
 echo $fail ? "$fail FAILED\n" : "all passed\n";
 exit($fail ? 1 : 0);
