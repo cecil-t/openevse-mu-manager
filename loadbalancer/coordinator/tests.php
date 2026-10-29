@@ -171,5 +171,14 @@ for ($s = 605; $s <= 700; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>tru
 check('plugged, starts charging: cap lifted promptly', $h['cap'] === null && $clawAt !== null && $clawAt - 605 <= 30, "lifted at +" . ($clawAt - 605) . "s");
 $sp = lb_split(80, [['id'=>1,'rating'=>48,'plugged'=>true,'cap'=>null,'setting'=>37], ['id'=>3,'rating'=>48,'plugged'=>true,'cap'=>6,'setting'=>37], ['id'=>5,'rating'=>48,'plugged'=>false,'setting'=>6]], true);
 check('idle plugged car capped at 6: charging car gets its 48 A saved', $sp['units'][1]['target'] == 48 && $sp['units'][3]['target'] == 6 && $sp['total'] <= 80, json_encode(array_map(function($u){return $u['target'];}, $sp['units'])));
+// idle-plug cap lifted the moment the unit really starts charging (no 15 s wait), even at a high draw
+$h = [];
+for ($s = 0; $s <= 400; $s += 5) [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'real'=>false, 'amps'=>0.0, 'alloc'=>37], $s);
+check('idle-plug cut marks idle_cap', $h['cap'] === 6 && !empty($h['idle_cap']));
+[$h, $ev] = lb_hr_step($h, ['charging'=>true, 'real'=>true, 'amps'=>23.0, 'alloc'=>6], 401);
+check('idle-capped unit starts charging: cap lifted on the first reading', $h['cap'] === null && $ev && $ev[0] == 'claw' && empty($h['idle_cap']), json_encode($ev));
+$h = [];
+for ($s = 0; $s <= 400; $s += 5) [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'real'=>true, 'amps'=>3.2, 'alloc'=>34], $s);
+check('low-draw cap of a charging car is not an idle cap', $h['cap'] !== null && empty($h['idle_cap']));
 echo $fail ? "$fail FAILED\n" : "all passed\n";
 exit($fail ? 1 : 0);

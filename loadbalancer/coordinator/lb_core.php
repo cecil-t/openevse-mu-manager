@@ -213,6 +213,12 @@ function lb_hr_step(array $h, array $in, $now){
 		return [['cap'=>null, 'charge_start'=>null, 'last_raise'=>$h['last_raise'], 'last_cut'=>$h['last_cut'], 'last_up'=>$h['last_up'], 'below_since'=>null, 'near_since'=>null], $ev];
 	}
 	if ($h['charge_start'] === null) $h['charge_start'] = $now;
+	// capped while plugged in but NOT charging (idle-plug rule): it is charging now, lift at once
+	if (!empty($in['real']) && !empty($h['idle_cap']) && $h['cap'] !== null) {
+		$ev = ['claw', $h['cap'], (float)($in['amps'] ?? 0)];
+		$h['cap'] = null; $h['idle_cap'] = false; $h['near_since'] = null; $h['below_since'] = null; $h['last_up'] = $now; $h['last_raise'] = $now;
+		return [$h, $ev];
+	}
 	if ($in['amps'] === null || $in['alloc'] === null) return [$h, null];
 	$a = (float)$in['amps'];
 	// claw back: pushing against its cap
@@ -235,7 +241,7 @@ function lb_hr_step(array $h, array $in, $now){
 		$new = max(LB_MIN_AMPS, (int)ceil($a + max($H['margin_a'], $H['margin_pct'] * $a)));
 		if ($ref - $new >= $H['ignore_a']) {
 			$ev = ['cut', $ref, $new, $a];
-			$h['cap'] = $new; $h['last_cut'] = $now; $h['below_since'] = null; $h['near_since'] = null;
+			$h['cap'] = $new; $h['idle_cap'] = (isset($in['real']) && !$in['real']); $h['last_cut'] = $now; $h['below_since'] = null; $h['near_since'] = null;
 			return [$h, $ev];
 		}
 	}

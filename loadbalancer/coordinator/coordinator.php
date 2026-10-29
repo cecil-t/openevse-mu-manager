@@ -209,7 +209,7 @@ while (true) {
 				$state['units'][$id]['mqtt_seen'] = $now;
 				if ($k === '' && $msg === 'connected') { $dirty[$id] = $now + 2; $state['units'][$id]['mqtt_boot'] = $now; lb_log("u$id: MQTT reconnected (restart or WiFi): checking" . ($DRY ? '' : ' and re-sending its setting')); }
 				if ($k === '' && $msg === 'disconnected') lb_log("u$id: MQTT disconnected");
-				if ($k === 'state' || $k === 'vehicle') { $prev = $state['units'][$id]["mq_$k"] ?? null; $state['units'][$id]["mq_$k"] = $msg; if ($prev !== null && $prev !== $msg) $dirty[$id] = ($k === 'state' && !empty($state['units'][$id]['sleepfree'])) ? $now : $now + 2; }   // a sleep-free unit waking: no 2 s debounce (its 6 A were lent out)
+				if ($k === 'state' || $k === 'vehicle') { $prev = $state['units'][$id]["mq_$k"] ?? null; $state['units'][$id]["mq_$k"] = $msg; if ($prev !== null && $prev !== $msg) $dirty[$id] = ($k === 'state' && (!empty($state['units'][$id]['sleepfree']) || ($msg === '3' && !empty($state['units'][$id]['hr']['idle_cap'])))) ? $now : $now + 2; }   // idle-capped unit starting to charge: no debounce either   // a sleep-free unit waking: no 2 s debounce (its 6 A were lent out)
 				if ($k === 'amp') $state['units'][$id]['mq_amp'] = round((float)$msg / 1000, 1);
 				// pilot above its share (controller restarted at its saved value?): read + re-apply now
 				if ($k === 'pilot' && is_numeric($msg) && isset($state['units'][$id]['plan_target']) && $state['units'][$id]['plan_target'] !== null && (int)$msg > (int)$state['units'][$id]['plan_target'] && empty($state['units'][$id]['lb_paused'])) {
@@ -414,7 +414,7 @@ function lb_hr_feed($id, $now){
 	$idlePlug = !$charging && !empty($r['plugged']) && !in_array((int)($r['state'] ?? 0), [254, 255], true) && empty($us['lb_paused']);
 	$feed = $charging || $idlePlug;
 	if (!$feed && empty($us['hr'])) return null;
-	[$us['hr'], $ev] = lb_hr_step($us['hr'] ?? [], ['charging'=>$feed, 'amps'=>$charging ? $r['amps'] : (float)($r['amps'] ?? 0), 'alloc'=>$alloc], $now);
+	[$us['hr'], $ev] = lb_hr_step($us['hr'] ?? [], ['charging'=>$feed, 'real'=>$charging, 'amps'=>$charging ? $r['amps'] : (float)($r['amps'] ?? 0), 'alloc'=>$alloc], $now);
 	if ($ev) lb_log(($DRY ? 'test mode: ' : '') . lb_hr_event_text($id, $units[$id]['name'], $ev));
 	return $ev;
 }
