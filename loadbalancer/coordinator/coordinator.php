@@ -53,7 +53,9 @@ function lb_state_load(){ global $RUN; $s = @json_decode((string)@file_get_conte
 function lb_state_save($s){ global $RUN, $ONCE; if ($ONCE) return; $t = "$RUN/state.json.tmp"; file_put_contents($t, json_encode($s)); rename($t, "$RUN/state.json"); }
 // plug / unplug seen here (MQTT-triggered reads) for the session logger: a quick swap can fall
 // between its 30-s readings. One JSON line each; collector.php reads it (sess_apply_plug_events).
-function lb_plug_event($id, $kind, $ts){ global $RUN, $ONCE; if ($ONCE) return; $f = "$RUN/plug_events.jsonl"; if (@filesize($f) > 1048576) @rename($f, "$f.1"); file_put_contents($f, json_encode(['unit'=>(int)$id, 'ts'=>$ts, 'kind'=>$kind]) . "\n", FILE_APPEND | LOCK_EX); }
+// Also charge start/stop (same reads), faults (MQTT state 4-11, even brief ones) and MQTT
+// reconnects/drops (restart or WiFi gap).
+function lb_plug_event($id, $kind, $ts, array $extra = []){ global $RUN, $ONCE; if ($ONCE) return; $f = "$RUN/plug_events.jsonl"; if (@filesize($f) > 1048576) @rename($f, "$f.1"); file_put_contents($f, json_encode(['unit'=>(int)$id, 'ts'=>$ts, 'kind'=>$kind] + $extra) . "\n", FILE_APPEND | LOCK_EX); }
 function lb_write_json($name, $data){ global $RUN; $t = "$RUN/$name.tmp"; file_put_contents($t, json_encode($data, JSON_PRETTY_PRINT)); rename($t, "$RUN/$name"); }
 
 // Groups and their units from the site's database (read-only); unit secrets stay in memory.
@@ -210,8 +212,9 @@ while (true) {
 				if (!preg_match('#^' . preg_quote($cfg['mqtt_prefix'], '#') . '/u(\d+)(?:/(.*))?$#', $topic, $m)) continue;
 				$id = (int)$m[1]; $k = $m[2] ?? '';
 				$state['units'][$id]['mqtt_seen'] = $now;
-				if ($k === '' && $msg === 'connected') { $dirty[$id] = $now + 2; $state['units'][$id]['mqtt_boot'] = $now; lb_log("u$id: MQTT reconnected (restart or WiFi): checking" . ($DRY ? '' : ' and re-sending its setting')); }
-				if ($k === '' && $msg === 'disconnected') lb_log("u$id: MQTT disconnected");
+				if ($k === '' && $msg === 'connected') { $dirty[$id] = $now + 2; $state['units'][$id]['mqtt_boot'] = $now; lb_plug_event($id, 'restart', $now); lb_log("u$id: MQTT reconnected (restart or WiFi): checking" . ($DRY ? '' : ' and re-sending its setting')); }
+				if ($k === '' && $msg === 'disconnected') { lb_plug_event($id, 'mqtt_down', $now); lb_log("u$id: MQTT disconnected"); }
+				if ($k === 'state' && is_numeric($msg) && (int)$msg >= 4 && (int)$msg <= 11 && ($state['units'][$id]['mq_state'] ?? null) !== $msg) lb_plug_event($id, 'fault', $now, ['state'=>(int)$msg]);
 				if ($k === 'state' || $k === 'vehicle') { $prev = $state['units'][$id]["mq_$k"] ?? null; $state['units'][$id]["mq_$k"] = $msg; if ($prev !== null && $prev !== $msg) $dirty[$id] = ($k === 'state' && (!empty($state['units'][$id]['sleepfree']) || ($msg === '3' && !empty($state['units'][$id]['hr']['idle_cap'])))) ? $now : $now + 2; }   // idle-capped unit starting to charge: no debounce either   // a sleep-free unit waking: no 2 s debounce (its 6 A were lent out)
 				if ($k === 'amp') $state['units'][$id]['mq_amp'] = round((float)$msg / 1000, 1);
 				// pilot above its share (controller restarted at its saved value?): read + re-apply now
@@ -261,8 +264,11 @@ while (true) {
 			if (!$ONCE && $ps !== null && $r['state'] !== null && $ps !== $r['state'])
 				lb_log("u$id {$u['name']}: state " . lb_state_name($ps) . ' -> ' . lb_state_name($r['state']) . ($ps === 254 ? ' (woke: schedule or manual)' : ($r['state'] === 254 ? ' (asleep: schedule or manual)' : '')) . ($r['plugged'] ? ', car plugged in' : ''));
 			if ($r['state'] !== null) $us['state'] = $r['state'];
+			$real = empty($r['pretend']) && !isset($PRETEND_CHG[$id]);
+			if ($real && $ps === 3 && $r['state'] !== null && $r['state'] !== 3) lb_plug_event($id, 'charge_stop', $now, ['state'=>$r['state']]);
 			if ($r['plugged'] && empty($us['plugged'])) { $us['plug_since'] = $now; if (!$ONCE) lb_log("u$id {$u['name']}: car plugged in"); if (empty($r['pretend'])) lb_plug_event($id, 'plug', $now); }
 			if (!$r['plugged'] && !empty($us['plugged'])) { unset($us['plug_since']); if (!$ONCE) lb_log("u$id {$u['name']}: car unplugged"); lb_plug_event($id, 'unplug', $now); }
+			if ($real && $ps !== null && $ps !== 3 && $r['state'] === 3) lb_plug_event($id, 'charge_start', $now);
 			$us['plugged'] = $r['plugged'];
 			if ($r['setting'] !== null) $us['setting'] = $r['setting'];
 			if ($r['saved'] !== null) $us['saved'] = $r['saved'];

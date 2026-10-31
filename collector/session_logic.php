@@ -381,7 +381,7 @@ function sess_process($db, $unit, $r, $now){
 	if ($segid && !$seg) { $segid = null; }
 
 	// ---- faults: state changes into an error, and counters that moved between polls
-	if ($r['state'] >= 4 && $r['state'] <= 11 && (int)$us['state'] !== $r['state']) {
+	if ($r['state'] >= 4 && $r['state'] <= 11 && (int)$us['state'] !== $r['state'] && !$db->query("SELECT 1 FROM events WHERE unit_id = $uid AND kind = 'fault' AND to_val = {$r['state']} AND ts BETWEEN " . ($now - 180) . " AND $now")->fetchColumn()) {
 		sess_event($db, $unit, $sid, $segid, $now, 'fault', evse_state_text($r['state']), $us['state'], $r['state'], $temp, $r['state'] == 10 ? 'thermal' : 'fault');
 	}
 	foreach (array('gfci'=>'GFCI trip', 'nognd'=>'No-ground trip', 'stuck'=>'Stuck-relay trip') as $k => $label) {
@@ -506,6 +506,11 @@ function sess_process($db, $unit, $r, $now){
 			// first reading that shows charging = charge start (no back-dating)
 			if (!$sess['charge_start_at']) $u['charge_start_at'] = isset($newseg_at) ? $newseg_at : $now;
 			if (isset($newseg_at) && $newseg_at < $now) $u['charge_seconds'] = (int)$sess['charge_seconds'] + ($now - $newseg_at);
+			if (!$prev_charging && $seg && !isset($newseg_at) && (int)$seg['stop_at'] < $now) {   // opened by a coordinator charge_start
+				$lbadd = $now - (int)$seg['stop_at'];
+				$u['charge_seconds'] = (int)$sess['charge_seconds'] + $lbadd;
+				if ($r['amps'] !== null) $u['amp_seconds'] = (float)$sess['amp_seconds'] + $r['amps'] * $lbadd;
+			}
 			if ($prev_charging && $dt) {
 				$u['charge_seconds'] = (int)$sess['charge_seconds'] + $dt;
 				if ($r['amps'] !== null) $u['amp_seconds'] = (float)$sess['amp_seconds'] + $r['amps'] * $dt;
@@ -536,6 +541,7 @@ function sess_process($db, $unit, $r, $now){
 
 		if ($seg) {
 			$g = array('stop_at'=>$now);
+			if (isset($lbadd)) { $g['seconds'] = (int)$seg['seconds'] + $lbadd; if ($r['amps'] !== null) $g['amp_seconds'] = (float)$seg['amp_seconds'] + $r['amps'] * $lbadd; }
 			if ($prev_charging && $dt) {
 				$g['seconds'] = (int)$seg['seconds'] + $dt;
 				if ($r['amps'] !== null) $g['amp_seconds'] = (float)$seg['amp_seconds'] + $r['amps'] * $dt;
@@ -774,9 +780,9 @@ function sess_apply_plug_events($db, $units){
 		if (substr($line, -1) !== "\n") break;   // half-written line: next run
 		$off += strlen($line);
 		$e = json_decode($line, true);
-		if (!is_array($e) || !isset($e['unit'], $e['ts'], $byid[(int)$e['unit']]) || !in_array($e['kind'] ?? '', array('plug', 'unplug'), true)) continue;
+		if (!is_array($e) || !isset($e['unit'], $e['ts'], $byid[(int)$e['unit']]) || !in_array($e['kind'] ?? '', array('plug', 'unplug', 'charge_start', 'charge_stop', 'fault', 'restart', 'mqtt_down'), true)) continue;
 		$lk = sess_unit_lock((int)$e['unit']);
-		try { sess_begin($db); sess_plug_event($db, $byid[(int)$e['unit']], (int)$e['ts'], $e['kind']); sess_commit($db); }
+		try { sess_begin($db); sess_plug_event($db, $byid[(int)$e['unit']], (int)$e['ts'], $e['kind'], isset($e['state']) ? (int)$e['state'] : null); sess_commit($db); }
 		catch (Throwable $x) { if ($db->inTransaction()) sess_rollback($db); slog('error', "{$byid[(int)$e['unit']]['name']}: plug event: " . $x->getMessage()); }
 		sess_unit_unlock($lk);
 	}
@@ -784,13 +790,14 @@ function sess_apply_plug_events($db, $units){
 	$db->prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('plug_events_off', ?)")->execute(array($off));
 }
 
-function sess_plug_event($db, $unit, $ts, $kind){
+function sess_plug_event($db, $unit, $ts, $kind, $state = null){
 	$uid = (int)$unit['id']; $name = $unit['name'];
 	$us = $db->query("SELECT * FROM unit_state WHERE unit_id = $uid")->fetch();
 	if (!$us) return;
 	$sid = $us['session_id'] ? (int)$us['session_id'] : null;
 	$sess = $sid ? $db->query("SELECT * FROM sessions WHERE id = $sid AND open = 1")->fetch() : null;
 	$lw = $us['lifetime_wh'] !== null ? (float)$us['lifetime_wh'] : null;
+	if (!in_array($kind, array('plug', 'unplug'))) return sess_lb_event($db, $unit, $us, $sess, $ts, $kind, $state, $lw);
 	if ($kind == 'unplug') {
 		if (!$sess) {   // a reading closed it already: keep the earlier time
 			$db->prepare("UPDATE sessions SET unplug_at = ? WHERE unit_id = ? AND open = 0 AND unplug_at > ? AND unplug_at <= ? AND plug_in_at < ?")->execute(array($ts, $uid, $ts, $ts + 120, $ts));
@@ -829,6 +836,68 @@ function sess_plug_event($db, $unit, $ts, $kind){
 	slog('info', "$name: session #$sid opened at plug-in " . date('H:i:s', $ts) . ' (load balancer)');
 }
 
+// charge start / stop, fault, restart and MQTT drop events from the coordinator (see above)
+function sess_lb_event($db, $unit, $us, $sess, $ts, $kind, $state, $lw){
+	$uid = (int)$unit['id']; $sid = $sess ? (int)$sess['id'] : null;
+	$seg = $us['segment_id'] ? $db->query("SELECT * FROM segments WHERE id = " . (int)$us['segment_id'] . " AND open = 1")->fetch() : null;
+	$segid = $seg ? (int)$seg['id'] : null;
+	$has = function($k, $from, $to, $extra = '') use ($db, $uid){ return $db->query("SELECT * FROM events WHERE unit_id = $uid AND kind = '$k' AND ts BETWEEN $from AND $to $extra ORDER BY ts LIMIT 1")->fetch(); };
+	if ($kind == 'charge_start') {
+		if (!$sess || (int)$sess['plug_in_at'] > $ts) return;
+		if ($seg) {   // a reading opened it already: start it at the event when that is up to 2 min earlier
+			$d = (int)$seg['start_at'] - $ts;
+			if ($d > 0 && $d <= 120) {
+				$db->exec("UPDATE segments SET start_at = $ts, seconds = seconds + $d WHERE id = $segid");
+				$db->exec("UPDATE sessions SET charge_seconds = charge_seconds + $d" . ((int)$sess['charge_start_at'] === (int)$seg['start_at'] ? ", charge_start_at = $ts" : '') . " WHERE id = $sid");
+			}
+			return;
+		}
+		if ($db->query("SELECT 1 FROM segments WHERE session_id = $sid AND stop_at >= $ts")->fetchColumn()) return;   // readings already past it
+		// open at the event; charging stays 0 in unit_state so the next reading adds the time from here (sess_process)
+		$db->prepare("INSERT INTO segments (session_id, unit_id, start_at, stop_at, seconds, lifetime_start_wh, lifetime_end_wh, open) VALUES (?,?,?,?,0,?,?,1)")->execute(array($sid, $uid, $ts, $ts, $lw, $lw));
+		$segid = (int)$db->lastInsertId();
+		$db->exec("UPDATE sessions SET segments = segments + 1, end_reason = NULL" . (!$sess['charge_start_at'] ? ", charge_start_at = $ts" : '') . " WHERE id = $sid");
+		sess_update_row($db, 'unit_state', 'unit_id', $uid, array('segment_id'=>$segid, 'charging'=>0));
+		return;
+	}
+	if ($kind == 'charge_stop') {
+		if ($state === null || $state >= 254) return;   // sleep (schedule, limit, override): the reading names the reason
+		$reason = sess_stop_reason(array('state'=>$state, 'limit_sleep'=>null, 'sched_disabled'=>null, 'api'=>null, 'timer_active'=>null), 1);
+		if ($seg) {
+			if ((int)$seg['start_at'] >= $ts || (int)$us['last_ok_at'] > $ts) return;   // a later reading still showed charging
+			$add = (int)$us['charging'] ? max(0, $ts - max((int)$us['last_ok_at'], (int)$seg['stop_at'])) : 0;
+			sess_close_segment($db, $seg, $ts, $lw, $reason, $add);
+			$db->prepare("UPDATE sessions SET end_reason = ?, charge_end_at = ?, charge_seconds = charge_seconds + ? WHERE id = ?")->execute(array($reason, $ts, $add, $sid));
+			sess_update_row($db, 'unit_state', 'unit_id', $uid, array('segment_id'=>null, 'charging'=>0));
+			return;
+		}
+		// a reading closed it already: stop it at the event when that is up to 2 min earlier
+		$g = $sid ? $db->query("SELECT * FROM segments WHERE session_id = $sid AND open = 0 ORDER BY id DESC LIMIT 1")->fetch() : null;
+		$d = $g ? (int)$g['stop_at'] - $ts : 0;
+		if ($g && $d > 0 && $d <= 120 && (int)$g['start_at'] < $ts && (int)$g['seconds'] >= $d) {
+			$db->exec("UPDATE segments SET stop_at = $ts, seconds = seconds - $d WHERE id = " . (int)$g['id']);
+			$db->exec("UPDATE sessions SET charge_seconds = max(0, charge_seconds - $d)" . ((int)$sess['charge_end_at'] === (int)$g['stop_at'] ? ", charge_end_at = $ts" : '') . " WHERE id = $sid");
+		}
+		return;
+	}
+	if ($kind == 'fault') {   // also brief ones the 30-s readings miss; sess_process skips a fault already logged
+		if ($state < 4 || $state > 11) return;
+		if ($e = $has('fault', $ts - 5, $ts + 180, "AND to_val = $state")) { if ((int)$e['ts'] > $ts) $db->exec("UPDATE events SET ts = $ts WHERE id = " . (int)$e['id']); return; }
+		sess_event($db, $unit, $sid, $segid, $ts, 'fault', evse_state_text($state) . ' (seen by load balancer)', null, $state, $us['temp_c'], $state == 10 ? 'thermal' : 'fault');
+		return;
+	}
+	if ($kind == 'restart') {   // MQTT reconnected: a WiFi module restart or a WiFi rejoin; sess_check_reboot confirms which
+		if ($has('reach', $ts, $ts, "AND reason = 'mqtt reconnect'") || $has('reboot', $ts - 5, $ts + 5)) return;
+		// a restart a poll already detected (2.x, dated at detection): date it at the reconnect
+		if ($e = $has('reboot', $ts, $ts + 1000, "AND detail LIKE 'WiFi module restart detected%'")) { $db->prepare("UPDATE events SET ts = ?, detail = ? WHERE id = ?")->execute(array($ts, 'WiFi module restarted (MQTT reconnect)', (int)$e['id'])); return; }
+		sess_event($db, $unit, $sid, $segid, $ts, 'reach', 'MQTT reconnected (restart or WiFi rejoin)', null, null, null, 'mqtt reconnect');
+		return;
+	}
+	if ($kind == 'mqtt_down') {
+		if (!$has('reach', $ts, $ts, "AND reason = 'mqtt down'")) sess_event($db, $unit, $sid, $segid, $ts, 'reach', 'MQTT disconnected', null, null, null, 'mqtt down');
+	}
+}
+
 // WiFi module reboot: v5 uptime gives the boot time; on 2.x the comm_sent counter
 // going backwards means it restarted since the last poll (time estimated from the
 // counter); the restart time is not known, so the event is dated when it was detected and
@@ -846,7 +915,9 @@ function sess_check_reboot($db, $unit, $us, $r, $now){
 	}
 	if ($rebooted) {
 		$prev = $us['last_full_poll_at'] ? (int)$us['last_full_poll_at'] : null;
-		sess_event($db, $unit, $us['session_id'] ?: null, $us['segment_id'] ?: null, $exact ? (int)$boot : $now, 'reboot',
+		$mq = $db->query("SELECT id, ts FROM events WHERE unit_id = " . (int)$unit['id'] . " AND reason = 'mqtt reconnect' AND ts BETWEEN " . (($prev ?: $now - 1000) - 30) . " AND $now ORDER BY ts DESC LIMIT 1")->fetch();
+		if ($mq) { $db->exec("UPDATE events SET kind = 'reboot', detail = 'WiFi module restarted (MQTT reconnect)', reason = 'wifi reboot' WHERE id = " . (int)$mq['id']); if (!$exact) $boot = (int)$mq['ts']; }
+		else sess_event($db, $unit, $us['session_id'] ?: null, $us['segment_id'] ?: null, $exact ? (int)$boot : $now, 'reboot',
 			$exact ? 'WiFi module restarted' : 'WiFi module restart detected (restarted after ' . ($prev ? date('H:i:s', $prev) : '?') . ')', null, null, null, 'wifi reboot');
 		slog('warn', "{$unit['name']}: WiFi module " . ($exact ? 'restarted at ' . date('Y-m-d H:i:s', (int)$boot) : 'restart detected, restarted after ' . ($prev ? date('H:i:s', $prev) : '?')));
 	}
