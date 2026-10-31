@@ -752,6 +752,83 @@ function sess_poll_one($db, $unit, $why = ''){
 	return array($r, $res, $api);
 }
 
+/*------------------------------------------------------------------------------
+ * Plug / unplug events from the load-balancer coordinator (loadbalancer/run/plug_events.jsonl,
+ * one JSON line per change it saw: {"unit":3,"ts":...,"kind":"plug"|"unplug"}). A quick swap
+ * (unplug + replug between two 30-s readings) never shows in the readings; these close the
+ * session at the unplug and open a new one at the plug-in. The time is the coordinator's own
+ * reading of the unit. Safe to apply twice: a session a reading already closed or opened is
+ * kept, only re-dated to the event when that is up to 2 min earlier.
+ *----------------------------------------------------------------------------*/
+function sess_apply_plug_events($db, $units){
+	$f = SESS_WEB . '/loadbalancer/run/plug_events.jsonl';
+	if (!is_file($f)) return;
+	clearstatcache();
+	$off = (int)$db->query("SELECT v FROM meta WHERE k = 'plug_events_off'")->fetchColumn();
+	$size = filesize($f);
+	if ($size < $off) $off = 0;   // file was rotated
+	if ($size == $off || !($h = fopen($f, 'r'))) return;
+	fseek($h, $off);
+	$byid = array(); foreach ($units as $u) $byid[(int)$u['id']] = $u;
+	while (($line = fgets($h)) !== false) {
+		if (substr($line, -1) !== "\n") break;   // half-written line: next run
+		$off += strlen($line);
+		$e = json_decode($line, true);
+		if (!is_array($e) || !isset($e['unit'], $e['ts'], $byid[(int)$e['unit']]) || !in_array($e['kind'] ?? '', array('plug', 'unplug'), true)) continue;
+		$lk = sess_unit_lock((int)$e['unit']);
+		try { sess_begin($db); sess_plug_event($db, $byid[(int)$e['unit']], (int)$e['ts'], $e['kind']); sess_commit($db); }
+		catch (Throwable $x) { if ($db->inTransaction()) sess_rollback($db); slog('error', "{$byid[(int)$e['unit']]['name']}: plug event: " . $x->getMessage()); }
+		sess_unit_unlock($lk);
+	}
+	fclose($h);
+	$db->prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('plug_events_off', ?)")->execute(array($off));
+}
+
+function sess_plug_event($db, $unit, $ts, $kind){
+	$uid = (int)$unit['id']; $name = $unit['name'];
+	$us = $db->query("SELECT * FROM unit_state WHERE unit_id = $uid")->fetch();
+	if (!$us) return;
+	$sid = $us['session_id'] ? (int)$us['session_id'] : null;
+	$sess = $sid ? $db->query("SELECT * FROM sessions WHERE id = $sid AND open = 1")->fetch() : null;
+	$lw = $us['lifetime_wh'] !== null ? (float)$us['lifetime_wh'] : null;
+	if ($kind == 'unplug') {
+		if (!$sess) {   // a reading closed it already: keep the earlier time
+			$db->prepare("UPDATE sessions SET unplug_at = ? WHERE unit_id = ? AND open = 0 AND unplug_at > ? AND unplug_at <= ? AND plug_in_at < ?")->execute(array($ts, $uid, $ts, $ts + 120, $ts));
+			return;
+		}
+		if ((int)$sess['plug_in_at'] >= $ts) return;   // older than this session
+		$seg = $us['segment_id'] ? $db->query("SELECT * FROM segments WHERE id = " . (int)$us['segment_id'] . " AND open = 1")->fetch() : null;
+		if ($seg) {
+			sess_close_segment($db, $seg, max($ts, (int)$seg['start_at']), $lw, 'unplugged');
+			$db->prepare("UPDATE sessions SET end_reason = 'unplugged', charge_end_at = ? WHERE id = ?")->execute(array($ts, $sid));
+		}
+		sess_close($db, $db->query("SELECT * FROM sessions WHERE id = $sid")->fetch(), $us, $ts, $lw, null);
+		// readings after the unplug are not part of this session (the plug-in event takes them)
+		$db->exec("UPDATE samples SET session_id = NULL WHERE session_id = $sid AND ts > $ts");
+		$db->exec("UPDATE events SET session_id = NULL, segment_id = NULL WHERE session_id = $sid AND ts > $ts");
+		sess_event($db, $unit, $sid, null, $ts, 'plug', 'unplugged (seen by load balancer)', null, null, null, 'unplug');
+		sess_update_row($db, 'unit_state', 'unit_id', $uid, array('session_id'=>null, 'segment_id'=>null, 'charging'=>0, 'connected'=>0));
+		slog('info', "$name: session #$sid closed at unplug " . date('H:i:s', $ts) . ' (load balancer)');
+		return;
+	}
+	if ($sess) {   // a reading opened it already: keep the earlier time
+		if ((int)$sess['plug_in_at'] > $ts && (int)$sess['plug_in_at'] <= $ts + 120) {
+			$db->exec("UPDATE events SET ts = $ts WHERE session_id = $sid AND kind = 'plug' AND reason = 'plug in' AND ts = " . (int)$sess['plug_in_at']);
+			$db->exec("UPDATE sessions SET plug_in_at = $ts WHERE id = $sid");
+		}
+		return;
+	}
+	if ($db->query("SELECT 1 FROM sessions WHERE unit_id = $uid AND (unplug_at > $ts OR plug_in_at >= $ts)")->fetchColumn()) return;   // already past it
+	$db->prepare("INSERT INTO sessions (unit_id, unit_name, plug_in_at, lifetime_start_wh, volts, pilot_start, open) VALUES (?,?,?,?,?,?,1)")
+		->execute(array($uid, $name, $ts, $lw, $us['volts'], $us['pilot']));
+	$sid = (int)$db->lastInsertId();
+	$db->exec("UPDATE samples SET session_id = $sid WHERE unit_id = $uid AND session_id IS NULL AND ts >= $ts");
+	$db->exec("UPDATE events SET session_id = $sid WHERE unit_id = $uid AND session_id IS NULL AND ts >= $ts");
+	sess_event($db, $unit, $sid, null, $ts, 'plug', 'plugged in (seen by load balancer)', null, null, null, 'plug in');
+	sess_update_row($db, 'unit_state', 'unit_id', $uid, array('session_id'=>$sid, 'segment_id'=>null, 'charging'=>0, 'connected'=>1));
+	slog('info', "$name: session #$sid opened at plug-in " . date('H:i:s', $ts) . ' (load balancer)');
+}
+
 // WiFi module reboot: v5 uptime gives the boot time; on 2.x the comm_sent counter
 // going backwards means it restarted since the last poll (time estimated from the
 // counter); the restart time is not known, so the event is dated when it was detected and

@@ -51,6 +51,9 @@ function lb_log($msg){
 }
 function lb_state_load(){ global $RUN; $s = @json_decode((string)@file_get_contents("$RUN/state.json"), true); return is_array($s) ? $s : ['units'=>[]]; }
 function lb_state_save($s){ global $RUN, $ONCE; if ($ONCE) return; $t = "$RUN/state.json.tmp"; file_put_contents($t, json_encode($s)); rename($t, "$RUN/state.json"); }
+// plug / unplug seen here (MQTT-triggered reads) for the session logger: a quick swap can fall
+// between its 30-s readings. One JSON line each; collector.php reads it (sess_apply_plug_events).
+function lb_plug_event($id, $kind, $ts){ global $RUN, $ONCE; if ($ONCE) return; $f = "$RUN/plug_events.jsonl"; if (@filesize($f) > 1048576) @rename($f, "$f.1"); file_put_contents($f, json_encode(['unit'=>(int)$id, 'ts'=>$ts, 'kind'=>$kind]) . "\n", FILE_APPEND | LOCK_EX); }
 function lb_write_json($name, $data){ global $RUN; $t = "$RUN/$name.tmp"; file_put_contents($t, json_encode($data, JSON_PRETTY_PRINT)); rename($t, "$RUN/$name"); }
 
 // Groups and their units from the site's database (read-only); unit secrets stay in memory.
@@ -258,8 +261,8 @@ while (true) {
 			if (!$ONCE && $ps !== null && $r['state'] !== null && $ps !== $r['state'])
 				lb_log("u$id {$u['name']}: state " . lb_state_name($ps) . ' -> ' . lb_state_name($r['state']) . ($ps === 254 ? ' (woke: schedule or manual)' : ($r['state'] === 254 ? ' (asleep: schedule or manual)' : '')) . ($r['plugged'] ? ', car plugged in' : ''));
 			if ($r['state'] !== null) $us['state'] = $r['state'];
-			if ($r['plugged'] && empty($us['plugged'])) { $us['plug_since'] = $now; if (!$ONCE) lb_log("u$id {$u['name']}: car plugged in"); }
-			if (!$r['plugged'] && !empty($us['plugged'])) { unset($us['plug_since']); if (!$ONCE) lb_log("u$id {$u['name']}: car unplugged"); }
+			if ($r['plugged'] && empty($us['plugged'])) { $us['plug_since'] = $now; if (!$ONCE) lb_log("u$id {$u['name']}: car plugged in"); if (empty($r['pretend'])) lb_plug_event($id, 'plug', $now); }
+			if (!$r['plugged'] && !empty($us['plugged'])) { unset($us['plug_since']); if (!$ONCE) lb_log("u$id {$u['name']}: car unplugged"); lb_plug_event($id, 'unplug', $now); }
 			$us['plugged'] = $r['plugged'];
 			if ($r['setting'] !== null) $us['setting'] = $r['setting'];
 			if ($r['saved'] !== null) $us['saved'] = $r['saved'];

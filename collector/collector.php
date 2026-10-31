@@ -43,6 +43,7 @@ try {
 	require SESS_DIR . '/session_logic.php';
 	$db = sess_db();
 	$units = evse_units();
+	sess_apply_plug_events($db, $units);   // quick unplug/replug seen by the load balancer
 	$push_units = $db->query("SELECT unit_id, node FROM emon_nodes WHERE key_hash IS NOT NULL")->fetchAll(PDO::FETCH_KEY_PAIR);
 	foreach ($units as $unit) {
 		if ($only && (int)$unit['id'] !== $only) continue;
