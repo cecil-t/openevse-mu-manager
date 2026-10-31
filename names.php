@@ -88,13 +88,13 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 <?php foreach ($data as $d) {
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="7" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
-	echo '<td>' . $cell($d['host']) . ($d['host'] !== $d['sug'] ? $warn('suggested: ' . $d['sug']) : '') . '</td>';
+	echo '<td>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
 	echo '<td>' . $cell($d['mac']) . '</td><td>' . $cell($d['serial']) . '</td>';
 	echo '<td>' . $cell($d['node']) . ($d['node_exp'] !== '' && $d['node'] !== $d['node_exp'] ? $warn('expected: ' . $d['node_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['topic']) . ($d['topic_exp'] !== '' && $d['topic'] !== $d['topic_exp'] ? $warn('expected: ' . $d['topic_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['wifi']) . '</td><td>' . $cell($d['ctl']) . '</td></tr>';
 } ?>
 </table></div>
-<div class="nm-foot">Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site suggests or expects. Hostnames can be set under Settings &gt; Units; the rule for suggested hostnames is in <a class="lnk" href="help.php#names">Help</a>.</div>
+<div class="nm-foot">Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site expects. Hostnames are set under Settings &gt; Units, which also suggests one (rule in <a class="lnk" href="help.php#names">Help</a>).</div>
 </div>
 </div></body></html>
