@@ -388,7 +388,7 @@ $dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 're
 		<?php if ($s['partial']) echo '<span class="tag">partial</span>'; ?>
 	</a></div>
 <?php } ?>
-<p class="sm"><a href="sessions.php?view=months">Monthly temperatures &amp; thermal events &rarr;</a></p></div>
+<p class="sm"><a href="report7.php">Last 7 days, all units on one chart &rarr;</a><br><a href="sessions.php?view=months">Monthly temperatures &amp; thermal events &rarr;</a></p></div>
 <div class="sec"><h4>Faults &amp; thermal</h4>
 <?php if (!$faults) echo '<p class="sm">None logged in this range.</p>'; ?>
 <?php foreach ($faults as $e) { ?>
