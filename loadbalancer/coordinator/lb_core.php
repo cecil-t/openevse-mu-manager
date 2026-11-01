@@ -152,12 +152,12 @@ function lb_plan($limit, array $units){
 	return ['units'=>$plan, 'total'=>$sp['total'], 'saved_total'=>$saved, 'warn'=>$sp['warn']];
 }
 
-// Sleep-free: which units asleep on their schedule may go uncounted. $cands = ids in order;
-// only with fast wake detection (MQTT up), at most 10 % of the limit (80 A: 1 unit).
-const LB_SLEEP_FREE_PCT = 0.10;
+// Sleep-free: every unit asleep on its schedule holds 6 A and isn't counted against the
+// limit (it can't draw while asleep). Only with fast wake detection (MQTT up), so a waking
+// unit is rebalanced within seconds. $cands = ids in order. $limit kept for callers.
 function lb_sleep_free(array $cands, $limit, $fastDetect){
 	if (!$fastDetect) return [];
-	return array_slice(array_values($cands), 0, intdiv((int)floor($limit * LB_SLEEP_FREE_PCT), LB_MIN_AMPS));
+	return array_values($cands);
 }
 
 // Idle pause wanted? 2+ cars charging and at least one held below what it can take

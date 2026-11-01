@@ -147,11 +147,13 @@ check('monitored unit: reads allowed ($GE $GS $GG $GC)', lb_cmd_allowed_for($mu,
 check('grouped unit: writes still allowed ($SC 20 V, $FD)', lb_write_allowed($gu) && lb_cmd_allowed_for($gu, '$SC 20 V') && lb_cmd_allowed_for($gu, '$FD'));
 $src = file_get_contents(__DIR__ . '/coordinator.php');
 check('coordinator: claim / release only inside the write guards; never writes the saved current', substr_count($src, 'evse_claim(') == 1 && substr_count($src, 'evse_release_claim(') == 1 && substr_count($src, 'evse_set_current(') == 0 && !preg_match('/\'\$SC \' \. \$R\b/', $src) && substr_count($src, 'lb_rapi_send(') >= 2 && !preg_match('/\brapi\(\$u(nit)?, *.\$(SC|FD|FE|FS)/', $src));
-echo "== sleep-free (asleep on its schedule: holds 6 A, not counted, while MQTT is up; max 10 % of the limit)\n";
+echo "== sleep-free (asleep on its schedule: holds 6 A, not counted, while MQTT is up; every sleeping unit)\n";
 $sfu = function($id, $chg, $sf = false){ return ['id'=>$id,'rating'=>48,'plugged'=>$chg,'plug_since'=>$chg ? $id : null,'prio'=>null,'setting'=>20,'cap'=>null,'charging'=>$chg,'sleepfree'=>$sf]; };
 t('car A + car B (heater) capped 28, unit 5 asleep free, unit 4 paused: car A 48 (was 46)', 80, [$sfu(1,true), array_merge($sfu(3,true), ['cap'=>28]), $sfu(4,false)+['lbpause'=>true], $sfu(5,false,true)], [1=>48,3=>28,4=>'P6',5=>6]);
 t('2 cars, unit 5 asleep free, unit 4 idle: 37/37, unit 4 6, unit 5 6 uncounted', 80, [$sfu(1,true), $sfu(3,true), $sfu(4,false), $sfu(5,false,true)], [1=>37,3=>37,4=>6,5=>6]);
-check('sleep-free only with MQTT up; 80 A: one unit; 40 A: none', lb_sleep_free([5,1], 80, true) == [5] && lb_sleep_free([5], 80, false) == [] && lb_sleep_free([5], 40, true) == [] && lb_sleep_free([5,1,3], 120, true) == [5,1]);
+check('sleep-free only with MQTT up; every sleeping unit, no cap', lb_sleep_free([5,1], 80, true) == [5,1] && lb_sleep_free([5], 80, false) == [] && lb_sleep_free([5], 40, true) == [5] && lb_sleep_free([5,1,3], 120, true) == [5,1,3]);
+t('2 asleep free (1, 5), units 3 + 4 idle: 20 each, 1 and 5 at 6 uncounted', 80, [$sfu(1,false,true), $sfu(3,false), $sfu(4,false), $sfu(5,false,true)], [1=>6,3=>20,4=>20,5=>6]);
+t('2 asleep free (1, 5), car on 3, unit 4 idle: car 48, unit 4 idle 20, 1 and 5 uncounted', 80, [$sfu(1,false,true), $sfu(3,true), $sfu(4,false), $sfu(5,false,true)], [1=>6,3=>48,4=>20,5=>6]);
 // units 1 + 3 charging; unit 5 asleep with a car, wakes at 10 min
 $sfr = function($delay) use ($R, $C){ return lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C], 5=>['plug'=>0, 'demand'=>$C]], 1200, ['sleep'=>[5=>600], 'sleep_free'=>true, 'wake_delay'=>$delay, 'measure_from'=>1]); };
 $z1 = $sfr(5);
