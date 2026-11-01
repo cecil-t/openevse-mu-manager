@@ -75,8 +75,8 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 .nm-top a.btn{display:inline-block;padding:6px 14px;border-radius:5px;background:#00706f;color:#fff;text-decoration:none;font-weight:bold}
 .nm a.lnk{color:#035a5a}
 .nm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.nm table{border-collapse:collapse;width:100%;background:#fff;font-size:16px}
-.nm th,.nm td{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top;white-space:nowrap}
+.nm table{border-collapse:collapse;width:100%;background:#fff;font-size:15px}
+.nm th,.nm td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top;white-space:nowrap}
 .nm th{background:#f2f2f2;font-weight:bold;color:#222}
 .nm td.num{text-align:right}
 .nm td.sm{font-size:13px}
@@ -92,7 +92,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 <?php foreach ($data as $d) {
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
-	echo '<td>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
+	echo '<td' . (strlen($d['host']) > 20 ? ' class="sm"' : '') . '>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
 	echo '<td class="sm">' . $cell($d['mac']) . '</td><td class="sm">' . $cell($d['serial']) . '</td>';
 	echo '<td class="num">' . $cell($d['max']) . '</td><td class="num">' . $cell($d['pilot']) . '</td><td class="num">' . ($d['vol'] === '' ? $dash : '(' . h($d['vol']) . ')') . '</td>';
 	echo '<td class="num">' . $cell($d['node']) . ($d['node_exp'] !== '' && $d['node'] !== $d['node_exp'] ? $warn('expected: ' . $d['node_exp']) : '') . '</td>';
