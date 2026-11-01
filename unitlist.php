@@ -79,6 +79,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 .nm th,.nm td{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top;white-space:nowrap}
 .nm th{background:#f2f2f2;font-weight:bold;color:#222}
 .nm td.num{text-align:right}
+.nm td.sm{font-size:13px}
 .nm .nm-w{font-size:14px;color:#8a5a00;margin-top:2px}
 .nm .nm-x{color:#999}
 .nm .nm-err{color:#a11}
@@ -92,7 +93,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
 	echo '<td>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
-	echo '<td>' . $cell($d['mac']) . '</td><td>' . $cell($d['serial']) . '</td>';
+	echo '<td class="sm">' . $cell($d['mac']) . '</td><td class="sm">' . $cell($d['serial']) . '</td>';
 	echo '<td class="num">' . $cell($d['max']) . '</td><td class="num">' . $cell($d['pilot']) . '</td><td class="num">' . ($d['vol'] === '' ? $dash : '(' . h($d['vol']) . ')') . '</td>';
 	echo '<td class="num">' . $cell($d['node']) . ($d['node_exp'] !== '' && $d['node'] !== $d['node_exp'] ? $warn('expected: ' . $d['node_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['topic']) . ($d['topic_exp'] !== '' && $d['topic'] !== $d['topic_exp'] ? $warn('expected: ' . $d['topic_exp']) : '') . '</td>';
