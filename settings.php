@@ -374,7 +374,7 @@ if ($sec === 'units') {
 		<?php return ob_get_clean();
 	}
 	$HSUG = oev_host_suggest($units);
-	echo '<div class="note" style="margin:2px 0 8px 0"><a href="names.php" style="color:#035a5a;font-weight:bold">View all unit names (table / CSV)</a></div>';
+	echo '<div class="note" style="margin:2px 0 8px 0"><a href="unitlist.php" style="color:#035a5a;font-weight:bold">Unit List (table / CSV)</a></div>';
 	echo '<div class="note">Changes are used right away by the pages, and by the load balancer within a minute.</div>';
 	foreach ($units as $u) {
 		$id = (int)$u['id'];

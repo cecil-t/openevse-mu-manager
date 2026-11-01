@@ -178,8 +178,8 @@ the steps are also written out so you can do them by hand.
      automatically by the jobs task within a minute. Taking it out turns MQTT off. Units outside a group
      can use MQTT any way you like.
    - Units in a load group should share one breaker panel or feeder. Set the group's capacity to that limit.
-   - **Names:** `names.php` (admins; linked from Settings > Units) shows each unit's number, name, IP,
-     hostname, MAC, controller serial, Emoncms node, MQTT topic (`openevse/u<unit number>`) and firmware, read
+   - **Unit List:** `unitlist.php` (admins; linked from Settings > Units; old `names.php` redirects) shows each unit's number, name, IP,
+     hostname, MAC, controller serial, saved max current, Emoncms node, MQTT topic (`openevse/u<unit number>`) and firmware, read
      live from the units, with a CSV download. Settings > Units suggests a hostname made from the name (rule
      in Help), and "Set hostname on unit" saves it and restarts only the unit's WiFi module.
    - **Site name:** Settings > Preferences. Used in page titles, under the logo, and in email subjects and
