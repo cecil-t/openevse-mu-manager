@@ -94,7 +94,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
 	echo '<td' . (strlen($d['host']) > 20 ? ' class="sm"' : '') . '>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
 	echo '<td class="sm">' . $cell($d['mac']) . '</td><td class="sm">' . $cell($d['serial']) . '</td>';
-	echo '<td class="num">' . $cell($d['max']) . '</td><td class="num">' . $cell($d['pilot']) . '</td><td class="num">' . ($d['vol'] === '' ? $dash : '(' . h($d['vol']) . ')') . '</td>';
+	echo '<td class="num">' . $cell($d['max']) . '</td><td class="num">' . $cell($d['pilot']) . '</td><td class="num">' . ($d['vol'] === '' ? $dash : '<span' . ($d['vol'] === $d['pilot'] ? ' style="opacity:.4" title="Same as Pilot: no temporary setting"' : '') . '>(' . h($d['vol']) . ')</span>') . '</td>';
 	echo '<td class="num">' . $cell($d['node']) . ($d['node_exp'] !== '' && $d['node'] !== $d['node_exp'] ? $warn('expected: ' . $d['node_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['topic']) . ($d['topic_exp'] !== '' && $d['topic'] !== $d['topic_exp'] ? $warn('expected: ' . $d['topic_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['wifi']) . '</td><td>' . $cell($d['ctl']) . '</td></tr>';

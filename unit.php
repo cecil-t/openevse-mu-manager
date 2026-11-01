@@ -266,7 +266,9 @@ function closePop(el){ while (el && !(el.classList && el.classList.contains('sli
 function fill(box, title, lines){ box.querySelector('.pt').textContent = title; var c = box.querySelector('.pc'); c.innerHTML = ''; lines.forEach(function(t){ var d = document.createElement('div'); d.className = 'pl'; d.textContent = t; c.appendChild(d); }); }
 function pop(title, lines, link){ var b = document.getElementById('pop_info'); fill(b, title, lines); var x = b.querySelector('.px'); x.innerHTML = ''; x.className = 'px'; if (link) { var a = document.createElement('a'); a.href = link[1]; a.textContent = link[0]; x.className = 'px pclose'; x.appendChild(a); } b.style.display = 'block'; popFit(b); }
 function ask(title, lines, ok){ var b = document.getElementById('pop_ask'); fill(b, title, lines); b.querySelector('#ask_ok').onclick = function(){ b.style.display = 'none'; ok(); }; b.style.display = 'block'; popFit(b); }
-function askForm(f, msg){ ask('Confirm', [msg], function(){ f.submit(); }); return false; }
+function askForm(f, msg){ ask('Confirm', [msg], function(){ if (f.elements.action && f.elements.action.value === 'restart') sentMsg('Reboot command sent\u2026 waiting for the unit'); f.submit(); }); return false; }
+// immediate note at the top while a slow action (reboot) runs; the result message replaces it when the page comes back
+function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.style.cssText = 'position:fixed;left:0;right:0;top:9px;z-index:50;text-align:center;pointer-events:none;'; var s = document.createElement('span'); s.style.cssText = 'display:inline-block;font-size:13px;line-height:18px;padding:1px 8px;color:#333;background:#fff;border:1px solid #ccc;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.25);'; s.textContent = t; d.appendChild(s); document.body.appendChild(d); }
 // live update from the load balancer (lbstate.php?unit=N, read only) every 5 s while the tab is visible:
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
 // Same light as the home page: green live, amber late or a failed fetch, red load balancer down (values from page load)
