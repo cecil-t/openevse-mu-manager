@@ -39,7 +39,7 @@ function nm_read($u, $sug, $nodes, $arp){
 	$o['serial'] = (string)($c['evse_serial'] ?? '');
 	if ($o['serial'] === '' && (int)$o['ctl'] >= 8) { $g = sess_rapi($u, '$GI'); if (is_string($g) && preg_match('/^[0-9A-F]{6,}$/i', trim($g))) $o['serial'] = trim($g); }
 	$o['node'] = !empty($c['emoncms_enabled']) ? (string)($c['emoncms_node'] ?? '') : 'off';
-	if (isset($st['pilot']) && $st['pilot'] !== '') $o['pilot'] = (string)(int)$st['pilot'];
+	if (isset($c['max_current_soft']) && $c['max_current_soft'] !== '') $o['pilot'] = (string)(int)$c['max_current_soft'];   // saved pilot, not the LB's temporary one
 	$o['topic'] = !empty($c['mqtt_enabled']) ? (string)($c['mqtt_topic'] ?? '') : 'off';
 	return $o;
 }
@@ -98,6 +98,6 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 	echo '<td>' . $cell($d['wifi']) . '</td><td>' . $cell($d['ctl']) . '</td></tr>';
 } ?>
 </table></div>
-<div class="nm-foot">* Node: the Emoncms node number this unit posts its data to (normally its unit number).<br>Max A: the Max current setting in MU Manager (Settings &gt; Units).<br>Pilot: the current the unit is offering right now.<br>Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site expects. Hostnames are set under Settings &gt; Units, which also suggests one (rule in <a class="lnk" href="help.php#names">Help</a>).</div>
+<div class="nm-foot">* Node: the Emoncms node number this unit posts its data to (normally its unit number).<br>Max A: the Max current setting in MU Manager (Settings &gt; Units).<br>Pilot: the unit's saved pilot current (not the load balancer's temporary setting).<br>Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site expects. Hostnames are set under Settings &gt; Units, which also suggests one (rule in <a class="lnk" href="help.php#names">Help</a>).</div>
 </div>
 </div></body></html>
