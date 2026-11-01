@@ -179,9 +179,30 @@ function evse_curl_is_shared($ch){
 // cache. Callers allow this at most once per request (twice if it starts as Basic).
 function evse_auth_retry($ch, $url, $code, $user, $pass){
 	if ((int)$code !== 401 || $user == '' || $pass == '') return false;
-	if (!evse_digest_learn($url, $GLOBALS['__evse_wa'][spl_object_id($ch)] ?? '')) return false;   // not a Digest challenge (e.g. wrong password on Basic)
-	evse_auth_set($url, 'digest');
-	return true;
+	if (evse_digest_learn($url, $GLOBALS['__evse_wa'][spl_object_id($ch)] ?? '')) { evse_auth_set($url, 'digest'); return true; }
+	// Self-heal: cached as Digest but the unit 401s without a Digest challenge (e.g. the address now
+	// belongs to a different unit / module): forget the cache, re-detect, send once more. Once per
+	// address per process, so a real wrong password can't loop.
+	if (evse_auth_mode($url) === 'digest' && empty($GLOBALS['__evse_auth_healed'][$url])) {
+		$GLOBALS['__evse_auth_healed'][$url] = true;
+		evse_auth_forget($url, 'self-heal: 401 with cached Digest login method, cache cleared, retrying');
+		return true;
+	}
+	return false;   // not a Digest challenge (e.g. wrong password on Basic)
+}
+// Forget everything cached about how to log in to $url (login method + Digest challenge),
+// in this process and in the temp dir. $why: logged if given. Credentials are untouched.
+function evse_auth_forget($url, $why = ''){
+	unset($GLOBALS['__evse_auth_mode'][$url], $GLOBALS['__evse_digest'][$url], $GLOBALS['__evse_curl_shared'][$url]);
+	@unlink(evse_auth_file($url)); @unlink(evse_digest_file($url));
+	if ($why !== '') evse_auth_log(evse_url_label($url) . ': ' . $why);
+}
+function evse_url_label($url){ $h = parse_url($url, PHP_URL_HOST); return $h ? $h : 'unit'; }
+function evse_auth_log($msg){ if (function_exists('lb_log')) lb_log($msg); else error_log('MU Manager: ' . $msg); }
+// Coordinator signal: addresses whose cache it should drop too (loadbalancer/run/auth_clear.txt, one URL per line)
+function evse_auth_signal_coordinator($urls){
+	$d = __DIR__ . '/loadbalancer/run'; if (!is_dir($d)) return false;
+	return @file_put_contents("$d/auth_clear.txt", implode("\n", array_filter((array)$urls)) . "\n", FILE_APPEND | LOCK_EX) !== false;
 }
 
 // next sequence id 1..255 (00 is reserved as "no id")

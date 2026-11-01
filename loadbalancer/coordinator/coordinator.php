@@ -185,6 +185,11 @@ lb_log('started' . ($DRY ? ' in test mode (no changes sent)' : '') . ($ONCE ? ' 
 
 while (true) {
 	$now = time();
+	// Settings / unit page "Reset connection cache": drop our copy of those addresses' login-method cache
+	if (is_file("$RUN/auth_clear.txt") && @rename("$RUN/auth_clear.txt", "$RUN/auth_clear.work")) {
+		foreach (array_unique(array_filter(array_map('trim', (array)@file("$RUN/auth_clear.work")))) as $cu) evse_auth_forget($cu, 'connection cache reset (requested from MU Manager)');
+		@unlink("$RUN/auth_clear.work");
+	}
 	if ($now >= $nextCfg) {
 		try { [$groups, $units] = lb_load_config(); } catch (Exception $e) { lb_log('ERROR reading openevse.db: ' . $e->getMessage()); if ($ONCE) exit(1); sleep(10); continue; }
 		$nextCfg = $now + (int)$cfg['config_reload_sec'];

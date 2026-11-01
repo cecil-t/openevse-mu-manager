@@ -150,6 +150,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$f = array($name, $url, $brk, $user, $pass, $en, $gid ?: null, $em, $xs, $xn, $xk, $vm, $hw);
 		if ($old) { $db->prepare('UPDATE evses SET name=?, evseurl=?, breaker=?, username=?, password=?, enabled=?, loadgroupid=?, emon_mode=?, emon_ext_server=?, emon_ext_node=?, emon_ext_key=?, voltmeter=?, hw_max=? WHERE id = ?')->execute(array_merge($f, array($id))); }
 		else { $db->prepare('INSERT INTO evses (name, evseurl, breaker, username, password, enabled, loadgroupid, emon_mode, emon_ext_server, emon_ext_node, emon_ext_key, voltmeter, hw_max) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($f); $id = (int)$db->lastInsertId(); }
+		// address changed: forget the login-method cache for both (the coordinator self-heals on a 401, and is told too)
+		if ($old && norm_url((string)$old['evseurl']) !== norm_url($url)) {
+			require_once __DIR__ . '/include_v5.php';
+			foreach (array((string)$old['evseurl'], $url) as $cu) evse_auth_forget($cu, 'address changed in Settings > Units, connection cache cleared');
+			evse_auth_signal_coordinator(array((string)$old['evseurl'], $url));
+		}
 		$msgs = array('Saved.');
 		// the unit's own saved current is never above Max current; also refreshes hw_max (cap_lib.php)
 		if ($en) {

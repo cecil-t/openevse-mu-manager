@@ -28,6 +28,7 @@ switch ($a) {
 	case 'timelimit':      $r = evse_set_time_limit($unit, isset($_POST['code']) ? $_POST['code'] : 0); break;
 	case 'timer':          $r = evse_set_timer($unit, isset($_POST['start']) ? $_POST['start'] : '', isset($_POST['end']) ? $_POST['end'] : ''); break;
 	case 'synctime':       $r = evse_sync_time($unit); break;
+	case 'reset_conn':     evse_auth_forget($unit['evseurl'], 'connection cache reset from the unit page'); evse_auth_signal_coordinator(array($unit['evseurl'])); $r = array('ok'=>true, 'msg'=>'Connection cache reset'); break;
 	case 'restart':        $r = evse_restart($unit, 'evse'); sleep(8); break;
 	default:               $r = array('ok'=>false, 'msg'=>'Unknown action');
 }
