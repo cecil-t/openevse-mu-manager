@@ -23,8 +23,8 @@ foreach ((@file('/proc/net/arp', FILE_IGNORE_NEW_LINES) ?: array()) as $l) { $p 
 // one unit, read only -> plain values (+ what this site expects)
 function nm_read($u, $sug, $nodes, $arp){
 	$id = (int)$u['id'];
-	$o = array('id' => $id, 'name' => $u['name'], 'ip' => '', 'host' => '', 'sug' => $sug, 'mac' => '', 'serial' => '', 'node' => '', 'node_exp' => '', 'topic' => '', 'topic_exp' => '', 'wifi' => '', 'ctl' => '', 'max' => '', 'max_exp' => '', 'err' => '');
-	if (!empty($u['breaker'])) $o['max_exp'] = (string)(int)$u['breaker'];
+	$o = array('id' => $id, 'name' => $u['name'], 'ip' => '', 'host' => '', 'sug' => $sug, 'mac' => '', 'serial' => '', 'node' => '', 'node_exp' => '', 'topic' => '', 'topic_exp' => '', 'wifi' => '', 'ctl' => '', 'max' => '', 'pilot' => '', 'err' => '');
+	if (!empty($u['breaker'])) $o['max'] = (string)(int)$u['breaker'];   // MU Manager Max current (Settings > Units)
 	$h = (string)parse_url($u['evseurl'], PHP_URL_HOST); $o['ip'] = $h;
 	if (($u['emon_mode'] ?: 'internal') === 'internal' && isset($nodes[$id])) $o['node_exp'] = (string)$nodes[$id];
 	if ($u['loadgroupid']) $o['topic_exp'] = 'openevse/u' . $id;
@@ -39,7 +39,7 @@ function nm_read($u, $sug, $nodes, $arp){
 	$o['serial'] = (string)($c['evse_serial'] ?? '');
 	if ($o['serial'] === '' && (int)$o['ctl'] >= 8) { $g = sess_rapi($u, '$GI'); if (is_string($g) && preg_match('/^[0-9A-F]{6,}$/i', trim($g))) $o['serial'] = trim($g); }
 	$o['node'] = !empty($c['emoncms_enabled']) ? (string)($c['emoncms_node'] ?? '') : 'off';
-	if (isset($c['max_current_soft']) && $c['max_current_soft'] !== '') $o['max'] = (string)(int)$c['max_current_soft'];
+	if (isset($st['pilot']) && $st['pilot'] !== '') $o['pilot'] = (string)(int)$st['pilot'];
 	$o['topic'] = !empty($c['mqtt_enabled']) ? (string)($c['mqtt_topic'] ?? '') : 'off';
 	return $o;
 }
@@ -54,8 +54,8 @@ if (!empty($_GET['csv'])) {
 	header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="' . $fn . '"'); header('Cache-Control: no-store');
 	$out = fopen('php://output', 'w');
 	$safe = function($v){ $v = (string)$v; return preg_match('/^[=+@\t\r]/', $v) ? "'" . $v : $v; };   // no spreadsheet formulas
-	fputcsv($out, array('#', 'Name', 'IP', 'Hostname', 'Suggested hostname', 'MAC', 'Controller Serial', 'Max current (A)', 'MU Manager max (A)', 'Emoncms node', 'Expected node', 'MQTT topic', 'Expected topic', 'WiFi fw', 'Controller fw', 'Read error', 'Read at'), ',', '"', '');
-	foreach ($data as $d) fputcsv($out, array_map($safe, array($d['id'], $d['name'], $d['ip'], $d['host'], $d['sug'], $d['mac'], $d['serial'], $d['max'], $d['max_exp'], $d['node'], $d['node_exp'], $d['topic'], $d['topic_exp'], $d['wifi'], $d['ctl'], $d['err'], date('Y-m-d H:i:s T', $read_at))), ',', '"', '');
+	fputcsv($out, array('#', 'Name', 'IP', 'Hostname', 'Suggested hostname', 'MAC', 'Controller Serial', 'Max A', 'Pilot', 'Emoncms node', 'Expected node', 'MQTT topic', 'Expected topic', 'WiFi fw', 'Controller fw', 'Read error', 'Read at'), ',', '"', '');
+	foreach ($data as $d) fputcsv($out, array_map($safe, array($d['id'], $d['name'], $d['ip'], $d['host'], $d['sug'], $d['mac'], $d['serial'], $d['max'], $d['pilot'], $d['node'], $d['node_exp'], $d['topic'], $d['topic_exp'], $d['wifi'], $d['ctl'], $d['err'], date('Y-m-d H:i:s T', $read_at))), ',', '"', '');
 	fclose($out); exit;
 }
 
@@ -86,18 +86,18 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 <div class="nm">
 <div class="nm-top"><h2>Unit List</h2><a class="btn" href="unitlist.php?csv=1">Download CSV</a><a class="lnk" href="settings.php?s=units">Settings &gt; Units</a><span>Read from the units at <?=h(date('g:i a T', $read_at))?></span></div>
 <div class="nm-wrap"><table>
-<tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Controller fw</th></tr>
+<tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Controller fw</th></tr>
 <?php foreach ($data as $d) {
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
-	if ($d['err'] !== '') { echo '<td colspan="8" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
+	if ($d['err'] !== '') { echo '<td colspan="9" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
 	echo '<td>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
 	echo '<td>' . $cell($d['mac']) . '</td><td>' . $cell($d['serial']) . '</td>';
-	echo '<td class="num">' . $cell($d['max']) . ($d['max_exp'] !== '' && $d['max'] !== '' && $d['max'] !== $d['max_exp'] ? $warn('MU Manager: ' . $d['max_exp']) : '') . '</td>';
+	echo '<td class="num">' . $cell($d['max']) . '</td><td class="num">' . $cell($d['pilot']) . '</td>';
 	echo '<td class="num">' . $cell($d['node']) . ($d['node_exp'] !== '' && $d['node'] !== $d['node_exp'] ? $warn('expected: ' . $d['node_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['topic']) . ($d['topic_exp'] !== '' && $d['topic'] !== $d['topic_exp'] ? $warn('expected: ' . $d['topic_exp']) : '') . '</td>';
 	echo '<td>' . $cell($d['wifi']) . '</td><td>' . $cell($d['ctl']) . '</td></tr>';
 } ?>
 </table></div>
-<div class="nm-foot">* Node: the Emoncms node number this unit posts its data to (normally its unit number).<br>Max A: the unit's saved max current; &#9888; if it differs from Max current on Settings &gt; Units.<br>Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site expects. Hostnames are set under Settings &gt; Units, which also suggests one (rule in <a class="lnk" href="help.php#names">Help</a>).</div>
+<div class="nm-foot">* Node: the Emoncms node number this unit posts its data to (normally its unit number).<br>Max A: the Max current setting in MU Manager (Settings &gt; Units).<br>Pilot: the current the unit is offering right now.<br>Read only: nothing is changed on the units. &#9888; marks a value that differs from what this site expects. Hostnames are set under Settings &gt; Units, which also suggests one (rule in <a class="lnk" href="help.php#names">Help</a>).</div>
 </div>
 </div></body></html>
