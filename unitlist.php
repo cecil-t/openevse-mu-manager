@@ -37,7 +37,10 @@ function nm_read($u, $sug, $nodes, $arp){
 	$o['mac'] = strtoupper((string)($st['macaddress'] ?? '')) ?: ($arp[$o['ip']] ?? '');
 	$o['wifi'] = (string)($c['version'] ?? ''); $o['ctl'] = (string)($c['firmware'] ?? '');
 	$o['serial'] = (string)($c['evse_serial'] ?? '');
-	if ($o['serial'] === '' && (int)$o['ctl'] >= 8) { $g = sess_rapi($u, '$GI'); if (is_string($g) && preg_match('/^[0-9A-F]{6,}$/i', trim($g))) $o['serial'] = trim($g); }
+	if (!oev_serial_ok($o['serial']) && (int)$o['ctl'] >= 8) {   // missing or a crossed boot reply in the module: ask the controller ($GI)
+		$bad = $o['serial']; $g = sess_rapi($u, '$GI');
+		$o['serial'] = (is_string($g) && oev_serial_ok($g)) ? trim($g) : ($bad === '' ? '' : 'invalid (' . $bad . ')');
+	}
 	$o['node'] = !empty($c['emoncms_enabled']) ? (string)($c['emoncms_node'] ?? '') : 'off';
 	if (isset($c['max_current_soft']) && $c['max_current_soft'] !== '') $o['pilot'] = (string)(int)$c['max_current_soft'];   // saved pilot, not the LB's temporary one
 	if (isset($st['pilot']) && $st['pilot'] !== '') $o['vol'] = (string)(int)$st['pilot'];   // live (volatile) pilot

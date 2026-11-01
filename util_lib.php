@@ -6,6 +6,10 @@
  *  oev_sess_ro() read-only connection to sessions.db (the collector's data)
  * Included with require_once; safe to load more than once.
  ******************************************************************************/
+// controller serial ($GI / WiFi /config evse_serial): 6 ASCII chars + 4+ hex digits, e.g. Y73595FF0E2D12.
+// WiFi 5.x reads it once at boot without RAPI sequence ids, so a late reply can land there
+// (seen: "12" = the $GE pilot, "220" = the $GA ammeter scale, "0").
+function oev_serial_ok($s){ return (bool)preg_match('/^[A-Za-z0-9]{6}[0-9A-Fa-f]{4,}$/', trim((string)$s)); }
 if (!function_exists('h')) { function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); } }
 
 // timestamp -> 'just now' / '5 min ago' / '3 h ago' / date; 0 or null -> 'never'
