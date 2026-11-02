@@ -37,6 +37,10 @@ if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
 	exit(0);
 }
 
+// Task Scheduler starts us (sudo -u http) in root's home, which http can't
+// enter; include_v5.php restores the starting folder, so start from the site.
+chdir(SESS_WEB);
+
 try {
 	require SESS_WEB . '/include_v5.php';
 	require SESS_WEB . '/sessions_lib.php';
