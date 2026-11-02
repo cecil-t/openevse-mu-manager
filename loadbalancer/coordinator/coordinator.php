@@ -380,7 +380,7 @@ while (true) {
 			} else {
 				$res1 = lb_rapi_send($u, '$SC ' . (int)$to . ' V', 'Set current (temporary)'); $msg .= $res1['msg'];
 			}
-			$conf = lb_read_setting($u, (int)$to);
+			$conf = lb_read_setting($u, (int)$to); $fb = null;
 			// v5: claim didn't take (WiFi firmware can drop it as "unchanged" after a controller restart):
 			// send the temporary current straight to the controller over /r, then re-check
 			if (evse_is_http($u) && $conf !== (int)$to && $conf !== null) {
@@ -388,6 +388,11 @@ while (true) {
 				$conf2 = lb_read_setting($u, (int)$to);
 				lb_log("u$id {$u['name']}: claim not applied (live $conf A), sent " . lb_fallback_cmd($to) . ' over /r: ' . ($conf2 === (int)$to ? 'now ' . $conf2 . ' A' : 'still ' . var_export($conf2, true) . ' (' . ($fb['msg'] ?? '') . ')'));
 				$conf = $conf2;
+			}
+			// still reverting after the direct fix 3 rounds in a row (scrambled stock module): restart the WiFi module once
+			if (evse_is_http($u) && lb_gw_restart_check($state['units'][$id], $u, $fb !== null, $now)) {
+				$gr = evse_restart($u, 'gateway');
+				lb_log("u$id {$u['name']}: live current kept reverting after the direct fix (" . LB_GW_RESTART['after'] . " rounds in a row): RESTARTING ITS WIFI MODULE (controller keeps running, charging continues): " . ($gr['msg'] ?? '') . '; share is re-sent when it reconnects to MQTT');
 			}
 			$sv = ($kind === 'full') ? lb_read_saved($u) : null;
 			$ok = ($conf === (int)$to) && ($kind !== 'full' || $sv === $R);

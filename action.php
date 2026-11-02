@@ -29,7 +29,7 @@ switch ($a) {
 	case 'timer':          $r = evse_set_timer($unit, isset($_POST['start']) ? $_POST['start'] : '', isset($_POST['end']) ? $_POST['end'] : ''); break;
 	case 'synctime':       $r = evse_sync_time($unit); break;
 	case 'reset_conn':     evse_auth_forget($unit['evseurl'], 'connection cache reset from the unit page'); evse_auth_signal_coordinator(array($unit['evseurl'])); $r = array('ok'=>true, 'msg'=>'Connection cache reset'); break;
-	case 'restart':        $r = evse_restart($unit, 'evse'); sleep(8); break;
+	case 'restart':        $r = evse_restart_unit($unit); sleep(evse_is_http($unit) ? 3 : 8); break;   // controller, then the WiFi module
 	default:               $r = array('ok'=>false, 'msg'=>'Unknown action');
 }
 $back($r['msg']);

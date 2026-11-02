@@ -20,14 +20,14 @@ $lbca = is_array($lbu) ? evse_lb_checkin_age($lbu) : null;
 
 // small POST button
 // $small: true = text link, 'chip' = compact button floated right in a table cell
-function btn($action, $label, $extra = array(), $confirm = '', $small = false){
+function btn($action, $label, $extra = array(), $confirm = '', $small = false, $title = ''){
 	global $unitid, $with;
 	if (!oev_can_control()) return '';   // view-only users and public links: no buttons
 	$o = '<form class="inl" method="post" action="action.php"' . ($confirm ? ' onsubmit="return askForm(this, ' . h(json_encode($confirm)) . ')"' : '') . '>';
 	$o .= '<input type="hidden" name="unitid" value="' . $unitid . '"><input type="hidden" name="with" value="' . h(implode(',', $with)) . '">';
 	$o .= '<input type="hidden" name="action" value="' . h($action) . '">' . oev_csrf_field();
 	foreach ($extra as $k => $v) $o .= '<input type="hidden" name="' . h($k) . '" value="' . h($v) . '">';
-	if ($small === 'chip') return $o . '<button type="submit" class="chip">' . h($label) . '</button></form>';
+	if ($small === 'chip') return $o . '<button type="submit" class="chip"' . ($title !== '' ? ' title="' . h($title) . '"' : '') . '>' . h($label) . '</button></form>';
 	if ($small) return $o . '<button type="submit" style="background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;font-size:smaller;">' . h($label) . '</button></form> ';
 	return $o . '<button type="submit"><a><span>' . h($label) . '</span></a></button></form> ';
 }
@@ -198,7 +198,7 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 		elseif (array_key_exists('clock_offset', $e) && $e['clock_offset'] === null) $tt[] = 'Clock not checked (no reply)';
 		if (!empty($e['ntp'])) $tt[] = 'Unit syncs from NTP';
 	?><td id="td_time" style="white-space:nowrap<?= $clkhl ? ';background-color:#ffa' : '' ?>"<?= $tt ? ' title="' . h(implode('. ', $tt)) . '"' : '' ?>><?=h($e['time'])?></td></tr>
-	<tr><td><?=btn('restart', 'Reboot', array(), 'This will reboot your EVSE. Are you sure?', 'chip')?>Uptime</td><td class="nw"><span title="<?=h($upt['title'])?>"><?=h($upt['text'])?></span></td></tr>
+	<tr><td><?=btn('restart', 'Reboot', array(), 'This will reboot your EVSE (the controller, then the WiFi module). It is offline for about a minute. Are you sure?', 'chip', 'Restarts both the controller and the WiFi module')?>Uptime</td><td class="nw"><span title="<?=h($upt['title'])?>"><?=h($upt['text'])?></span></td></tr>
 	<?php if (!oev_is_public()) { /* view-only link: live status only, no history */ ?><tr><td><a id="a_faults" href="javascript:void(0);">Lifetime</a></td><td><?=$e['lifetimeKWH'] === null ? "\u{2014}" : round($e['lifetimeKWH'] / 1000, 2) . ' MWh'?></td></tr>
 	<tr><td>Last Session</td><td class="nw"><?php
 		if ($ls) {

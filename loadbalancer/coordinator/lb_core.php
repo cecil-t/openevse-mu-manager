@@ -292,6 +292,22 @@ function lb_gc_parse($s){
 // v5 fallback when our claim didn't take (module dropped it): temporary current straight to the
 // controller over the module's /r pass-through. Always volatile (V): never an EEPROM write.
 function lb_fallback_cmd($amps){ return '$SC ' . max(LB_MIN_AMPS, (int)$amps) . ' V'; }
+// Stock WiFi firmware after a controller-only restart: its scrambled boot readings keep pulling the
+// controller back (e.g. to 6 A) even after the direct $SC N V fallback. Only a WiFi module restart
+// clears it (the controller keeps running, charging continues). Restart it after 3 rounds in a row
+// that needed the fallback; normally once. Safety net: not again for the same unit within 10 min.
+// Never for an ungrouped (monitored) unit. $us = the unit's coordinator state (updated in place).
+const LB_GW_RESTART = ['after'=>3, 'gap_sec'=>600];
+function lb_gw_restart_check(array &$us, array $unit, $needed_fallback, $now){
+	if (!lb_write_allowed($unit)) { unset($us['fb_runs']); return false; }
+	if (!$needed_fallback) { unset($us['fb_runs']); return false; }
+	// "in a row": rounds more than 5 min apart don't add up
+	$us['fb_runs'] = ($now - ($us['fb_last'] ?? 0) <= 300 ? ($us['fb_runs'] ?? 0) : 0) + 1; $us['fb_last'] = $now;
+	if ($us['fb_runs'] < LB_GW_RESTART['after']) return false;
+	if (isset($us['gw_restart_at']) && $now - $us['gw_restart_at'] < LB_GW_RESTART['gap_sec']) return false;
+	$us['gw_restart_at'] = $now; $us['fb_runs'] = 0;
+	return true;
+}
 function lb_cmd_allowed($cmd){
 	$t = preg_split('/\s+/', trim($cmd));
 	if (!in_array($t[0], LB_RAPI_ALLOWED, true)) return false;

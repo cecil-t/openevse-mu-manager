@@ -743,6 +743,24 @@ function evse_sync_time($unit, $epoch = null){
 	return evse_result(evse_http($unit, 'POST', 'time', array('sntp_enabled'=>false, 'time_zone'=>$tz, 'time'=>gmdate('Y-m-d\TH:i:s\Z', $epoch))), 'Sync time');
 }
 
+// Unit page Reboot: the whole unit, like the old behaviour. Controller first ($FR on RAPI units:
+// the only reboot they have), wait until it answers again over /r, then restart the WiFi module so it
+// boots cleanly against the running controller (stock 5.x can scramble its readings otherwise).
+function evse_restart_unit($unit){
+	$r = evse_restart($unit, 'evse');
+	if (!evse_is_http($unit) || empty($r['ok'])) return $r;
+	sleep(5); $back = false;
+	for ($i = 0; $i < 20 && !$back; $i++) {
+		unset($GLOBALS['__evse_rapi_budget'], $GLOBALS['__evse_rapi_memo']);   // fresh read each try
+		$gc = rapi($unit, '$GC');
+		$back = is_string($gc) && preg_match('/^\d+ \d+ \d+ \d+$/', trim($gc));
+		if (!$back) sleep(1);
+	}
+	if ($back) sleep(2);   // let it finish its self test
+	$g = evse_restart($unit, 'gateway');
+	return array('ok'=>!empty($g['ok']), 'msg'=>'Controller restarted' . ($back ? '' : ' (no answer yet)') . (!empty($g['ok']) ? ', then the WiFi module' : '; WiFi module restart failed (' . $g['msg'] . ')'));
+}
+
 // Reboot. 'evse' = controller (old $FR), 'gateway' = WiFi module.
 function evse_restart($unit, $device = 'evse'){
 	if (!evse_is_http($unit)) return evse_rapi_action($unit, '$FR', 'Reboot');
