@@ -5,6 +5,8 @@ $mode = getenv('MOCK_MODE') ?: 'both'; $m = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if ($path !== '/r') { http_response_code(404); exit; }
 file_put_contents(getenv('MOCK_LOG'), $m . "\n", FILE_APPEND);
+// MOCK_AUTH=1: Basic login u/p required (401 + Basic challenge otherwise), checked before the method
+if (getenv('MOCK_AUTH') && (($_SERVER['PHP_AUTH_USER'] ?? '') !== 'u' || ($_SERVER['PHP_AUTH_PW'] ?? '') !== 'p')) { header('WWW-Authenticate: Basic realm="mock"'); http_response_code(401); exit; }
 if ($m === 'POST' && $mode === 'get') { http_response_code(405); exit; }
 if ($m === 'GET' && $mode === 'post') { http_response_code(403); echo 'use POST'; exit; }
 $rapi = $m === 'POST' ? ($_POST['rapi'] ?? '') : ($_GET['rapi'] ?? '');
