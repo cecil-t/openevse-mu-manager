@@ -1,7 +1,7 @@
 <?php
 // php tests/rapi_post_test.php - /r pass-through sends POST (json=1&rapi=...), falls back to GET
 // once when a unit rejects POST. Runs a mock module on 127.0.0.1 with PHP's built-in server.
-$dir = sys_get_temp_dir() . '/oev_post_' . getmypid(); @mkdir($dir); putenv("TMPDIR=$dir");
+$dir = __DIR__ . '/tmp/run_' . getmypid(); @mkdir($dir, 0700, true); putenv("OEV_RUN_DIR=$dir"); putenv("TMPDIR=$dir");   // inside the site folder
 require_once __DIR__ . '/../include.php';
 require_once __DIR__ . '/../include_v5.php';
 require_once __DIR__ . '/../collector/session_logic.php';
@@ -38,5 +38,5 @@ foreach (array('post'=>'POST POST', 'get'=>'POST POST GET') as $mode => $want) {
 	ck("401 self-heal parallel mode=$mode", $r === '6 48 20 48' && evse_auth_mode($u['evseurl']) === 'basic');
 	evse_auth_forget($u['evseurl']);
 }
-proc_terminate($proc); array_map('unlink', glob("$dir/*")); @rmdir($dir);
+proc_terminate($proc); exec('rm -rf ' . escapeshellarg($dir));
 echo $f ? "$f failed\n" : "ok\n"; exit($f ? 1 : 0);

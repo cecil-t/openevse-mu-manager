@@ -26,6 +26,7 @@ function sess_db($readonly = false){
 		PDO::ATTR_TIMEOUT => 10,
 	));
 	$db->exec('PRAGMA busy_timeout = 10000');
+	$db->exec('PRAGMA temp_store = MEMORY');   // SQLite temp files would go to the NAS temp folder
 	if (!$readonly) {
 		if (strtolower((string)$db->query('PRAGMA journal_mode')->fetchColumn()) !== 'wal') $db->exec('PRAGMA journal_mode = WAL');
 		$db->exec('PRAGMA synchronous = NORMAL');

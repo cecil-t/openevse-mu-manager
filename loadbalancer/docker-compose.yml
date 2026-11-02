@@ -15,6 +15,8 @@ services:
       - ./secrets/mosquitto_passwd:/mosquitto/passwd:ro
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
+    logging:
+      driver: none                    # it logs to mosquitto/log (no copy kept by Docker)
   coordinator:
     build: ./coordinator
     image: openevse-lb-coordinator:1
@@ -27,11 +29,18 @@ services:
       - LB_CONFIG=/app/lb.ini
       - OPENEVSE_SITE=${OPENEVSE_SITE}   # the site folder (from .env)
       - LB_RUN_DIR=/run-lb
+      - TMPDIR=/run-lb/tmp
       - LB_DRY_RUN=${LB_DRY_RUN:-}       # 1 = only log, 0 = live; blank = dry_run in lb.ini
     volumes:
       - "${OPENEVSE_SITE}:${OPENEVSE_SITE}:ro"   # PHP helpers + openevse.db, read-only
       - ./coordinator:/app:ro
       - ./run:/run-lb
+    # Nothing may be written outside the site folder: the container's own filesystem is
+    # read-only, temp files go to run/tmp, and its output isn't kept by Docker (it logs
+    # to run/coordinator.log and run/php_errors.log instead).
+    read_only: true
+    logging:
+      driver: none
     healthcheck:
       test: ["CMD", "php", "/app/health.php"]
       interval: 30s

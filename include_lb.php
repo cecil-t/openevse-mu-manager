@@ -38,7 +38,8 @@ function evse_lb_note($u){
 // seconds since the unit's last MQTT check-in (null = never)
 function evse_lb_checkin_age($u){ return (is_array($u) && !empty($u['mqtt_seen'])) ? max(0, time() - (int)$u['mqtt_seen']) : null; }
 
-function evse_home_slow_file($unit){ return sys_get_temp_dir() . '/oev_home_slow_' . md5((string)$unit['evseurl']) . '.json'; }
+require_once __DIR__ . '/run_lib.php';
+function evse_home_slow_file($unit){ return oev_cache_dir() . '/oev_home_slow_' . md5((string)$unit['evseurl']) . '.json'; }
 function evse_home_slow_get($unit){ $c = @json_decode((string)@file_get_contents(evse_home_slow_file($unit)), true); return is_array($c) ? $c : null; }
 function evse_home_slow_clear($unit){ @unlink(evse_home_slow_file($unit)); }
 function evse_home_slow_put($unit, $e){

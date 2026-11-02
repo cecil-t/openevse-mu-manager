@@ -68,6 +68,16 @@ chown root:root "$SITE/private/jobs_root.sh" && chmod 755 "$SITE/private/jobs_ro
 [ "$(stat -c %h "$SITE/private/jobs_root.sh")" = 1 ] || warn "private/jobs_root.sh has more than one hard link: copy it (cp) instead, or the jobs task will refuse it"
 ok "private/ (root), key/ status/ firmware/ backups/ run/ secrets/ ($WU), mosquitto data/log (uid 1883)"
 
+echo "Run-time files stay in the site folder"
+# caches, temp files, PHP sessions and PHP's error log: loadbalancer/run (never served), shared with the coordinator
+for d in cache tmp sessions; do mkdir -p "$SITE/loadbalancer/run/$d"; done
+chown "$U:$G" "$SITE/loadbalancer/run/cache" "$SITE/loadbalancer/run/tmp" "$SITE/loadbalancer/run/sessions"; chmod 770 "$SITE/loadbalancer/run/cache" "$SITE/loadbalancer/run/tmp" "$SITE/loadbalancer/run/sessions"
+mkdir -p "$SITE/tests/tmp" && chmod 1777 "$SITE/tests/tmp"   # tests make their own run_<pid> folder here
+R=$SITE/loadbalancer/run
+printf '; made by setup.sh: keep PHP run-time files inside the site folder (PHP-FPM reads this)\nsession.save_path = "%s/sessions"\nerror_log = "%s/php_errors.log"\n' "$R" "$R" > "$SITE/.user.ini"
+chown "$U:$G" "$SITE/.user.ini"; chmod 644 "$SITE/.user.ini"
+ok ".user.ini (sessions + PHP error log in loadbalancer/run), run/cache run/tmp run/sessions, tests/tmp"
+
 echo "Encryption key"
 if [ -s "$SITE/private/key/secret.key" ]; then ok "private/key/secret.key already there (kept)"
 else W sh -c "umask 077; openssl rand -hex 32 > '$SITE/private/key/secret.key' 2>/dev/null || '$PHP' -r 'echo bin2hex(random_bytes(32)), \"\\n\";' > '$SITE/private/key/secret.key'; chmod 400 '$SITE/private/key/secret.key'" && ok "private/key/secret.key made: back it up" || bad "could not make the key"; fi

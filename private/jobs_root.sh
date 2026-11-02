@@ -28,8 +28,8 @@ PHP=${OEV_PHP:-}; if [ -z "$PHP" ]; then for p in php8.4 php84 php8.3 php83 php8
 DOCKER=${OEV_DOCKER:-$(command -v docker)}
 IMG=eclipse-mosquitto:2
 asweb(){ sudo -u "#$WUID" "$@"; }
-LOCK=/tmp/openevse_jobs_root.$(printf '%s' "$SITE" | cksum | cut -d' ' -f1).lock
-exec 9>"$LOCK"; flock -n 9 || exit 0
+# one run at a time: lock this script file itself (opened read-only, so no lock file is written anywhere)
+exec 9<"$SITE/private/jobs_root.sh"; flock -n 9 || exit 0
 log(){ echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | asweb sh -c "cat >> '$SITE/collector/jobs.log'"; }
 [ -n "$PHP" ] || { logger -t openevse "jobs_root.sh: php not found"; exit 1; }
 
@@ -43,7 +43,9 @@ printf '{"time":%s,"containers":{"openevse-mosquitto":"%s","openevse-lb-coordina
 asweb "$PHP" "$SITE/collector/jobs.php" --logins
 
 if [ -f "$SEC/reload.flag" ] && [ -n "$DOCKER" ]; then
-	T=$(mktemp -d /tmp/oevpw.XXXXXX) && chmod 700 "$T"
+	# scratch folder inside the site, under private/ (owned by root, so the web user can't plant links there)
+	mkdir -p "$SITE/private/tmp" && chmod 700 "$SITE/private/tmp"
+	T=$(mktemp -d "$SITE/private/tmp/oevpw.XXXXXX") && chmod 700 "$T"
 	# plain "user:password" lines from mqtt_users.json (names and hex passwords only), read as the web user
 	asweb "$PHP" -r '$u = json_decode(file_get_contents($argv[1]), true); foreach ((array)$u as $k => $v) if (preg_match("/^[a-z0-9]{1,16}$/", $k) && is_string($v) && preg_match("/^[a-f0-9]{16,64}$/", $v)) echo "$k:$v\n";' "$SEC/mqtt_users.json" > "$T/p"
 	# hash in a throw-away container, then copy into the broker's file from inside a container too:

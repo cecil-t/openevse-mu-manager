@@ -1,5 +1,6 @@
 <?php
 include 'connection.php';
+require_once __DIR__ . '/run_lib.php';      // run-time files stay inside the site folder
 require_once __DIR__ . '/volts_lib.php';   // the one voltage rule (assumed L1/L2 volts, overrides)
 
 /******************************************************************************
@@ -55,12 +56,12 @@ define('EVSE_RAPI_RETRY_BUDGET', PHP_SAPI === 'cli' ? 30 : 3);   // per unit, pe
  * header ourselves and send it with the first request, so there's no 401
  * challenge round trip (~30 ms per request). The server's last challenge (realm,
  * nonce, opaque, qop - no credentials) is kept in a shared per-unit cache file in
- * the temp dir (pages, logger, push/clock logic all share it; flock'd), with nc
+ * loadbalancer/run/cache (pages, logger, coordinator, push/clock logic all share it; flock'd), with nc
  * counted up per request and a fresh cnonce each time. ESPAsyncWebServer 1.2.3
  * doesn't track nonces (it only recomputes the hash), but if a unit ever answers
  * 401 we take its new challenge, update the cache and send the request once more.
  ******************************************************************************/
-function evse_auth_file($url){ return sys_get_temp_dir() . '/oev_auth_' . md5($url) . '.txt'; }
+function evse_auth_file($url){ return oev_cache_dir() . '/oev_auth_' . md5($url) . '.txt'; }
 function evse_auth_mode($url){
 	$c = &$GLOBALS['__evse_auth_mode'];
 	if (!is_array($c)) $c = array();
@@ -74,7 +75,7 @@ function evse_auth_set($url, $mode){
 }
 
 // Digest challenge cache (per unit URL): {"realm","nonce","opaque","qop","nc","at"}
-function evse_digest_file($url){ return sys_get_temp_dir() . '/oev_digest_' . md5($url) . '.json'; }
+function evse_digest_file($url){ return oev_cache_dir() . '/oev_digest_' . md5($url) . '.json'; }
 // open + lock the cache file; null if it can't be opened (then the process copy is used)
 function evse_digest_open($url){
 	$f = evse_digest_file($url);
@@ -194,11 +195,16 @@ function evse_auth_retry($ch, $url, $code, $user, $pass){
 // in this process and in the temp dir. $why: logged if given. Credentials are untouched.
 function evse_auth_forget($url, $why = ''){
 	unset($GLOBALS['__evse_auth_mode'][$url], $GLOBALS['__evse_digest'][$url], $GLOBALS['__evse_curl_shared'][$url]);
-	@unlink(evse_auth_file($url)); @unlink(evse_digest_file($url));
+	// If a file can't be deleted (e.g. left by another user), overwrite it instead; if even that
+	// fails, this process still goes on with Basic (re-detect) so the self-heal never gets stuck.
+	$af = evse_auth_file($url); $df = evse_digest_file($url);
+	if (!@unlink($af) && is_file($af)) @file_put_contents($af, 'basic', LOCK_EX);
+	if (!@unlink($df) && is_file($df)) @file_put_contents($df, '', LOCK_EX);
+	if (is_file($af)) $GLOBALS['__evse_auth_mode'][$url] = 'basic';
 	if ($why !== '') evse_auth_log(evse_url_label($url) . ': ' . $why);
 }
 function evse_url_label($url){ $h = parse_url($url, PHP_URL_HOST); return $h ? $h : 'unit'; }
-function evse_auth_log($msg){ if (function_exists('lb_log')) lb_log($msg); else error_log('MU Manager: ' . $msg); }
+function evse_auth_log($msg){ if (function_exists('lb_log')) lb_log($msg); else @file_put_contents(oev_run_dir() . '/mu_manager.log', date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND | LOCK_EX); }
 // Coordinator signal: addresses whose cache it should drop too (loadbalancer/run/auth_clear.txt, one URL per line)
 function evse_auth_signal_coordinator($urls){
 	$d = __DIR__ . '/loadbalancer/run'; if (!is_dir($d)) return false;
@@ -249,7 +255,7 @@ function evse_rapi_parse_reply($text, $seq){
 
 // Last good reply of a slow-changing read ($GV, $GE, $GD, $G3, $GH), for when the
 // current read can't be confirmed. Cleared when we send that unit a write.
-function evse_rapi_cache_file($url){ return sys_get_temp_dir() . '/oev_rapi_cache_' . md5($url) . '.json'; }
+function evse_rapi_cache_file($url){ return oev_cache_dir() . '/oev_rapi_cache_' . md5($url) . '.json'; }
 function rapi_cached(&$unit, $cmd, $maxage){
 	$r = rapi($unit, $cmd);
 	$f = evse_rapi_cache_file($unit['evseurl']);

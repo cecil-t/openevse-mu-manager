@@ -18,5 +18,7 @@ function ago($t){ if (!$t) return 'never'; $d = time() - (int)$t; if ($d < 120) 
 // sessions.db opened read-only (pages never write it; the collector and the receiver do, via sess_db()).
 // Throws on failure: callers wrap it in try/catch.
 function oev_sess_ro($timeout = 2, $dir = null){
-	return new PDO('sqlite:' . ($dir ?? __DIR__) . '/sessions.db', null, null, array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_TIMEOUT => $timeout, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+	$db = new PDO('sqlite:' . ($dir ?? __DIR__) . '/sessions.db', null, null, array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_TIMEOUT => $timeout, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+	$db->exec('PRAGMA temp_store = MEMORY');   // big sorts never spill into the NAS temp folder
+	return $db;
 }

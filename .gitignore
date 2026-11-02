@@ -36,3 +36,6 @@ loadbalancer/mosquitto/log/
 @eaDir/
 .DS_Store
 Thumbs.db
+.user.ini
+tests/tmp/
+private/tmp/
