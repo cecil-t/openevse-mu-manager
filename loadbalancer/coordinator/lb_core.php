@@ -277,6 +277,21 @@ function lb_cmd_allowed_for(array $unit, $cmd){
 	if (!lb_cmd_allowed($cmd)) return false;
 	return lb_write_allowed($unit) || in_array(preg_split('/\s+/', trim((string)$cmd))[0], LB_READ_ONLY_CMDS, true);
 }
+// Direct "$GC" reply ("min hwmax live saved") -> parts, or null if it doesn't look right.
+// On v5 units the coordinator trusts this over the module's own status "pilot": after a
+// controller restart stock WiFi firmware can report stale/scrambled values (showed 20, live 48).
+function lb_gc_parse($s){
+	if (!is_string($s)) return null;
+	$t = preg_split('/\s+/', trim($s));
+	if (count($t) != 4) return null;
+	foreach ($t as $x) if (!ctype_digit($x)) return null;
+	[$min, $hmax, $live, $saved] = array_map('intval', $t);
+	if ($min < 6 || $hmax < $min || $hmax > 80 || $live < $min || $live > $hmax || $saved < $min || $saved > $hmax) return null;
+	return ['min'=>$min, 'hmax'=>$hmax, 'live'=>$live, 'saved'=>$saved];
+}
+// v5 fallback when our claim didn't take (module dropped it): temporary current straight to the
+// controller over the module's /r pass-through. Always volatile (V): never an EEPROM write.
+function lb_fallback_cmd($amps){ return '$SC ' . max(LB_MIN_AMPS, (int)$amps) . ' V'; }
 function lb_cmd_allowed($cmd){
 	$t = preg_split('/\s+/', trim($cmd));
 	if (!in_array($t[0], LB_RAPI_ALLOWED, true)) return false;

@@ -104,6 +104,11 @@ function lb_read_gen($unit, $api){
 		$r['setting'] = isset($j['pilot']) ? (int)$j['pilot'] : null;
 		$r['saved'] = ($c['ok'] && isset($c['json']['max_current_soft'])) ? (int)$c['json']['max_current_soft'] : null;
 		$r['hmax'] = ($c['ok'] && isset($c['json']['max_current_hard'])) ? (int)$c['json']['max_current_hard'] : null;
+		// grouped units: the controller's live pilot straight from $GC (/r, tagged) wins over the module's status value
+		if (empty($unit['monitor'])) {
+			$gc = lb_gc_parse(yield from evse_par_rapi('$GC', null, $unit['evseurl']));
+			if ($gc !== null) { $r['mod_pilot'] = $r['setting']; $r['setting'] = $gc['live']; }
+		}
 		$r['ok'] = ($r['plugged'] !== null);
 		return $r;
 	}
@@ -156,7 +161,12 @@ function lb_reset_request_globals(){
 function lb_read_setting($unit, $expect = null){
 	for ($i = 0; $i < 4; $i++) {
 		lb_reset_request_globals();
-		if (evse_is_http($unit)) { $r = evse_http($unit, 'GET', 'status'); $v = ($r['ok'] && isset($r['json']['pilot'])) ? (int)$r['json']['pilot'] : null; }
+		if (evse_is_http($unit)) {
+			// direct $GC first (the module's status can be stale after a controller restart), status if that fails
+			$gc = empty($unit['monitor']) ? lb_gc_parse(rapi($unit, '$GC')) : null;
+			if ($gc !== null) $v = $gc['live'];
+			else { $r = evse_http($unit, 'GET', 'status'); $v = ($r['ok'] && isset($r['json']['pilot'])) ? (int)$r['json']['pilot'] : null; }
+		}
 		else { $ge = rapi($unit, '$GE'); $v = (is_string($ge) && $ge !== 'Error') ? (int)preg_split('/\s+/', trim($ge))[0] : null; }
 		if ($expect === null || $v === $expect || !evse_is_http($unit)) return $v;
 		usleep(500000);
@@ -371,6 +381,14 @@ while (true) {
 				$res1 = lb_rapi_send($u, '$SC ' . (int)$to . ' V', 'Set current (temporary)'); $msg .= $res1['msg'];
 			}
 			$conf = lb_read_setting($u, (int)$to);
+			// v5: claim didn't take (WiFi firmware can drop it as "unchanged" after a controller restart):
+			// send the temporary current straight to the controller over /r, then re-check
+			if (evse_is_http($u) && $conf !== (int)$to && $conf !== null) {
+				$fb = lb_rapi_send($u, lb_fallback_cmd($to), 'Set current (temporary, direct)');
+				$conf2 = lb_read_setting($u, (int)$to);
+				lb_log("u$id {$u['name']}: claim not applied (live $conf A), sent " . lb_fallback_cmd($to) . ' over /r: ' . ($conf2 === (int)$to ? 'now ' . $conf2 . ' A' : 'still ' . var_export($conf2, true) . ' (' . ($fb['msg'] ?? '') . ')'));
+				$conf = $conf2;
+			}
 			$sv = ($kind === 'full') ? lb_read_saved($u) : null;
 			$ok = ($conf === (int)$to) && ($kind !== 'full' || $sv === $R);
 			$a = ['t'=>$now, 'unit'=>$id, 'from'=>$from, 'to'=>$to, 'kind'=>$kind, 'dry'=>false, 'ok'=>$ok];

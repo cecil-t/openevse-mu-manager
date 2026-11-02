@@ -182,5 +182,11 @@ check('idle-capped unit starts charging: cap lifted on the first reading', $h['c
 $h = [];
 for ($s = 0; $s <= 400; $s += 5) [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'real'=>true, 'amps'=>3.2, 'alloc'=>34], $s);
 check('low-draw cap of a charging car is not an idle cap', $h['cap'] !== null && empty($h['idle_cap']));
+echo "== v5 direct \$GC check and /r fallback\n";
+check('$GC parse: live pilot is the 3rd field', lb_gc_parse('6 48 20 48') == ['min'=>6,'hmax'=>48,'live'=>20,'saved'=>48]);
+check('$GC parse: scrambled / short / junk replies rejected', lb_gc_parse('0') === null && lb_gc_parse('220 0 12 5') === null && lb_gc_parse('6 48 20') === null && lb_gc_parse('6 48 x 48') === null && lb_gc_parse(null) === null && lb_gc_parse('6 48 60 48') === null);
+check('fallback is always volatile ($SC N V) and whitelisted', lb_fallback_cmd(20) === '$SC 20 V' && lb_cmd_allowed(lb_fallback_cmd(20)) && lb_fallback_cmd(3) === '$SC 6 V');
+$mu2 = ['id'=>2, 'monitor'=>true];
+check('fallback refused for an ungrouped unit', !lb_cmd_allowed_for($mu2, lb_fallback_cmd(12)));
 echo $fail ? "$fail FAILED\n" : "all passed\n";
 exit($fail ? 1 : 0);
