@@ -207,7 +207,6 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 		} else echo "\u{2014}";
 	?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>
-	<?php if (oev_is_admin()) { ?><tr><td><?=btn('reset_conn', 'Reset', array(), 'Reset the connection cache for this unit? Your saved username and password are kept.', 'chip')?>Connection</td><td style="white-space:normal"><span style="font-size:smaller;color:#666">Forgets how MU Manager connects to this unit (login method only; your saved username and password are kept). Use if a unit stops responding after an IP or module change.</span></td></tr><?php } ?>
 </table>
 </div><?php /* #ucard */ ?>
 

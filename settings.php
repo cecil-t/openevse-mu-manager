@@ -10,7 +10,7 @@
 require_once __DIR__ . '/auth_lib.php';
 $me = oev_require('admin');
 // Test connection, hostname and its read-back need the unit helpers
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['a'] ?? '', array('unit_test', 'unit_hostname', 'host_read'), true)) { require_once __DIR__ . '/include_v5.php'; require_once __DIR__ . '/collector/session_logic.php'; }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['a'] ?? '', array('unit_test', 'unit_hostname', 'host_read', 'unit_connreset'), true)) { require_once __DIR__ . '/include_v5.php'; require_once __DIR__ . '/collector/session_logic.php'; }
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
 $db = oev_db();
 $sec = in_array($_GET['s'] ?? '', array('units', 'groups', 'prefs', 'users', 'link', 'system'), true) ? $_GET['s'] : 'units';
@@ -81,6 +81,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			$lines[] = 'Voltage it reports: ' . $V(round($v, 1) . ' V') . ($std ? ' (a standard value: most likely the service-level default, not a sensor).' : ' (looks like a real measurement: tick "has its own voltage sensor" if so).');
 		}
 		$out(true, implode(' ', $lines), $hw);
+	}
+	/* ---- units: Reset connection cache (forget the login method for its address; saved username/password kept), JSON ---- */
+	if ($a === 'unit_connreset') {
+		header('Content-Type: application/json'); header('Cache-Control: no-store');
+		$id = (int)$P('id'); $us = evse_units(array($id));
+		if (!isset($us[$id])) { echo json_encode(array('ok' => false, 'msg' => 'That unit is gone.')); exit; }
+		evse_auth_forget($us[$id]['evseurl'], 'connection cache reset from Settings > Units');
+		evse_auth_signal_coordinator(array($us[$id]['evseurl']));
+		echo json_encode(array('ok' => true, 'msg' => 'Connection cache reset')); exit;
 	}
 	/* ---- units: set the hostname on the unit, restart only its WiFi module, read it back ---- */
 	/* ---- units: read the unit's current hostname (read only), JSON ---- */
@@ -343,7 +352,7 @@ if ($sec === 'units') {
 		<div><label>Unit password</label><input type="password" name="password" value="" placeholder="<?=!empty($u['password']) ? '(saved)' : '(none)'?>" autocomplete="new-password"></div></div>
 		<div class="note">Only if the unit's web page asks for a login. The password is stored encrypted and never shown. Leave it blank to keep the saved one.</div>
 		<?php if (!empty($u['password'])) { ?><label class="in"><input type="checkbox" name="clearpass">Remove the saved password</label><?php } ?>
-		<div><button type="button" onclick="utest(this)">Test connection</button></div>
+		<div style="display:flex;flex-wrap:wrap"><button type="button" onclick="utest(this)">Test connection</button><?php if ($id) { ?><button type="button" onclick="uconnreset(this)" title="Forgets how MU Manager connects to this unit (login method only; saved username and password are kept)">Reset connection cache</button><?php } ?></div>
 		<div class="tres" hidden></div>
 		<?php if ($id) { $sug = $HSUG[$id] ?? oev_host_base($u['name'], $id); ?>
 		<label>Hostname on the unit</label>
@@ -408,6 +417,14 @@ if ($sec === 'units') {
 				if (!i.value || parseInt(i.value, 10) > j.hw) { i.value = j.hw; out.insertAdjacentHTML('beforeend', ' Max current set to <span class="v">' + parseInt(j.hw, 10) + ' A</span>.'); }
 				ubrk(i); }
 		}).catch(function(){ out.className = 'tres bad'; out.textContent = '\u2716 The test did not finish. Try again.'; }).then(function(){ b.disabled = false; });
+	}
+	function uconnreset(b){
+		var f = b.form, out = f.querySelector('.tres');
+		if (!confirm('Reset the connection cache for this unit? Your saved username and password are kept.')) return;
+		var fd = new FormData(); fd.set('a', 'unit_connreset'); fd.set('id', f.elements.id.value); fd.set('csrf', f.elements.csrf ? f.elements.csrf.value : ''); b.disabled = true;
+		fetch('settings.php?s=units', {method: 'POST', body: fd, credentials: 'same-origin'}).then(function(r){ return r.json(); }).then(function(j){
+			out.hidden = false; out.className = 'tres ' + (j.ok ? 'ok' : 'bad'); out.textContent = (j.ok ? '\u2714 ' : '\u2716 ') + (j.msg || '');
+		}).catch(function(){ out.hidden = false; out.className = 'tres bad'; out.textContent = '\u2716 The reset did not finish. Try again.'; }).then(function(){ b.disabled = false; });
 	}
 	function uhost(b){
 		var f = b.form, out = f.querySelector('.hres'), hn = f.querySelector('input[name=hostname]').value;
