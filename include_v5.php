@@ -63,7 +63,7 @@ function evse_with_param(){
  * GETs retry on any failure; writes retry only when the connection failed
  * (code 0), so a write is never sent twice after the unit accepted it.
  *----------------------------------------------------------------------------*/
-function evse_http($unit, $method, $path, $body = null, $want_json = true){
+function evse_http($unit, $method, $path, $body = null, $want_json = true, $ctype = 'application/json'){
 	$url = rtrim($unit['evseurl'], '/') . '/' . ltrim($path, '/');
 	$tries = 1 + EVSE_RETRIES;
 	$out = array('ok'=>false, 'code'=>0, 'json'=>null, 'raw'=>'', 'error'=>'');
@@ -81,7 +81,7 @@ function evse_http($unit, $method, $path, $body = null, $want_json = true){
 		);
 		if ($body !== null) {
 			$opts[CURLOPT_POSTFIELDS] = is_string($body) ? $body : json_encode($body);
-			$opts[CURLOPT_HTTPHEADER] = array('Accept: application/json', 'Content-Type: application/json');
+			$opts[CURLOPT_HTTPHEADER] = array('Accept: application/json', 'Content-Type: ' . $ctype);
 		}
 		$hdrs = $opts[CURLOPT_HTTPHEADER]; unset($opts[CURLOPT_HTTPHEADER]);
 		curl_setopt_array($ch, $opts);
@@ -854,9 +854,18 @@ function evse_par_handle($unit, $req){
 	if ($req['type'] == 'rapi') {
 		$cmd = evse_rapi_with_seq($req['cmd'], $req['seq'] ?? 0);   // sequence id: see include.php
 		evse_rapi_stat('sent');
-		$u = $unit['evseurl'] . 'r?rapi=' . urlencode(evse_rapi_wire($cmd)); $hdrs = array();
-		curl_setopt_array($ch, array(CURLOPT_URL => $u, CURLOPT_HTTPGET => true,
-			CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 1, CURLOPT_TIMEOUT => 5));
+		$wire = evse_rapi_wire($cmd);
+		if (!empty($req['get'])) {   // this unit rejected POST /r: old GET (see include.php)
+			$u = $unit['evseurl'] . evse_rapi_get_path($wire); $hdrs = array(); $m = 'GET';
+			curl_setopt_array($ch, array(CURLOPT_URL => $u, CURLOPT_HTTPGET => true,
+				CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 1, CURLOPT_TIMEOUT => 5));
+		} else {
+			$u = $unit['evseurl'] . 'r'; $hdrs = array('Content-Type: application/x-www-form-urlencoded'); $m = 'POST';
+			curl_setopt_array($ch, array(CURLOPT_URL => $u, CURLOPT_POST => true, CURLOPT_POSTFIELDS => evse_rapi_post_body($wire),
+				CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 1, CURLOPT_TIMEOUT => 5));
+		}
+		evse_curl_auth($ch, $unit['evseurl'], $unit['username'], $unit['password'], $hdrs, $m, $u);
+		return $ch;
 	} else {
 		$u = rtrim($unit['evseurl'], '/') . '/' . ltrim($req['path'], '/'); $hdrs = array('Accept: application/json');
 		curl_setopt_array($ch, array(CURLOPT_URL => $u, CURLOPT_HTTPGET => true,
@@ -902,7 +911,7 @@ function evse_par_run($units, $gens){
 		$reqs = array();
 		foreach ($batch as $k) {
 			$reqs[$k] = $gens[$k]->current();
-			if ($reqs[$k]['type'] == 'rapi') $reqs[$k]['seq'] = EVSE_RAPI_SEQ ? evse_rapi_seq_next() : 0;
+			if ($reqs[$k]['type'] == 'rapi') { $reqs[$k]['seq'] = EVSE_RAPI_SEQ ? evse_rapi_seq_next() : 0; $reqs[$k]['get'] = !evse_rapi_use_post($units[$k]['evseurl']); }
 			$hs[$k] = evse_par_handle($units[$k], $reqs[$k]); curl_multi_add_handle($mh, $hs[$k]);
 		}
 		do {
@@ -918,6 +927,8 @@ function evse_par_run($units, $gens){
 			$again = (($authre[$k] ?? 0) < 2) && evse_auth_retry($ch, $units[$k]['evseurl'], $code, $units[$k]['username'], $units[$k]['password']);
 			if (!evse_curl_is_shared($ch)) curl_close($ch);
 			if ($again) { $authre[$k] = ($authre[$k] ?? 0) + 1; $ready[$k] = microtime(true); continue; }
+			// POST /r rejected (not carried out): same request once more as GET
+			if ($reqs[$k]['type'] == 'rapi' && empty($reqs[$k]['get']) && evse_rapi_post_rejected($code)) { evse_rapi_mark_get_only($units[$k]['evseurl']); $ready[$k] = microtime(true); continue; }
 			$authre[$k] = 0;
 			$g = $gens[$k];
 			$g->send(evse_par_result($reqs[$k], $raw, $code));

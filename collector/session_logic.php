@@ -58,7 +58,13 @@ function sess_v5_voltset($j, $state){
 function sess_rapi($unit, $cmd){
 	$seq = EVSE_RAPI_SEQ ? evse_rapi_seq_next() : 0;
 	$wire = evse_rapi_wire(evse_rapi_with_seq($cmd, $seq));
-	$r = evse_http($unit, 'GET', 'r?json=1&rapi=' . rawurlencode($wire));
+	// POST /r (form body); the old GET once if the unit rejects POST (see include.php)
+	$r = null;
+	if (evse_rapi_use_post($unit['evseurl'])) {
+		$r = evse_http($unit, 'POST', 'r', evse_rapi_post_body($wire), true, 'application/x-www-form-urlencoded');
+		if (evse_rapi_post_rejected($r['code'])) { evse_rapi_mark_get_only($unit['evseurl']); $r = null; }
+	}
+	if ($r === null) $r = evse_http($unit, 'GET', evse_rapi_get_path($wire));
 	if (!$r['ok'] || !isset($r['json']['ret'])) return null;
 	$GLOBALS['__sess_rapi_last'] = trim((string)$r['json']['ret']) . ' (sent ' . evse_rapi_with_seq($cmd, $seq) . ')';   // for the log line
 	$rep = evse_rapi_parse_reply(trim((string)$r['json']['ret']), $seq);

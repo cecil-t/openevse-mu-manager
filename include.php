@@ -298,6 +298,17 @@ function evse_rapi_shape_ok($cmd, $p){
 	return true;
 }
 
+// /r pass-through: POST the command as a form body (json=1&rapi=...), which every
+// WiFi v4/v5 accepts and newer (post-5.1.5) firmware requires (GET /r -> 403). If a
+// unit rejects the POST (400/403/404/405/501, e.g. old 2.x WiFi), send it once as the
+// old GET and remember that unit as GET-only for an hour.
+define('EVSE_RAPI_GET_ONLY_S', 3600);
+function evse_rapi_post_body($wire){ return 'json=1&rapi=' . rawurlencode($wire); }
+function evse_rapi_get_path($wire){ return 'r?json=1&rapi=' . rawurlencode($wire); }
+function evse_rapi_post_rejected($code){ return in_array((int)$code, array(400, 403, 404, 405, 501), true); }
+function evse_rapi_use_post($url){ $g = $GLOBALS['__evse_rapi_get_only'][$url] ?? 0; return !$g || time() - $g > EVSE_RAPI_GET_ONLY_S; }
+function evse_rapi_mark_get_only($url){ $GLOBALS['__evse_rapi_get_only'][$url] = time(); }
+
 // Sends RAPI command to OpenEVSE box.
 // Returns the reply payload (string), 'Error' ($NK to our command), -1 (no valid
 // reply), or for writes -2 (sent, but the reply wasn't verifiably ours - the
@@ -307,18 +318,20 @@ function rapi(&$evseconnect, $command){
 	$username = $evseconnect['username'];
 	$password = $evseconnect['password'];
 
-	$fetch = function($rapiurl) use ($url, $username, $password){
+	// $body null = GET $rapiurl; else POST $body (form) to $rapiurl
+	$fetch = function($rapiurl, $body = null) use ($url, $username, $password){
 		// up to 3 sends: Basic -> 401 -> Digest; a stale cached challenge -> 401 -> fresh one
-		$dig_retry = 0;
+		$dig_retry = 0; $method = ($body === null) ? 'GET' : 'POST';
 		for ($a = 0; $a < 3; $a++) {
 			$was_digest = (evse_auth_mode($url) === 'digest');
 			$shared = ($username <> '' && $password <> '' && evse_auth_mode($url) === 'digest');
 			$ch = $shared ? evse_curl_shared($url) : curl_init();
 			curl_setopt($ch, CURLOPT_URL, $rapiurl);
-			curl_setopt($ch, CURLOPT_HTTPGET, true);
+			if ($body === null) { curl_setopt($ch, CURLOPT_HTTPGET, true); $hdrs = array(); }
+			else { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, $body); $hdrs = array('Content-Type: application/x-www-form-urlencoded'); }
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 			curl_setopt($ch,CURLOPT_CONNECTTIMEOUT, 1);  //Connection timeout to X seconds per call.
-			evse_curl_auth($ch, $url, $username, $password, array(), 'GET', $rapiurl);   // Basic, or preemptive Digest for 2.9.x (see above)
+			evse_curl_auth($ch, $url, $username, $password, $hdrs, $method, $rapiurl);   // Basic, or preemptive Digest for 2.9.x (see above)
 			$result = curl_exec($ch);
 			$response = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 			$retry = evse_auth_retry($ch, $url, $response, $username, $password) && (!$was_digest || $dig_retry++ < 1);
@@ -326,6 +339,15 @@ function rapi(&$evseconnect, $command){
 			if (!$retry) break;
 		}
 		return array($result, $response);
+	};
+	// one RAPI line over /r: POST, or the old GET once if the unit rejects POST
+	$send = function($wire) use ($url, $fetch){
+		if (evse_rapi_use_post($url)) {
+			list($result, $response) = $fetch($url . 'r', evse_rapi_post_body($wire));
+			if (!evse_rapi_post_rejected($response)) return array($result, $response);
+			evse_rapi_mark_get_only($url);   // rejected = not carried out; safe to resend as GET
+		}
+		return $fetch($url . evse_rapi_get_path($wire));
 	};
 
 	if ( substr($command, 0, 1) != '$' ) {
@@ -358,7 +380,7 @@ function rapi(&$evseconnect, $command){
 		$seq = EVSE_RAPI_SEQ ? evse_rapi_seq_next() : 0;
 		$sent = evse_rapi_with_seq($command, $seq);
 		evse_rapi_stat('sent');
-		list($result, $response) = $fetch($url . 'r?rapi=' . urlencode(evse_rapi_wire($sent)));
+		list($result, $response) = $send(evse_rapi_wire($sent));
 		if ($response <> 200) { $last = -1; continue; }
 		$rep = evse_rapi_parse_reply($result, $seq);
 		if ($rep === null) {
