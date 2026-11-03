@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_lib.php'; oev_require('public');   // login gate (auth_lib.php)
 include __DIR__ . '/include_v5.php';
+require_once __DIR__ . '/index_wide_lib.php';   // idx_temp_html(): the home page's temperature dot and thresholds
 $with  = evse_with_param();
 $wq    = $with ? '?with=' . implode(',', $with) : '';
 $units = evse_units($with);
@@ -87,6 +88,20 @@ table.stats td:first-child form.inl button.chip{margin:0 0 0 8px}
 @media (max-width:359px){#ucard{padding:10px 4px}}
 table.stats tr.g td{border-top:2px solid #9a9a9a}
 table.stats tr.g2 td{background-color:#e3e7ec}
+/* readings: darker text, a little larger; the temperature dot as on the home page (index_wide.php) */
+#ucard table.stats td{color:#222;font-size:16px}@media screen and (min-width:700px){#ucard table.stats td{font-size:17px}}#ucard table.stats td:first-child{color:#444}#ucard table.stats td a{color:inherit}
+@media (max-width:359px){#ucard table.stats td{font-size:15px}}
+.td{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}.td.g{background:#2a2}.td.y{background:#e6b800}.td.r{background:#d22}.td.b{background:#1e6fd9}.td.ta{margin:0 0 0 5px;vertical-align:middle}
+/* phones: the two tables read as one list */
+#ucard table.stats{table-layout:fixed}#ucard table.stats th{width:auto}#ucard col.cn{width:42%}#ucard table.st2{margin-top:0}#ucard tr.r_head2{display:none}#ucard table.st2 tr:nth-child(2) td{border-top:2px solid #9a9a9a}
+/* desktop: two name/value tables side by side; name columns only as wide as their text */
+@media screen and (min-width:700px){
+	#ucard .ustats{display:flex;gap:28px;align-items:flex-start}
+	body.pgw #ucard{padding:12px 22px 20px 22px}#ucard form#unit{margin:12px 0}#ucard table.stats td{padding:4px 12px}
+	#ucard .ustats table.stats{flex:1 1 0;min-width:0;max-width:none;margin:0}
+	#ucard tr.r_head2{display:table-row}
+	#ucard table.stats{table-layout:auto}#ucard table.stats th{width:auto}#ucard col.cn{width:33%}#ucard table.stats td{white-space:nowrap}
+}
 .lbdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:5px;vertical-align:middle;background:#bbb}
 .lbdot.g{background:#2a2}.lbdot.a{background:#e9a000}.lbdot.r{background:#d22}.lbdot.x{display:none}
 </style>
@@ -158,8 +173,8 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 	setTimeout(function(){ m.style.opacity = '0'; setTimeout(function(){ m.style.display = 'none'; }, 600); }, 3000);
 })();
 </script><?php } ?>
-<table class="stats">
-	<tr id="r_head"><th class="s<?=h($e['statecode'])?>">Name</th><th class="s<?=h($e['statecode'])?>">Value</th></tr>
+<div class="ustats"><table class="stats"><colgroup><col class="cn"><col></colgroup>
+	<tr id="r_head" class="r_head"><th class="s<?=h($e['statecode'])?>">Name</th><th class="s<?=h($e['statecode'])?>">Value</th></tr>
 	<tr><td><?=$sleepbtn?><a id="a_state" href="javascript:void(0);">State</a></td><td id="v_state" class="nw"<?=!empty($e['state_title']) ? ' title="' . h($e['state_title']) . '"' : ''?>><img src="media/plug.svg" alt="EV Connected" title="EV Connected" class="plug" id="v_plug"<?=$e['connected'] ? '' : ' style="display:none"'?> /><?=$e['connected'] ? ' ' : ''?><span id="v_st"><?=h($e['state'])?></span></td></tr>
 	<?php if ($e['api'] == 'http') { ?>
 	<tr><td>Override</td><?php
@@ -183,7 +198,9 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 	<tr><td>Last check-in</td><td id="v_seen" class="nw" title="When this unit last reported over MQTT. The light: green = live, updated every 5 s; amber = late; red = load balancer down (values from page load)"><span id="v_age"><?=$lbca === null ? "\u{2014}" : h($lbca < 120 ? $lbca . ' s ago' : ($lbca < 7200 ? round($lbca / 60) . ' min ago' : round($lbca / 3600, 1) . ' h ago'))?></span><span id="lbdot" class="lbdot <?=is_array($lbhb) && $lbu ? ($lbhb['fresh'] ? 'g' : 'r') : 'x'?>"></span></td></tr>
 	<tr><td>Energy</td><td><?=$e['energy'] === null ? "\u{2014}" : h($e['energy']) . ' kWh'?></td></tr>
 	<tr><td>Charge Time</td><td><?=($cur && $ctsec && !oev_is_public()) ? '<a href="sessions.php?id=' . (int)$cur['id'] . '" title="Current session report">' . h($cttxt) . '</a>' : h($cttxt)?></td></tr>
-	<tr><td>Temp</td><td><?=temp_txt_f($e['temp'])?></td></tr>
+	<tr><td>Temp</td><td class="nw"><?=is_numeric($e['temp']) ? idx_temp_html(((float)$e['temp'] - 32) * 5 / 9, true) : temp_txt_f($e['temp'])?></td></tr>
+</table><table class="stats st2"><colgroup><col class="cn"><col></colgroup><?php /* desktop: settings and info beside the live readings; phones: one list */ ?>
+	<tr class="r_head r_head2"><th class="s<?=h($e['statecode'])?>">Name</th><th class="s<?=h($e['statecode'])?>">Value</th></tr>
 	<tr class="g g2"><td><a id="a_timer" href="javascript:void(0);">Start / Stop</a></td><td><?=h($e['timerstart'] . ' / ' . $e['timerend'])?></td></tr>
 	<tr class="g2"><td><a id="a_limits" href="javascript:void(0);">Limits</a></td><td class="nw"><?=h($limtxt)?></td></tr>
 	<tr class="g"><td><a id="a_level" href="javascript:void(0)">Level</a></td><td><?=$e['level'] === null ? "\u{2014}" : 'L' . h($e['level']) . ' (' . h($e['autolevel']) . ')'?></td></tr>
@@ -208,7 +225,7 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 		} else echo "\u{2014}";
 	?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>
-</table>
+</table></div>
 </div><?php /* #ucard */ ?>
 
 <?php
@@ -290,7 +307,7 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 		if (newer) {
 		var st = $('v_st'); st.textContent = u.pill; $('v_state').title = u.pill_title;
 		$('v_plug').style.display = u.plugged ? '' : 'none';
-		document.querySelectorAll('#r_head th').forEach(function(th){ th.className = u.paused ? 's254' : u.pill_cls; });
+		document.querySelectorAll('.r_head th').forEach(function(th){ th.className = u.paused ? 's254' : u.pill_cls; });
 		var asl = u.code == 254 || u.code == 255; $('b_wake').style.display = asl ? '' : 'none'; $('b_sleep').style.display = asl ? 'none' : '';
 		if (u.label) { var t = u.label + ((u.saved !== null && u.setting < u.saved) ? ' / ' + u.saved + ' A' : '') + ' \u00b7 ' + (u.setting * V / 1000).toFixed(1) + ' kW'; $('v_pilot').textContent = t; $('v_pilot').title = u.label_title; }
 		}

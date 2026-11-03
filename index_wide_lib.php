@@ -6,14 +6,16 @@
 if (!function_exists('h')) { http_response_code(404); exit; }
 define('IDX_THROTTLE_C', 65.0);   // controller throttles from 65 C (as the session logger, collector/session_logic.php)
 define('IDX_TEMP_NEAR_C', 60.0);  // yellow from here: close to throttling
+define('IDX_TEMP_COLD_C', (40 - 32) * 5 / 9);   // blue below 40 F (4.44 C): cold
 
-// temperature (Celsius) with its coloured dot: red throttling, yellow close, green fine
-function idx_temp_html($c){
+// temperature (Celsius) with its coloured dot: red throttling, yellow close, blue cold, green fine
+function idx_temp_html($c, $after = false){   // $after: the dot after the value (unit.php), as its Last check-in dot
 	if ($c === null || $c === '' || !is_numeric($c)) return '';
 	$c = (float)$c;
-	$cls = $c >= IDX_THROTTLE_C ? 'r' : ($c >= IDX_TEMP_NEAR_C ? 'y' : 'g');
-	$t = ($cls == 'r' ? 'Throttling' : ($cls == 'y' ? 'Close to throttling' : 'Normal')) . ' (yellow from ' . strip_tags(html_entity_decode(temp_txt(IDX_TEMP_NEAR_C))) . ', throttles at ' . strip_tags(html_entity_decode(temp_txt(IDX_THROTTLE_C))) . ')';
-	return '<span class="td ' . $cls . '" title="' . h($t) . '"></span>' . temp_txt($c);
+	$cls = $c >= IDX_THROTTLE_C ? 'r' : ($c >= IDX_TEMP_NEAR_C ? 'y' : ($c < IDX_TEMP_COLD_C - 1e-9 ? 'b' : 'g'));
+	$t = $cls == 'b' ? 'Cold (blue below ' . strip_tags(html_entity_decode(temp_txt(IDX_TEMP_COLD_C))) . ')' : ($cls == 'r' ? 'Throttling' : ($cls == 'y' ? 'Close to throttling' : 'Normal')) . ' (yellow from ' . strip_tags(html_entity_decode(temp_txt(IDX_TEMP_NEAR_C))) . ', throttles at ' . strip_tags(html_entity_decode(temp_txt(IDX_THROTTLE_C))) . ')';
+	$dot = '<span class="td ' . $cls . ($after ? ' ta' : '') . '" title="' . h($t) . '"></span>';
+	return $after ? temp_txt($c) . $dot : $dot . temp_txt($c);
 }
 // WiFi signal as 5 bars
 function idx_bars_html($dbm){
