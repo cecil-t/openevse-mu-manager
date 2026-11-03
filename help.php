@@ -33,7 +33,16 @@ $hbm = (int)$S['heartbeat_min'];
 .hp b{color:#333}
 </style>
 <div class="slidebox hp pgcard">
-<div class="toc"><a href="#data">Getting the data</a><a href="#lb">Load groups</a><a href="#clock">Unit clocks</a><a href="#fw">Firmware</a><a href="#volts">Voltage</a><a href="#mail">Emails</a><a href="#names">Names</a><a href="#logins">Logins</a><?=oev_is_admin() ? '<a href="#sys">System status</a><a href="#setup">Setup</a>' : ''?></div>
+<div class="toc"><a href="#home">Home page</a><a href="#data">Getting the data</a><a href="#lb">Load groups</a><a href="#clock">Unit clocks</a><a href="#fw">Firmware</a><a href="#volts">Voltage</a><a href="#mail">Emails</a><a href="#names">Names</a><a href="#logins">Logins</a><?=oev_is_admin() ? '<a href="#sys">System status</a><a href="#setup">Setup</a>' : ''?></div>
+
+<h2 id="home">Home page</h2>
+<ul>
+<li>Every unit is listed, grouped by load group by default. Units not in a group are under <b>No load group</b>. Use the search box or the buttons (By group, By charging, By problems, By name) to find or sort units.</li>
+<li>Click a group's header to fold it up or open it. With more than 50 units or more than 5 groups, the groups start folded.</li>
+<li>A plug icon means a car is plugged in. <b>Draw</b> (Drawing on wider screens) is the current the car is taking right now.</li>
+<li><b>Wider screens</b> (700 pixels and up) show a full table. Click a unit's row to see its details, and use <b>Open unit page</b> there for its own page with buttons and settings. On a phone, tap a unit to open its page.</li>
+<li>Session Reports and, for admins, Settings and Unit List / Info are in the menu under your initials (top right).</li>
+</ul>
 
 <h2 id="data">How the server gets its data</h2>
 <ul>
@@ -121,9 +130,9 @@ $NS = oev_host_suggest($NU); $NV = array_values(array_filter($NU, 'oev_unit_visi
 <ul>
 <li>Admins can view and change everything, in every load group. View-only logins can look but can't press buttons or change settings, and can be limited to certain load groups.</li>
 <li>A login can be limited to some load groups. Units not in a group are only shown to logins that see all groups.</li>
-<li>You stay logged in on each device until you log out (Account). Change your password there too.</li>
+<li>You stay logged in on each device until you log out (Account). Change your name, email address and password there too. Your email address is your login and where your notification emails go.</li>
 <li>A view-only link (Settings) lets anyone with the link see what is happening right now (the home page and each unit's live status) without a login. It shows no session reports, graphs, history or logs. Turn it off at any time.</li>
-<li>Your initials in the circle at the top right open a menu: Account (your name and password), Help, Settings for admins, and Log out.</li>
+<li>Your initials in the circle at the top right open a menu: Home, Session Reports, Account, Help, and Log out. Admins also get Settings, Unit List / Info (each unit's network and firmware details, with a CSV download) and System status.</li>
 </ul>
 <?php if (oev_is_admin()) { ?>
 <h2 id="sys">System status (admins)</h2>

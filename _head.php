@@ -3,7 +3,8 @@ if (!function_exists("h")) { http_response_code(404); exit; }
 // shared page header for the v5 pages
 // site name (Settings > Preferences): page titles and the line under the logo
 $oev_site = function_exists('oev_site_name') ? oev_site_name() : 'OpenEVSE MU Manager';
-$title = (isset($title) && $title !== '') ? $title . ' - ' . $oev_site : $oev_site;
+$oev_tsite = preg_replace('/\bMU Manager\b/', 'Multi-Unit Manager', $oev_site);   // browser tab title only; the logo line keeps the site name
+$title = (isset($title) && $title !== '') ? $title . ' - ' . $oev_tsite : $oev_tsite;
 $oev_sub = trim(preg_replace('/^\s*open\s*evse\b[\s:-]*/i', '', $oev_site));   // the logo already says OpenEVSE
 if ($oev_sub === '') $oev_sub = $oev_site;
 ?><!DOCTYPE html>
