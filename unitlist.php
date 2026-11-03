@@ -92,7 +92,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 <div class="nm pgcard">
 <div class="nm-top"><h2>Unit List</h2><a class="btn" href="unitlist.php?csv=1">Download CSV</a><a class="lnk" href="settings.php?s=units">Settings &gt; Units</a><span>Read from the units at <?=h(date('g:i a T', $read_at))?></span></div>
 <div class="nm-wrap"><table>
-<tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Volatile</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Controller fw</th></tr>
+<tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Volatile</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Cntrl fw</th></tr>
 <?php foreach ($data as $d) {
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
