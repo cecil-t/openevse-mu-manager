@@ -183,3 +183,11 @@ img.plug{
 	height: 12px;
 	opacity: 0.7;
 	}
+
+/* desktop (700px and up): pages with body.pgw (_head.php) use the main page's wide card (index_wide.php) */
+@media screen and (min-width:700px){
+	body.pgw{zoom:100% !important}
+	body.pgw .container{max-width:1200px}
+	body.pgw .pgcard{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
+	body.pgw .container>.sec{margin-left:8px;margin-right:8px}   /* sessions.php: its sections line up with the card */
+}

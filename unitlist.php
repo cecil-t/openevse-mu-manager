@@ -65,7 +65,7 @@ if (!empty($_GET['csv'])) {
 
 /* ---------- page ---------- */
 $title = 'Unit List'; $wq = '';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 $dash = '<span class="nm-x">&mdash;</span>';
 $cell = function($v) use ($dash){ return ($v === '' || $v === null) ? $dash : h($v); };
 $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div>'; };
@@ -85,10 +85,11 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 .nm td.sm{font-size:13px}
 .nm .nm-w{font-size:14px;color:#8a5a00;margin-top:2px}
 .nm .nm-x{color:#999}
+@media screen and (min-width:700px){.nm table,.nm td.sm{font-size:13px}.nm .nm-w{font-size:12px}.nm th,.nm td{padding:4px}}   /* desktop: the whole table in the small font so it fits the card */
 .nm .nm-err{color:#a11}
 .nm-foot{margin:8px 0 0 0;color:#555}
 </style>
-<div class="nm">
+<div class="nm pgcard">
 <div class="nm-top"><h2>Unit List</h2><a class="btn" href="unitlist.php?csv=1">Download CSV</a><a class="lnk" href="settings.php?s=units">Settings &gt; Units</a><span>Read from the units at <?=h(date('g:i a T', $read_at))?></span></div>
 <div class="nm-wrap"><table>
 <tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Volatile</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Controller fw</th></tr>

@@ -5,7 +5,7 @@ $with  = evse_with_param();
 $wq    = $with ? '?with=' . implode(',', $with) : '';
 $units = evse_units($with);
 $unitid = isset($_GET['unitid']) ? $_GET['unitid'] : '';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 if (!ctype_digit((string)$unitid) || !isset($units[(int)$unitid]) || filter_var($units[(int)$unitid]['evseurl'], FILTER_VALIDATE_URL) === false) {
 	die('missing or invalid unitid</div></body></html>');
 }
@@ -35,7 +35,7 @@ function btn($action, $label, $extra = array(), $confirm = '', $small = false, $
 <script>var liveOK = false, loadedAt = Date.now();
 // full reload every 60 s, or every 5 min while the live update (below) is working; never while a popup is open
 function autoRefresh(){ var open = [].some.call(document.querySelectorAll('.slidecontainer'), function(x){ return x.style.display == 'block'; }); if (open || (liveOK && Date.now() - loadedAt < 300000)) setTimeout(autoRefresh, 10000); else location.href = <?=json_encode($self)?>; } setTimeout(autoRefresh, 60000);</script>
-<div class="slidebox" id="ucard"><?php /* the page's card: the same rounded .slidebox as index.php (style.css); the popups below stay outside it */ ?>
+<div class="slidebox pgcard" id="ucard"><?php /* the page's card: the same rounded .slidebox as index.php (style.css); the popups below stay outside it */ ?>
 <div style="text-align:center;">
 	<form method="get" id="unit">
 	Select Unit:

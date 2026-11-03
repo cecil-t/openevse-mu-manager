@@ -31,7 +31,7 @@ if ($oev_sub === '') $oev_sub = $oev_site;
 .avm a span.avok,.avm a span.avbad{display:inline;border:0;padding:0;margin:0 0 0 6px;background:none;box-shadow:none;font:bold 17px Arial,sans-serif}.avm a span.avok{color:#2a7a2a}.avm a span.avbad{color:#b11}
 .avlogin{display:inline-block;margin-top:6px;padding:6px 12px;border-radius:16px;background:#00807f;color:#fff !important;font:bold 16px Arial,sans-serif;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.35)}</style>
 </head>
-<body>
+<body<?=!empty($GLOBALS['OEV_WIDE']) ? ' class="pgw"' : ''?>>
 <div class="container">
 <div class="header" onclick="location.href='./<?=$wq?>';" style="cursor:pointer;"><h1>Open<span>EVSE</span></h1><h3><?=h($oev_sub)?></h3></div>
 <?php if (function_exists('oev_userbar') && empty($GLOBALS['OEV_NOBAR'])) echo oev_userbar(); ?>

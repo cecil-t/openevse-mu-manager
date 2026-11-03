@@ -285,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 /* ======================= PAGE ======================= */
 $title = 'Settings'; $wq = '';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 $S = oev_settings();
 // remember this site's public address for the command-line scripts (email links, the units' Emoncms server):
 // only an https address with a host name (not a LAN or VPN IP address, not localhost)
@@ -330,7 +330,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set .sys b{color:#222}
 .set .nflag{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#fff4d6;border:1px solid #e9c46a;color:#6b4b00;font-weight:normal}
 </style>
-<div class="slidebox set">
+<div class="slidebox set pgcard">
 <div class="tabs">
 <?php foreach (array('units' => 'Units', 'groups' => 'Load groups', 'prefs' => 'Preferences', 'users' => 'Users', 'link' => 'View-only link', 'system' => 'System status') as $k => $t) echo '<a href="settings.php?s=' . $k . '"' . ($k === $sec ? ' class="on"' : '') . '>' . $t . '</a>'; ?>
 </div>

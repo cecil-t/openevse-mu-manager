@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 if (isset($_GET['saved'])) $msg = 'Name saved.';
 $title = 'Account'; $wq = '';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
 .ac{font-size:16px;line-height:1.45;color:#444;text-align:left}
@@ -40,7 +40,7 @@ include __DIR__ . '/_head.php';
 .ac .msg{background:#e3f4e3;border:1px solid #9c9;border-radius:6px;padding:6px 9px;color:#245a24}
 .ac .err{background:#fde3e3;border:1px solid #e99;border-radius:6px;padding:6px 9px;color:#a11;font-weight:normal}
 </style>
-<div class="slidebox ac">
+<div class="slidebox ac pgcard">
 <?php if ($msg) echo '<div class="msg">' . h($msg) . '</div>'; if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>
 <div class="card"><b><?=h(oev_user_name($me))?></b><br><?=oev_v($me['email'])?><br><?=$me['role'] === 'admin' ? 'Admin: can view and change everything.' : 'View only.'?> <?=($me['role'] === 'admin' || $me['scope_all']) ? 'Sees all load groups.' : 'Sees some load groups.'?></div>
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?><input type="hidden" name="a" value="name">

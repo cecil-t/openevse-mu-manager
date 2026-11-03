@@ -13,7 +13,7 @@ require_once __DIR__ . '/evse_prefs.php';   // TEMP_UNIT (display only)
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
 $wq = '';
 $title = 'Sessions';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
 .card{background:#eee;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0;color:#555;font-size:15px}

@@ -4,7 +4,7 @@ require_once __DIR__ . '/auth_lib.php';
 oev_require('view');
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
 $title = 'Help'; $wq = '';
-include __DIR__ . '/_head.php';
+$OEV_WIDE = 1; include __DIR__ . '/_head.php';
 $S = oev_settings();
 // numbers shown here are read from where the system really keeps them (shown in black: oev_v())
 function hp_const($file, $name, $def){ $t = (string)@file_get_contents(__DIR__ . '/' . $file); return preg_match("/define\\('" . preg_quote($name, '/') . "',\\s*([0-9.]+)\\)/", $t, $m) ? $m[1] + 0 : $def; }
@@ -32,7 +32,7 @@ $hbm = (int)$S['heartbeat_min'];
 .hp .toc a{display:inline-block;margin:0 10px 4px 0;color:#035a5a}
 .hp b{color:#333}
 </style>
-<div class="slidebox hp">
+<div class="slidebox hp pgcard">
 <div class="toc"><a href="#data">Getting the data</a><a href="#lb">Load groups</a><a href="#clock">Unit clocks</a><a href="#fw">Firmware</a><a href="#volts">Voltage</a><a href="#mail">Emails</a><a href="#names">Names</a><a href="#logins">Logins</a><?=oev_is_admin() ? '<a href="#sys">System status</a><a href="#setup">Setup</a>' : ''?></div>
 
 <h2 id="data">How the server gets its data</h2>
