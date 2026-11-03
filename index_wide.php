@@ -7,13 +7,14 @@ $wnu = count($W);
 $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pub'=>oev_is_public(), 'wq'=>$with ? '&with=' . implode(',', $with) : '');
 ?>
 <style>
-#wide{display:none;text-align:left}
+#wide{text-align:left}
+#unit dl.units,#unit .uhead{display:none}
+#unit.slidebox{background:#fff}
+@media screen and (max-width:699px){#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}}
 @media screen and (min-width:700px){
 	body{zoom:100% !important}
 	.container{max-width:1200px}
-	#unit.slidebox{max-width:none;width:auto;margin:0 8px;padding:10px 12px;background:#fff}
-	#unit dl.units,#unit .uhead{display:none}
-	#wide{display:block}
+	#unit.slidebox{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
 }
 #wide .bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:10px}
 #wide .bar input{padding:6px 8px;border:1px solid #bbb;border-radius:5px;font-size:15px;flex:1;min-width:140px;max-width:260px}
@@ -185,6 +186,7 @@ var OEWide = (function(){
 		}; });
 		t.querySelectorAll('tr.u').forEach(function(r){ r.onclick = function(ev){
 			if (ev.target.closest('a')) return;   // the unit name opens the unit page
+			if (!window.matchMedia('(min-width:700px)').matches) { location.href = r.querySelector('td a').href; return; }   // phones: no expand, open the unit page
 			var id = parseInt(r.dataset.id, 10);
 			openId = (openId === id) ? null : id;
 			try { if (openId) sessionStorage.setItem('oemu-open', openId); else sessionStorage.removeItem('oemu-open'); } catch (e) {}
