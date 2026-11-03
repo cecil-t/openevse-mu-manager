@@ -10,7 +10,6 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wide{text-align:left}
 #unit dl.units,#unit .uhead{display:none}
 #unit.slidebox{background:#fff}
-@media screen and (max-width:699px){#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}}
 @media screen and (min-width:700px){
 	body{zoom:100% !important}
 	.container{max-width:1200px}
@@ -24,8 +23,9 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt{border-collapse:collapse;width:100%;background:#fff;table-layout:fixed;font:15px/1.4 Arial,sans-serif;color:#000}
 #wt th,#wt td{border-bottom:1px solid #e3e3e3;padding:6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #wt th{position:sticky;top:0;z-index:5;box-shadow:0 1px 0 #ccc;background:#f2f2f2;font-size:13px;color:#222}
-#wt col.cu{width:19%}#wt col.cs{width:11%}#wt col.cd{width:13%}#wt col.ce{width:18%}#wt col.ch{width:19.5%}#wt col.cl{width:10.5%}#wt col.cn{width:9%}
+#wt col.cu{width:19%}#wt col.cs{width:13%}#wt col.cd{width:13%}#wt col.ce{width:16%}#wt col.ch{width:18%}#wt col.cl{width:12%}#wt col.cn{width:9%}
 #wt .num{text-align:right}
+#wt td.stc{overflow:visible;text-overflow:clip}
 #wt td.dp,#wt th.dp{text-align:right;padding-right:22px}
 #wt tr.u{cursor:pointer}#wt tr.u:hover,#wt tr.u.op{background:#f4fbfb}
 #wt tr.u td:first-child a{color:#000;font-weight:bold;text-decoration:none}
@@ -69,10 +69,13 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt .ok{color:#11632f;font-weight:bold}#wt .e{color:#a11;font-weight:bold}
 #wt .ld{color:#aaa;font-style:italic}
 .c-w{display:none}.c-x{display:none}
-@media (min-width:900px){#wt .c-w{display:table-cell}}
-@media (min-width:1000px){#wt .c-x{display:table-cell}}
+@media (min-width:900px){#wt .c-w{display:table-cell}#wt col.c-w{display:table-column}}
+@media (min-width:1000px){#wt .c-x{display:table-cell}#wt col.c-x{display:table-column}}
 @media (max-width:999px){#wt{table-layout:auto}#wt col{width:auto !important}}
 @media (max-width:899px){#wt .dg{display:flex;flex-direction:column}#wt .dg>.strip{flex-wrap:wrap;margin-top:8px}}
+@media screen and (max-width:699px){#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
+	#wt{table-layout:fixed}#wt col.cu{width:46% !important}#wt col.cs{width:28% !important}#wt col.cd{width:26% !important}#wt th{font-size:12px}#wt td.dp,#wt th.dp{padding-right:4px}
+	#wt img.plug{margin-left:3px}}
 </style>
 <div id="wide">
 <div class="bar"><input id="wq" type="search" placeholder="Search units&hellip;" aria-label="Search units">
@@ -117,7 +120,7 @@ var OEWide = (function(){
 		var sch = u.sch ? '<span' + (u.run ? ' class="run" title="Scheduled charge running"' : '') + '>' + esc(u.sch) + '</span>' : DASH;
 		return '<tr class="u' + (u.id === openId ? ' op' : '') + '" data-id="' + u.id + '" data-in="' + u.g + '"' + hid + '>'
 			+ '<td><a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
-			+ '<td><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '</td>'
+			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '</td>'
 			+ '<td class="num dp" data-k="drw">' + drawing(u) + '</td>'
 			+ '<td class="c-w ses">' + ses + '</td>'
 			+ '<td class="c-x">' + sch + (u.clock_off ? '<small class="ck" title="Unit clock is off from server time">clock off</small>' : '') + '</td>'
