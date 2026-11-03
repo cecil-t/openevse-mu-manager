@@ -135,6 +135,7 @@ $lbhb = oev_filter_hb(evse_lb_heartbeat());   // only the groups this user may s
 $lbu  = evse_lb_units($lbhb);   // unit id => heartbeat entry (fresh heartbeat only)
 $grouped = array(); foreach ($lgroups as $g) foreach ($g['keys'] as $k) $grouped[$k] = true;
 $all = evse_home_all($units, $lbhb, $grouped);
+require_once __DIR__ . '/index_wide_lib.php';
 function idx_lb_tag($hb){
 	if (!is_array($hb)) return '';
 	if (!$hb['fresh']) return '<span class="lb down" title="Load balancer not running: last heartbeat ' . h(date('m/d H:i', (int)$hb['time'])) . '. Units are read directly.">LB down</span>';
@@ -142,16 +143,25 @@ function idx_lb_tag($hb){
 	if (empty($hb['mqtt'])) return '<span class="lb warn" title="Load balancer running, but its MQTT link is down: it reacts on its 20 s poll instead of within seconds">LB slow</span>';
 	return '<span class="lb' . ($live ? ' live' : '') . '" title="Load balancer running (' . ($live ? 'live' : 'dry run: no changes made') . ')">LB ' . ($live ? 'on' : 'dry run') . '</span>';
 }
-$sections = array();
+$sections = array(); $wgroups = array();
 foreach ($lgroups as $gid => $g) {
 	$hg = null; if (is_array($lbhb) && $lbhb['fresh']) foreach ((array)$lbhb['groups'] as $x) if ((int)$x['id'] === (int)$gid) $hg = $x;
 	if ($hg) $amps = (float)$hg['live_amps'];
 	else { $amps = 0; foreach ($g['keys'] as $k) $amps += (float)(($all[$k]['amps'] ?? 0) ?: 0); }
 	$warn = '<div class="lgwb" data-g="' . (int)$gid . '">'; if ($hg) foreach ((array)$hg['warn'] as $w) $warn .= '<div class="lgw">' . h($w) . '</div>'; $warn .= '</div>';
+	$wgroups[(int)$gid] = array('id'=>(int)$gid, 'name'=>$g['name'], 'limit'=>(int)$g['limit'], 'amps'=>round($amps, 1));
 	$sections[] = array('<div class="lgh" data-g="' . (int)$gid . '"><span class="n">' . (oev_is_public() ? h($g['name']) : '<a href="lbstatus.php" title="' . h($g['name']) . ': load group, ' . (int)$g['limit'] . ' A limit. Details">' . h($g['name']) . '</a>') . '</span>'
-		. '<span class="a" title="Drawing now / group limit">' . h(number_format($amps, 1)) . ' / ' . (int)$g['limit'] . ' A</span>' . idx_lb_tag($lbhb) . '</div>' . $warn, $g['keys']);
+		. '<span class="a" title="Drawing now / group limit">' . h(number_format($amps, 1)) . ' / ' . (int)$g['limit'] . ' A</span>' . idx_lb_tag($lbhb) . '</div>' . $warn, $g['keys'], (int)$gid);
 }
-if ($ungrouped) $sections[] = array($lgroups ? '<div class="lgh ung"><span class="n">No load group</span></div>' : '', $ungrouped);
+if ($ungrouped) $sections[] = array($lgroups ? '<div class="lgh ung"><span class="n">No load group</span></div>' : '', $ungrouped, 0);
+// wide layout (index_wide.php): unit_state from the session logger (temp, WiFi signal, check-in), one read-only query, no unit calls
+$ustate = array();
+try {
+	$sdb = oev_sess_ro(1);
+	foreach ($sdb->query('SELECT unit_id, last_ok_at, last_poll_at, temp_max_c, srssi, wifi_uptime, level, volts FROM unit_state')->fetchAll(PDO::FETCH_ASSOC) as $r) $ustate[(int)$r['unit_id']] = $r;
+	$sdb = null;
+} catch (Exception $ex) { $ustate = array(); }
+$W = array();
 foreach ($sections as $sec) {
 echo $sec[0];
 foreach ($sec[1] as $k) {
@@ -194,8 +204,10 @@ foreach ($sec[1] as $k) {
 			if (!empty($e['clock_off'])) echo '<span class="ex"><small style="background-color:#ffa" title="Unit clock is ' . h(evse_offset_text($e['clock_offset'])) . ' from server time">clock off</small></span>';
 		?><?=($e['statecode'] != -1) ? idx_session($e, $sess[(int)$unit['id']] ?? array()) : ''?></dd>
 	</div>
+<?php $W[] = idx_wide_unit($unit, $e, $lu, $lv, $sec[2], $sess[(int)$unit['id']] ?? array(), $ustate[(int)$unit['id']] ?? null, $vv, $link); ?>
 <?php } } ?>
 </dl>
+<?php include __DIR__ . '/index_wide.php'; ?>
 <table class="list">
 <tr>
 	<td id="td_time" style="vertical-align:bottom;white-space:nowrap"><i>as of <span id="asof"><?=date('m/d') . '&nbsp;' . date('H:i');?></span></i> <span id="lbdot" class="lbdot <?=is_array($lbhb) ? ($lbhb['fresh'] ? 'g' : 'r') : 'x'?>" title="<?=is_array($lbhb) ? ($lbhb['fresh'] ? 'Live updates: load balancer running' : 'Load balancer down: data read from the units at page load') : 'No load balancer'?>"></span></td>
@@ -227,12 +239,14 @@ foreach ($sec[1] as $k) {
 			if (!j.fresh) return;   // stale: leave the values read at page load
 			j.groups.forEach(function(g){
 				var h = document.querySelector('.lgh[data-g="' + g.id + '"] .a'); if (h) h.textContent = g.live_amps.toFixed(1) + ' / ' + g.limit + ' A';
+				if (window.OEWide) OEWide.group(g);
 				var w = document.querySelector('.lgwb[data-g="' + g.id + '"]');
 				if (w) { w.innerHTML = ''; g.warn.forEach(function(x){ var d = document.createElement('div'); d.className = 'lgw'; d.textContent = x; w.appendChild(d); }); }
 				g.units.forEach(upd);
 			});
 			(j.monitor || []).forEach(upd);
 			function upd(u){
+					if (window.OEWide) OEWide.unit(u);
 					var b = document.querySelector('.ub[data-u="' + u.id + '"]'); if (!b || !u.ok) return;
 					var st = b.querySelector('dd .st'); st.className = 'st ' + u.pill_cls; st.title = u.pill_title; st.querySelector('i').textContent = u.pill;
 					var pc = b.querySelector('dt .pc'); if (pc) { pc.textContent = u.label; pc.title = u.label_title; }
