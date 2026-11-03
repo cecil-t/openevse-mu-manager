@@ -11,7 +11,7 @@ No passwords or keys are kept in this repository. Everything secret is made on y
 during setup and stays there (see `.gitignore`).
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Home page: units grouped by load group with live status" width="380">
+  <img src="docs/screenshots/home.png" alt="Home page on a phone: units grouped by load group with live status" width="380">
   &nbsp;
   <img src="docs/screenshots/unit.png" alt="Unit page: live details for one charger" width="300">
 </p>
