@@ -20,12 +20,26 @@ try { $s = oev_sess_ro(3); $nodes = $s->query('SELECT unit_id, node FROM emon_no
 $arp = array();
 foreach ((@file('/proc/net/arp', FILE_IGNORE_NEW_LINES) ?: array()) as $l) { $p = preg_split('/\s+/', trim($l)); if (isset($p[3]) && preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i', $p[3]) && $p[3] !== '00:00:00:00:00:00') $arp[$p[0]] = strtoupper($p[3]); }
 
+// the browser is on the units' own network: REMOTE_ADDR (the app trusts no proxy headers) is a private IPv4 address in the same /24 as the unit's IP
+function nm_same_net($client, $ip){
+	$f = FILTER_FLAG_IPV4;
+	if (!is_string($client) || !is_string($ip) || filter_var($client, FILTER_VALIDATE_IP, $f) !== $client || filter_var($ip, FILTER_VALIDATE_IP, $f) !== $ip) return false;
+	if (filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // public or Tailscale (100.64/10): not private
+	return (ip2long($client) & 0xFFFFFF00) === (ip2long($ip) & 0xFFFFFF00);
+}
+// the unit's own web page, from its Address (Settings > Units): scheme, host and port only, never a login
+function nm_web($evseurl){
+	$p = parse_url((string)$evseurl); if (!is_array($p) || empty($p['host'])) return '';
+	$sc = strtolower($p['scheme'] ?? 'http'); if ($sc !== 'http' && $sc !== 'https') return '';
+	$h = $p['host']; if (filter_var(trim($h, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) $h = '[' . trim($h, '[]') . ']';
+	return $sc . '://' . $h . (isset($p['port']) ? ':' . (int)$p['port'] : '') . '/';
+}
 // one unit, read only -> plain values (+ what this site expects)
 function nm_read($u, $sug, $nodes, $arp){
 	$id = (int)$u['id'];
 	$o = array('id' => $id, 'name' => $u['name'], 'ip' => '', 'host' => '', 'sug' => $sug, 'mac' => '', 'serial' => '', 'node' => '', 'node_exp' => '', 'topic' => '', 'topic_exp' => '', 'wifi' => '', 'ctl' => '', 'max' => '', 'pilot' => '', 'vol' => '', 'err' => '');
 	if (!empty($u['breaker'])) $o['max'] = (string)(int)$u['breaker'];   // MU Manager Max current (Settings > Units)
-	$h = (string)parse_url($u['evseurl'], PHP_URL_HOST); $o['ip'] = $h;
+	$h = (string)parse_url($u['evseurl'], PHP_URL_HOST); $o['ip'] = $h; $o['web'] = nm_web($u['evseurl']);
 	if (($u['emon_mode'] ?: 'internal') === 'internal' && isset($nodes[$id])) $o['node_exp'] = (string)$nodes[$id];
 	if ($u['loadgroupid']) $o['topic_exp'] = 'openevse/u' . $id;
 	$r = evse_http($u, 'GET', 'config');
@@ -91,10 +105,12 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 </style>
 <div class="nm pgcard">
 <div class="nm-top"><h2>Unit List</h2><a class="btn" href="unitlist.php?csv=1">Download CSV</a><a class="lnk" href="settings.php?s=units">Settings &gt; Units</a><span>Read from the units at <?=h(date('g:i a T', $read_at))?></span></div>
+<p style="margin:0 0 8px 0;color:#555">Unit names link to each unit's own web page when you're on the same network as the units.</p>
 <div class="nm-wrap"><table>
 <tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Volatile</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Cntrl fw</th></tr>
 <?php foreach ($data as $d) {
-	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . h($d['name']) . '</td><td>' . $cell($d['ip']) . '</td>';
+	$nm = ($d['web'] ?? '') !== '' && nm_same_net($_SERVER['REMOTE_ADDR'] ?? '', $d['ip']) ? '<a class="lnk" href="' . h($d['web']) . '" target="_blank" rel="noopener noreferrer">' . h($d['name']) . '</a>' : h($d['name']);
+	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . $nm . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
 	echo '<td' . (strlen($d['host']) > 20 ? ' class="sm"' : '') . '>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
 	echo '<td class="sm">' . $cell($d['mac']) . '</td><td class="sm">' . $cell($d['serial']) . '</td>';
