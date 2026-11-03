@@ -213,10 +213,6 @@ foreach ($sec[1] as $k) {
 	<td id="td_time" style="vertical-align:bottom;white-space:nowrap"><i>as of <span id="asof"><?=date('m/d') . '&nbsp;' . date('H:i');?></span></i> <span id="lbdot" class="lbdot <?=is_array($lbhb) ? ($lbhb['fresh'] ? 'g' : 'r') : 'x'?>" title="<?=is_array($lbhb) ? ($lbhb['fresh'] ? 'Live updates: load balancer running' : 'Load balancer down: data read from the units at page load') : 'No load balancer'?>"></span></td>
 	<td colspan="2" style="vertical-align:bottom;text-align:right;"><?=oev_is_public() ? '' : '<i>' . round($lifetotal/1000,2) . ' MWh</i>'?></td>
 </tr>
-<tr>
-	<td><br /><?=oev_is_public() ? '' : '<a href="sessions.php">Session Reports</a>'?></td>
-	<td colspan="2" style="text-align:right"><br><?=oev_is_admin() ? '<a href="settings.php">Settings</a>' : ''?></td>
-</tr>
 </table>
 <script>
 	var difference = (new Date() - new Date(<?=date('U')*1000;?>)) / 1000;

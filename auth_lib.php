@@ -210,7 +210,7 @@ function oev_userbar(){
 	$o = '<div class="av"><button type="button" class="avb" aria-haspopup="true" aria-expanded="false" title="' . $e(oev_user_name($u)) . '" onclick="oevAv(event)"><span class="avc">' . $e(oev_initials($u)) . '</span></button>'
 		. (!empty($p) ? '<span class="avdot" title="System problem: see System status"></span>' : '')
 		. '<div class="avm" hidden><div class="avn">' . $e(oev_user_name($u)) . '<span>' . $e($u['email']) . '</span></div>'
-		. '<a href="./">Home</a><a href="account.php">Account</a><a href="help.php">Help</a>' . ($adm ? '<a href="settings.php">Settings</a><a href="unitlist.php">Unit List / Info</a>' . $sys : '')
+		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a><a href="account.php">Account</a><a href="help.php">Help</a>' . ($adm ? '<a href="settings.php">Settings</a><a href="unitlist.php">Unit List / Info</a>' . $sys : '')
 		. '<form method="post" action="account.php">' . oev_csrf_field() . '<button type="submit" name="a" value="logout">Log out</button></form></div></div>'
 		. '<script>function oevAv(ev){ ev.stopPropagation(); var b = ev.currentTarget, m = b.parentNode.querySelector(".avm"); m.hidden = !m.hidden; b.setAttribute("aria-expanded", m.hidden ? "false" : "true"); }'
 		. 'document.addEventListener("click", function(ev){ document.querySelectorAll(".av .avm").forEach(function(m){ if (!m.hidden && !m.contains(ev.target)) { m.hidden = true; m.parentNode.querySelector(".avb").setAttribute("aria-expanded", "false"); } }); });'

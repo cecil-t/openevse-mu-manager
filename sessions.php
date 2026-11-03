@@ -28,6 +28,7 @@ form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
 .ev{border-left:3px solid #aaa;padding:2px 0 2px 7px;margin:5px 0;font-size:14px}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.pilot{border-color:#07d}.ev.amps{border-color:#0a7}.ev.limit{border-color:#82d}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
 svg text{font-family:Arial,sans-serif}
+.chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
 .sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
 .sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
 /* style.css boxes every 'a span' (old button look); undo that inside the session cards */
@@ -109,7 +110,29 @@ function svg_bars($labels, $values, $unit){
 		if ($v > 0) $o .= "<rect x='" . round($cx - $bw / 2, 1) . "' y='" . round($y, 1) . "' width='" . round($bw, 1) . "' height='" . round($hgt, 1) . "' fill='teal'>$tip</rect>";
 		if ($i % $every == 0) $o .= "<text x='" . round($cx, 1) . "' y='" . ($H - 6) . "' font-size='10' text-anchor='middle' fill='#666'>" . h($labels[$i]) . "</text>";
 	}
-	return $o . "</svg>";
+	return "<div class='chp'>" . $o . "</svg></div>" . svg_bars_wide($labels, $values, $unit, $ymax, $step, $dec);
+}
+// desktop (700px and up, CSS above): the same chart without a viewBox, so its text keeps a fixed pixel size at any width.
+// The y labels sit in a fixed 48px column; the plot's x positions are percentages of the remaining width.
+function svg_bars_wide($labels, $values, $unit, $ymax, $step, $dec){
+	$n = count($values); $H = 220; $pt = 30; $pb = 26; $ph = $H - $pt - $pb;
+	$o = "<div class='chd' style='background:#fff;border:1px solid #ccc;border-radius:6px'><svg width='48' height='$H' style='flex:0 0 48px;display:block' aria-hidden='true'>";
+	$g = "<svg width='100%' height='$H' role='img' style='flex:1 1 auto;min-width:0;display:block;margin-right:12px;overflow:visible'><text x='0' y='18' font-size='15' fill='#555'>" . h($unit) . "</text>";
+	for ($v = 0; $v <= $ymax + $step / 2; $v += $step) {
+		$y = round($pt + $ph * (1 - $v / $ymax), 1);
+		$o .= "<text x='42' y='" . ($y + 4.5) . "' font-size='13' text-anchor='end' fill='#888'>" . number_format($v, $dec) . "</text>";
+		$g .= "<line x1='0' x2='100%' y1='$y' y2='$y' stroke='" . ($v ? '#eee' : '#ccc') . "'/>";
+	}
+	$slot = 100 / $n; $bw = min($slot * 0.7, 6);   // percent of the plot width
+	$lw = 0; foreach ($labels as $l) $lw = max($lw, strlen($l) * 7.3 + 12);   // ~px per label at 13px
+	$every = max(1, (int)ceil($lw / (600 / $n)));   // the plot is at least ~600px wide on desktop
+	foreach ($values as $i => $v) {
+		$cx = $slot * ($i + 0.5); $hgt = $ph * $v / $ymax; $y = $pt + $ph - $hgt;
+		$tip = '<title>' . h($labels[$i]) . ': ' . number_format($v, 1) . ' kWh</title>';
+		if ($v > 0) $g .= "<rect x='" . round($cx - $bw / 2, 2) . "%' y='" . round($y, 1) . "' width='" . round($bw, 2) . "%' height='" . round($hgt, 1) . "' fill='teal'>$tip</rect>";
+		if ($i % $every == 0) $g .= "<text x='" . round($cx, 2) . "%' y='" . ($H - 7) . "' font-size='13' text-anchor='middle' fill='#666'>" . h($labels[$i]) . "</text>";
+	}
+	return $o . "</svg>" . $g . "</svg></div>";
 }
 // Session graph: amps (left axis, kW = A x V on the inner labels), pilot, and each
 // fitted temperature sensor (right axis). Works on any sample density: push rows

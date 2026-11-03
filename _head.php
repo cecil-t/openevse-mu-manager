@@ -25,7 +25,7 @@ if ($oev_sub === '') $oev_sub = $oev_site;
 .avm{position:absolute;right:4px;top:44px;background:#fff;border:1px solid #bbb;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);min-width:220px;max-width:280px;padding:4px 0}
 .avm .avn{padding:8px 14px 9px 14px;border-bottom:1px solid #ddd;color:#222;font:bold 17px Arial,sans-serif;word-break:break-word}
 .avm .avn span{display:block;font-weight:normal;color:#555;font-size:16px;margin-top:2px}
-.avm a,.avm button{display:block;width:100%;box-sizing:border-box;padding:10px 14px;margin:0;color:#035a5a;text-decoration:none;background:none;border:0;border-radius:0;text-align:left;font:17px Arial,sans-serif;cursor:pointer}
+.avm a,.avm button{display:block;width:100%;box-sizing:border-box;padding:6px 14px;line-height:1.2;margin:0;color:#035a5a;text-decoration:none;background:none;border:0;border-radius:0;text-align:left;font:17px Arial,sans-serif;cursor:pointer}
 .avm a:hover,.avm button:hover{background:#eef6f6}
 .avm form{margin:0;border-top:1px solid #ddd}
 .avm a span.avok,.avm a span.avbad{display:inline;border:0;padding:0;margin:0 0 0 6px;background:none;box-shadow:none;font:bold 17px Arial,sans-serif}.avm a span.avok{color:#2a7a2a}.avm a span.avbad{color:#b11}
