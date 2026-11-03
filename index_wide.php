@@ -162,7 +162,7 @@ var OEWide = (function(){
 	function byName(a, b){ return a.name.localeCompare(b.name, undefined, {numeric: true}); }
 	function render(){
 		var h = '<colgroup><col class="cu"><col class="cs"><col class="cd"><col class="ce c-w"><col class="ch c-x"><col class="cl c-x"><col class="cn c-w"></colgroup>'
-			+ '<tr><th>Unit</th><th>Status</th><th class="num dp"><span class="dw">Drawing / Pilot</span><span class="pw">Drawing</span></th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">Last seen</th></tr>';
+			+ '<tr><th>Unit</th><th>Status</th><th class="num dp"><span class="dw">Drawing / Pilot</span><span class="pw">Draw</span></th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">Last seen</th></tr>';
 		var qq = q.trim().toLowerCase();
 		var us = U.filter(function(u){ return !qq || u.name.toLowerCase().indexOf(qq) >= 0 || (G[u.g] && G[u.g].name.toLowerCase().indexOf(qq) >= 0); });
 		function rows(list, hid){ var o = ''; list.forEach(function(u){ o += row(u, hid); if (u.id === openId) o += det(u, hid); }); return o; }
