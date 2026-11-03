@@ -74,7 +74,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 @media (max-width:999px){#wt{table-layout:auto}#wt col{width:auto !important}}
 @media (max-width:899px){#wt .dg{display:flex;flex-direction:column}#wt .dg>.strip{flex-wrap:wrap;margin-top:8px}}
 @media screen and (max-width:699px){#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
-	#wt{table-layout:fixed}#wt col.cu{width:46% !important}#wt col.cs{width:28% !important}#wt col.cd{width:26% !important}#wt th{font-size:12px}#wt td.dp,#wt th.dp{padding-right:4px}
+	#wt{table-layout:fixed}#wt col.cu{width:46% !important}#wt col.cs{width:28% !important}#wt col.cd{width:26% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
 	#wt img.plug{margin-left:3px}}
 </style>
 <div id="wide">
