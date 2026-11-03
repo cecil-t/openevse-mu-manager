@@ -189,5 +189,5 @@ img.plug{
 	body.pgw{zoom:100% !important}
 	body.pgw .container{max-width:1200px}
 	body.pgw .pgcard{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
-	body.pgw .container>.sec{margin-left:8px;margin-right:8px}   /* sessions.php: its sections line up with the card */
+	body.pgw .container>.sec,body.pgw .container>.card,body.pgw .container>p{margin-left:8px;margin-right:8px}   /* sessions.php: its filter, summary and sections line up with the main page's card */
 }
