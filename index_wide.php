@@ -24,7 +24,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt{border-collapse:collapse;width:100%;background:#fff;table-layout:fixed;font:15px/1.4 Arial,sans-serif;color:#000}
 #wt th,#wt td{border-bottom:1px solid #e3e3e3;padding:6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #wt th{position:sticky;top:0;z-index:5;box-shadow:0 1px 0 #ccc;background:#f2f2f2;font-size:13px;color:#222}
-#wt col.cu{width:19%}#wt col.cs{width:11%}#wt col.cd{width:13%}#wt col.ce{width:18%}#wt col.ch{width:16%}#wt col.cl{width:14%}#wt col.cn{width:9%}
+#wt col.cu{width:19%}#wt col.cs{width:11%}#wt col.cd{width:13%}#wt col.ce{width:18%}#wt col.ch{width:19.5%}#wt col.cl{width:10.5%}#wt col.cn{width:9%}
 #wt .num{text-align:right}
 #wt td.dp,#wt th.dp{text-align:right;padding-right:22px}
 #wt tr.u{cursor:pointer}#wt tr.u:hover,#wt tr.u.op{background:#f4fbfb}
