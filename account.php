@@ -38,12 +38,13 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac button{font-size:16px;padding:5px 14px;margin:10px 8px 2px 0;border:1px solid #888;border-radius:5px;background:#f6f6f6;cursor:pointer}
 .ac button.go{background:#00706f;border-color:#00706f;color:#fff}
 .ac .msg{background:#e3f4e3;border:1px solid #9c9;border-radius:6px;padding:6px 9px;color:#245a24}
+@media screen and (min-width:700px){.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2{margin:8px 0}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}   /* desktop: name and password side by side */
 .ac .err{background:#fde3e3;border:1px solid #e99;border-radius:6px;padding:6px 9px;color:#a11;font-weight:normal}
 </style>
 <div class="slidebox ac pgcard">
 <?php if ($msg) echo '<div class="msg">' . h($msg) . '</div>'; if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>
 <div class="card"><b><?=h(oev_user_name($me))?></b><br><?=oev_v($me['email'])?><br><?=$me['role'] === 'admin' ? 'Admin: can view and change everything.' : 'View only.'?> <?=($me['role'] === 'admin' || $me['scope_all']) ? 'Sees all load groups.' : 'Sees some load groups.'?></div>
-<div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?><input type="hidden" name="a" value="name">
+<div class="ac2"><div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?><input type="hidden" name="a" value="name">
 <b>Your name</b>
 <div style="display:flex;gap:8px"><div style="flex:1;min-width:0"><label>First name</label><input type="text" name="first_name" value="<?=h($me['first_name'] ?? '')?>" maxlength="60" autocomplete="given-name"></div>
 <div style="flex:1;min-width:0"><label>Last name</label><input type="text" name="last_name" value="<?=h($me['last_name'] ?? '')?>" maxlength="60" autocomplete="family-name"></div></div>
@@ -54,7 +55,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <label>Current password</label><input type="password" name="current" autocomplete="current-password" required>
 <label>New password</label><input type="password" name="new" autocomplete="new-password" required>
 <label>New password again</label><input type="password" name="new2" autocomplete="new-password" required>
-<button type="submit" class="go">Change password</button></form></div>
+<button type="submit" class="go">Change password</button></form></div></div>
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
 <p><a href="./">&larr; Home</a><?=oev_is_admin() ? ' &middot; <a href="settings.php">Settings</a>' : ''?> &middot; <a href="help.php">Help</a></p>
