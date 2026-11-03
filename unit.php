@@ -75,6 +75,7 @@ table.stats td:first-child form.inl button.chip{margin:0 0 0 8px}
 .slidecontainer .slidebox .pf input[type=time]{width:7.5em}
 .slidecontainer .slidebox .pf input[type=number]{width:4.5em}
 .slidecontainer .slidebox .pf select{max-width:9em}
+@media screen and (max-width:699px){#ucard{width:auto;max-width:none;margin:0 5px;padding:8px}}
 .slidecontainer .slidebox .pf button.pbtn{margin:0 0 0 4px}
 #pop_info .slidebox{text-align:left}
 /* page card: index.php's card; the table keeps its own width (max 300px) centred in it */
