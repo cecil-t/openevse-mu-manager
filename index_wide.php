@@ -42,6 +42,9 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt .st.s254,#wt .st.s255{background:rgba(136,34,221,.13);color:#5a1a96}
 #wt .st.serr{background:rgba(255,34,34,.13);color:#a11}
 #wt img.plug{height:1.4em;margin-left:6px;vertical-align:middle;opacity:.8}
+#wt tr.u td:first-child img.plug{float:right;margin:0 0 0 4px}
+#wide .pw{display:none}
+#wt .gp{white-space:nowrap}#wt .gp .gn{overflow:hidden;text-overflow:ellipsis;min-width:0}#wt .gp .m{flex:none}
 #wt .x{color:#aaa}
 #wt .ses .t{color:#666;margin-left:6px}
 #wt .run{color:#c62828;font-weight:600}
@@ -73,13 +76,15 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 @media (min-width:1000px){#wt .c-x{display:table-cell}#wt col.c-x{display:table-column}}
 @media (max-width:999px){#wt{table-layout:auto}#wt col{width:auto !important}}
 @media (max-width:899px){#wt .dg{display:flex;flex-direction:column}#wt .dg>.strip{flex-wrap:wrap;margin-top:8px}}
-@media screen and (max-width:699px){#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
-	#wt{table-layout:fixed}#wt col.cu{width:46% !important}#wt col.cs{width:28% !important}#wt col.cd{width:26% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
+@media screen and (max-width:699px){#wide .pw{display:inline}#wide .gp.pw{display:flex}#wide .dw{display:none}
+	#wide .bar{gap:6px}#wide .bar input{flex:1 1 180px;max-width:none;min-width:0;padding:5px 7px}#wide .chip{padding:4px 9px;font-size:12px}
+	#wt tr.u td:first-child{font-size:14px}#wt tr.u td:first-child img.plug{height:1em;margin-top:2px}#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
+	#wt{table-layout:fixed}#wt col.cu{width:51% !important}#wt col.cs{width:31% !important}#wt col.cd{width:18% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
 	#wt img.plug{margin-left:3px}}
 </style>
 <div id="wide">
 <div class="bar"><input id="wq" type="search" placeholder="Search units&hellip;" aria-label="Search units">
-<button type="button" class="chip" data-s="group">By group</button><button type="button" class="chip" data-s="charging">Charging first</button><button type="button" class="chip" data-s="problems">Problems first</button><button type="button" class="chip" data-s="name">Name</button>
+<button type="button" class="chip" data-s="group">By group</button><button type="button" class="chip" data-s="charging">By charging</button><button type="button" class="chip" data-s="problems">By problems</button><button type="button" class="chip" data-s="name">By name</button>
 <span class="cnt"><?=(int)$nenabled?> unit<?=$nenabled == 1 ? '' : 's'?><?=$ngroups ? ' &middot; ' . (int)$ngroups . ' load group' . ($ngroups == 1 ? '' : 's') : ''?></span></div>
 <table id="wt"></table>
 </div>
@@ -109,7 +114,7 @@ var OEWide = (function(){
 		if (forceId && us.some(function(u){ return u.id === forceId; })) return true;
 		return (k in mem) ? !!mem[k] : !big;
 	}
-	function drawing(u){ return u.amps === null ? DASH : '<b>' + fmtA(u.amps) + '</b> / ' + (u.pilot === null ? '\u2014' : u.pilot) + ' A'; }
+	function drawing(u){ return u.amps === null ? DASH : '<span class="dw"><b>' + fmtA(u.amps) + '</b> / ' + (u.pilot === null ? '\u2014' : u.pilot) + ' A</span><span class="pw"><b>' + fmtA(u.amps) + '</b> A</span>'; }
 	function share(u){
 		if (!u.g) return '<span class="x">not balanced</span>';
 		if (u.share === null) return DASH;
@@ -119,8 +124,8 @@ var OEWide = (function(){
 		var ses = u.ses ? (u.ses.kwh === null ? '' : '<b>' + esc(u.ses.kwh) + '</b> kWh') + '<span class="t">' + esc(u.ses.dur) + '</span>' : DASH;
 		var sch = u.sch ? '<span' + (u.run ? ' class="run" title="Scheduled charge running"' : '') + '>' + esc(u.sch) + '</span>' : DASH;
 		return '<tr class="u' + (u.id === openId ? ' op' : '') + '" data-id="' + u.id + '" data-in="' + u.g + '"' + hid + '>'
-			+ '<td><a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
-			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '</td>'
+			+ '<td>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '<a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
+			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span></td>'
 			+ '<td class="num dp" data-k="drw">' + drawing(u) + '</td>'
 			+ '<td class="c-w ses">' + ses + '</td>'
 			+ '<td class="c-x">' + sch + (u.clock_off ? '<small class="ck" title="Unit clock is off from server time">clock off</small>' : '') + '</td>'
@@ -151,12 +156,12 @@ var OEWide = (function(){
 		var k = String(g ? g.id : 0), op = gOpen(k, us), ar = op ? '\u25BE' : '\u25B8';
 		if (!g) return '<tr class="g ung" data-g="0"><td colspan="7">' + ar + ' No load group <span class="m">&middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span></td></tr>';
 		var pct = g.limit ? Math.min(100, g.amps / g.limit * 100) : 0;
-		return '<tr class="g" data-g="' + g.id + '"><td colspan="7">' + ar + ' ' + esc(g.name) + ' <span class="m">&middot; ' + g.limit + ' A limit &middot; <span class="gu">' + fmtA(g.amps) + '</span> A in use &middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span><span class="bal"><i class="' + (pct > 90 ? 'hi' : '') + '" style="width:' + pct.toFixed(0) + '%"></i></span></td></tr>';
+		return '<tr class="g" data-g="' + g.id + '"><td colspan="7"><span class="pw gp"><span>' + ar + '\u00a0</span><span class="gn">' + esc(g.name) + '</span><span class="m">\u00a0&middot; Using ' + fmtA(g.amps) + ' A of ' + g.limit + ' A</span></span><span class="dw">' + ar + ' ' + esc(g.name) + ' <span class="m">&middot; ' + g.limit + ' A limit &middot; <span class="gu">' + fmtA(g.amps) + '</span> A in use &middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span><span class="bal"><i class="' + (pct > 90 ? 'hi' : '') + '" style="width:' + pct.toFixed(0) + '%"></i></span></span></td></tr>';
 	}
 	function byName(a, b){ return a.name.localeCompare(b.name, undefined, {numeric: true}); }
 	function render(){
 		var h = '<colgroup><col class="cu"><col class="cs"><col class="cd"><col class="ce c-w"><col class="ch c-x"><col class="cl c-x"><col class="cn c-w"></colgroup>'
-			+ '<tr><th>Unit</th><th>Status</th><th class="num dp">Drawing / Pilot</th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">Last seen</th></tr>';
+			+ '<tr><th>Unit</th><th>Status</th><th class="num dp"><span class="dw">Drawing / Pilot</span><span class="pw">Drawing</span></th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">Last seen</th></tr>';
 		var qq = q.trim().toLowerCase();
 		var us = U.filter(function(u){ return !qq || u.name.toLowerCase().indexOf(qq) >= 0 || (G[u.g] && G[u.g].name.toLowerCase().indexOf(qq) >= 0); });
 		function rows(list, hid){ var o = ''; list.forEach(function(u){ o += row(u, hid); if (u.id === openId) o += det(u, hid); }); return o; }
@@ -185,7 +190,7 @@ var OEWide = (function(){
 			if (forceId && cells.length && !o) forceId = null;
 			mem[k] = o; try { localStorage.setItem(KS, JSON.stringify(mem)); } catch (e) {}
 			cells.forEach(function(x){ x.style.display = o ? '' : 'none'; });
-			var c = r.firstChild; c.innerHTML = c.innerHTML.replace(/^[\u25BE\u25B8]/, o ? '\u25BE' : '\u25B8');
+			var c = r.firstChild; c.innerHTML = c.innerHTML.replace(/[\u25BE\u25B8]/g, o ? '\u25BE' : '\u25B8');
 		}; });
 		t.querySelectorAll('tr.u').forEach(function(r){ r.onclick = function(ev){
 			if (ev.target.closest('a')) return;   // the unit name opens the unit page
