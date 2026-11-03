@@ -81,7 +81,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 	#wt tr.u td:first-child{font-size:14px}#wt tr.u td:first-child img.plug{height:1em;margin-top:2px}#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
 	#wt{table-layout:fixed}#wt col.cu{width:51% !important}#wt col.cs{width:31% !important}#wt col.cd{width:18% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
 	#wt img.plug{margin-left:3px}
-	body{margin-left:0;margin-right:0}#unit.slidebox{width:auto;max-width:none;margin:0 5px;padding:8px}}
+	#unit.slidebox{width:auto;max-width:none;margin:0 5px;padding:8px}}
 </style>
 <div id="wide">
 <div class="bar"><input id="wq" type="search" placeholder="Search units&hellip;" aria-label="Search units">
