@@ -27,6 +27,21 @@ function nm_same_net($client, $ip){
 	if (filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // public or Tailscale (100.64/10): not private
 	return (ip2long($client) & 0xFFFFFF00) === (ip2long($ip) & 0xFFFFFF00);
 }
+// or the browser comes in from this site's own public address (it shares the units' home internet connection): the site name's DNS A records, as set by the web server (not the browser's Host header)
+function nm_home_public($client){
+	static $pub = null; $f = FILTER_FLAG_IPV4;
+	if (!is_string($client) || filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== $client) return false;
+	if ($pub === null) {
+		$pub = array(); $n = (string)($_SERVER['SERVER_NAME'] ?? '');
+		if ($n !== '' && filter_var($n, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === $n && strpos($n, '.') !== false)
+			foreach ((@dns_get_record($n, DNS_A) ?: array()) as $r) if (isset($r['ip']) && filter_var($r['ip'], FILTER_VALIDATE_IP, $f) === $r['ip']) $pub[] = $r['ip'];
+	}
+	return in_array($client, $pub, true);
+}
+function nm_local($client, $ip){
+	if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== $ip || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // the unit must be on a private network
+	return nm_same_net($client, $ip) || nm_home_public($client);
+}
 // the unit's own web page, from its Address (Settings > Units): scheme, host and port only, never a login
 function nm_web($evseurl){
 	$p = parse_url((string)$evseurl); if (!is_array($p) || empty($p['host'])) return '';
@@ -109,7 +124,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 <div class="nm-wrap"><table>
 <tr><th>#</th><th>Name</th><th>IP</th><th>Hostname</th><th>MAC</th><th>Controller Serial</th><th>Max A</th><th>Pilot</th><th>Volatile</th><th>Node*</th><th>MQTT topic</th><th>WiFi fw</th><th>Cntrl fw</th></tr>
 <?php foreach ($data as $d) {
-	$nm = ($d['web'] ?? '') !== '' && nm_same_net($_SERVER['REMOTE_ADDR'] ?? '', $d['ip']) ? '<a class="lnk" href="' . h($d['web']) . '" target="_blank" rel="noopener noreferrer">' . h($d['name']) . '</a>' : h($d['name']);
+	$nm = ($d['web'] ?? '') !== '' && nm_local($_SERVER['REMOTE_ADDR'] ?? '', $d['ip']) ? '<a class="lnk" href="' . h($d['web']) . '" target="_blank" rel="noopener noreferrer">' . h($d['name']) . '</a>' : h($d['name']);
 	echo '<tr><td class="num">' . (int)$d['id'] . '</td><td>' . $nm . '</td><td>' . $cell($d['ip']) . '</td>';
 	if ($d['err'] !== '') { echo '<td colspan="10" class="nm-err">Could not read the unit (' . h($d['err']) . ')</td></tr>'; continue; }
 	echo '<td' . (strlen($d['host']) > 20 ? ' class="sm"' : '') . '>' . $cell($d['host']) . '</td>';   // hostname hints live on Settings > Units only
