@@ -308,6 +308,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set label{display:block;margin:8px 0 2px 0;color:#333}
 .set label.in{display:inline-block;margin:4px 14px 2px 0;font-weight:normal}
 .set input[type=text],.set input[type=email],.set input[type=password],.set input[type=number],.set input[type=time],.set input[type=url],.set select{width:100%;box-sizing:border-box;font-size:16px;padding:5px 6px;border:1px solid #bbb;border-radius:4px;background:#fff}
+@media screen and (min-width:700px){.set.s-units{container-type:inline-size}.set.s-units input:not([type=checkbox]):not([type=radio]),.set.s-units select,.set.s-units textarea,.set.s-units .row2,.set.s-units .emrow{max-width:50vw;max-width:calc(50cqw - 40px)}}   /* desktop, Units tab: no field past the middle of the screen */
 .set input[type=checkbox],.set input[type=radio]{width:18px;height:18px;vertical-align:-3px;margin:0 5px 0 0}
 .set .row2{display:flex;gap:8px}.set .row2>div{flex:1 1 0;min-width:0}
 .set .note{color:#666;margin:4px 0}
@@ -330,7 +331,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set .sys b{color:#222}
 .set .nflag{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#fff4d6;border:1px solid #e9c46a;color:#6b4b00;font-weight:normal}
 </style>
-<div class="slidebox set pgcard">
+<div class="slidebox set pgcard s-<?=h($sec)?>">
 <div class="tabs">
 <?php foreach (array('units' => 'Units', 'groups' => 'Load groups', 'prefs' => 'Preferences', 'users' => 'Users', 'link' => 'View-only link', 'system' => 'System status') as $k => $t) echo '<a href="settings.php?s=' . $k . '"' . ($k === $sec ? ' class="on"' : '') . '>' . $t . '</a>'; ?>
 </div>
