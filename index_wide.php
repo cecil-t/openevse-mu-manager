@@ -134,7 +134,7 @@ var OEWide = (function(){
 		return '<tr class="det" data-in="' + u.g + '"' + hid + '><td colspan="7"><div class="dg">'
 			+ '<div><h4>Status</h4><table><tr><td>State</td><td>' + state + '</td></tr>' + tr('Override', 'ovr') + tr('Pilot', 'pilot') + tr('Current', 'amps') + tr('Voltage', 'volts') + tr('Power', 'power') + tr('Temp', 'temp') + tr('Session Energy', 'energy') + tr('Charge Time', 'ct') + '</table></div>'
 			+ '<div><h4>Schedule &amp; limits</h4><table>' + tr('Start / Stop', 'start') + tr('Limits', 'lim') + tr('Level', 'level') + '</table>'
-			+ '<h4 class="lbh">Load balancer</h4><table><tr><td>Group</td><td>' + (g ? esc(g.name) : 'Not in a group') + '</td></tr>'
+			+ '<h4 class="lbh">Load balancer</h4><table><tr><td>Group</td><td>' + (g ? esc(g.name) : 'No load group') + '</td></tr>'
 			+ '<tr><td>Share</td><td>' + (g && u.share !== null ? u.share + ' A of ' + g.limit + ' A' : (g ? DASH : 'not balanced')) + '</td></tr>'
 			+ tr('Max A', 'maxa') + '<tr><td>Drawing</td><td>' + (u.amps === null ? DASH : fmtA(u.amps) + ' A') + '</td></tr></table></div>'
 			+ '<div><h4>Settings &amp; Info</h4><table>' + tr('Last check-in', 'checkin') + tr('Safety Checks', 'checks') + tr('Time', 'time') + tr('Uptime', 'uptime') + tr('Firmware / WiFi', 'fw') + tr('API', 'api') + tr('Hostname', 'host') + tr('IP address', 'ip') + tr('SSID', 'ssid') + tr('WiFi signal', 'rssi') + '</table></div>'
@@ -145,7 +145,7 @@ var OEWide = (function(){
 	var LAZY = {ovr:1, checks:1, time:1, fw:1, host:1, ssid:1, energy:1, lim:1, level:1, uptime:1, start:1, temp:1, rssi:1, volts:1, pilot:1};
 	function gHead(g, us){
 		var k = String(g ? g.id : 0), op = gOpen(k, us), ar = op ? '\u25BE' : '\u25B8';
-		if (!g) return '<tr class="g ung" data-g="0"><td colspan="7">' + ar + ' Not in a group <span class="m">&middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span></td></tr>';
+		if (!g) return '<tr class="g ung" data-g="0"><td colspan="7">' + ar + ' No load group <span class="m">&middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span></td></tr>';
 		var pct = g.limit ? Math.min(100, g.amps / g.limit * 100) : 0;
 		return '<tr class="g" data-g="' + g.id + '"><td colspan="7">' + ar + ' ' + esc(g.name) + ' <span class="m">&middot; ' + g.limit + ' A limit &middot; <span class="gu">' + fmtA(g.amps) + '</span> A in use &middot; ' + us.length + ' unit' + (us.length == 1 ? '' : 's') + '</span><span class="bal"><i class="' + (pct > 90 ? 'hi' : '') + '" style="width:' + pct.toFixed(0) + '%"></i></span></td></tr>';
 	}
