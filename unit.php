@@ -311,7 +311,7 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 		var asl = u.code == 254 || u.code == 255; $('b_wake').style.display = asl ? '' : 'none'; $('b_sleep').style.display = asl ? 'none' : '';
 		if (u.label) { var t = u.label + ((u.saved !== null && u.setting < u.saved) ? ' / ' + u.saved + ' A' : '') + ' \u00b7 ' + (u.setting * V / 1000).toFixed(1) + ' kW'; $('v_pilot').textContent = t; $('v_pilot').title = u.label_title; }
 		}
-		if (u.amps !== null) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
+		if (u.amps !== null && !(window.wsAt && Date.now() - wsAt < 15000)) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
 		$('v_age').textContent = ago(u.checkin);
 		if (u.stale) dot('a', 'No MQTT check-in for ' + ago(u.checkin).replace(' ago', ''));
 		else if (j.age > 15) dot('a', 'Load balancer data is ' + j.age + ' s old');
@@ -319,6 +319,19 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 	}
 	OEVLive.poll('lbstate.php?unit=<?=$unitid?>', apply, function(){ liveOK = false; })();
 })();
+<?php if (!empty($_GET['ws']) && is_file(__DIR__ . '/ws_bridge.php')) { ?>
+// TEST (?ws=1): current and power straight from the unit's WebSocket, relayed by ws_bridge.php; the 5 s poll above keeps everything else
+var wsAt = 0;
+(function(){
+	var V = <?=(int)$e['volts']?>, es = new EventSource('ws_bridge.php?unit=<?=$unitid?>'), d = document.getElementById('lbdot'), n = 0;
+	function num(x){ return String(Math.round(x * 100) / 100); }
+	es.addEventListener('u', function(m){ var j = JSON.parse(m.data); n++; wsAt = Date.now();
+		if (typeof j.amp === 'number') { var a = j.amp / 1000; document.getElementById('v_amps').textContent = num(a) + ' amps'; document.getElementById('v_power').textContent = (Math.round(a * V / 100) / 10) + ' kW'; }
+		d.title = 'WebSocket test: ' + n + ' updates, last ' + new Date().toLocaleTimeString(); d.style.outline = '2px solid #0077dd'; });
+	es.addEventListener('fail', function(){ d.style.outline = '2px solid #e9a000'; });
+	es.onerror = function(){ if (Date.now() - wsAt > 15000) d.style.outline = ''; };   // EventSource reconnects by itself
+})();
+<?php } ?>
 document.getElementById('a_state').onclick = function(){ pop('State', <?=json_encode($stl)?>, <?=oev_is_public() ? 'null' : "['Raw status dump', " . json_encode('dump.php?unitid=' . $unitid . '&with=' . implode(',', $with)) . ']'?>); }
 <?php if ($CAN) { ?>
 document.getElementById('a_pilot').onclick = function(){ openPop('setpilot'); }
