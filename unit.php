@@ -104,8 +104,8 @@ table.stats tr.g2 td{background-color:#e3e7ec}
 }
 .lbdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:5px;vertical-align:middle;background:#bbb}
 .lbdot.g{background:#2a2}.lbdot.a{background:#e9a000}.lbdot.r{background:#d22}.lbdot.x{display:none}
-table.stats td.vfade{transition:background-color 1.5s ease-out}
-table.stats td.vfade.vchg{background-color:#fff3b0;transition:none}
+table.stats td.vfade{transition:background-color 1.2s ease-out}
+table.stats td.vfade.vchg{background-color:#fff8d1;transition:none}
 </style>
 <?php
 $e = evse_status($unit);
@@ -289,12 +289,12 @@ function ask(title, lines, ok){ var b = document.getElementById('pop_ask'); fill
 function askForm(f, msg){ ask('Confirm', [msg], function(){ if (f.elements.action && f.elements.action.value === 'restart') sentMsg('Reboot command sent\u2026 waiting for the unit'); f.submit(); }); return false; }
 // immediate note at the top while a slow action (reboot) runs; the result message replaces it when the page comes back
 function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.style.cssText = 'position:fixed;left:0;right:0;top:9px;z-index:50;text-align:center;pointer-events:none;'; var s = document.createElement('span'); s.style.cssText = 'display:inline-block;font-size:13px;line-height:18px;padding:1px 8px;color:#333;background:#fff;border:1px solid #ccc;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.25);'; s.textContent = t; d.appendChild(s); document.body.appendChild(d); }
-// a value that changes (live feed or 5 s poll) flashes pale yellow and fades out (~1.5 s); Last check-in excluded
+// a value that changes (live feed or 5 s poll) flashes pale yellow and fades out (~1.2 s); Last check-in excluded
 (function(){
 	var cells = [].filter.call(document.querySelectorAll('table.stats td:nth-child(2)'), function(c){ return c.id !== 'v_seen'; });
 	cells.forEach(function(c){ c._t = c.textContent; c.classList.add('vfade'); new MutationObserver(function(){
 		if (c.textContent === c._t) return; c._t = c.textContent;
-		clearTimeout(c._h); c.classList.add('vchg'); c._h = setTimeout(function(){ c.classList.remove('vchg'); }, 250);   // full colour for 0.25 s, then a 1.5 s fade
+		clearTimeout(c._h); c.classList.add('vchg'); c._h = setTimeout(function(){ c.classList.remove("vchg"); }, 100);   // full colour for 0.1 s, then a 1.2 s fade
 	}).observe(c, {childList: true, characterData: true, subtree: true}); });
 })();
 // WebSocket feed (on by default; ?ws=0 turns it off, below): per value, when the feed last sent it; none = never
