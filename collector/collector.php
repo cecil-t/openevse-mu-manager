@@ -49,9 +49,10 @@ try {
 	$units = evse_units();
 	sess_apply_plug_events($db, $units);   // quick unplug/replug seen by the load balancer
 	$push_units = $db->query("SELECT unit_id, node FROM emon_nodes WHERE key_hash IS NOT NULL")->fetchAll(PDO::FETCH_KEY_PAIR);
-	foreach ($units as $unit) {
+	// pass 1: which units to poll this run (and why); no unit is called here except by sess_check_push_stale
+	$plan = array();
+	foreach ($units as $k => $unit) {
 		if ($only && (int)$unit['id'] !== $only) continue;
-		if (time() - $started > 45) { slog('warn', 'run took over 45 s, skipping remaining units'); break; }
 		try {
 			$uid = (int)$unit['id'];
 			$us = $db->query("SELECT * FROM unit_state WHERE unit_id = $uid")->fetch();
@@ -63,6 +64,35 @@ try {
 				if ($verbose) echo str_pad($unit['name'], 20) . " push  skip (last push " . (time() - (int)$us['last_push_at']) . " s ago)\n";
 				continue;
 			}
+			$plan[$k] = $why;
+		} catch (Throwable $e) {
+			if (isset($db) && $db->inTransaction()) sess_rollback($db);
+			slog('error', "{$unit['name']}: " . $e->getMessage());
+		}
+	}
+	// pass 2: GET /config from every unit to be polled at once (curl_multi, include_v5.php), so units
+	// that don't answer cost one timeout in total, not one each; fills the evse_detect() cache
+	$gens = array(); $pu = array();
+	foreach ($plan as $k => $why) {
+		$pu[$k] = $units[$k];
+		$gens[$k] = (function() { $r = yield from evse_par_get('config'); return $r; })();
+	}
+	foreach (evse_par_run($pu, $gens) as $k => $r) {
+		$info = array('api'=>'offline', 'version'=>'', 'config'=>null, 'code'=>$r['code']);   // same as evse_detect()
+		if ($r['ok'] && is_array($r['json'])) {
+			$ver = isset($r['json']['version']) ? (string)$r['json']['version'] : '';
+			$info['version'] = $ver; $info['config'] = $r['json'];
+			$info['api'] = ((int)ltrim($ver, 'vV') >= 4) ? 'http' : 'rapi';
+		} elseif ($r['code'] == 200) {
+			$info['api'] = 'rapi';
+		}
+		evse_detect_prime($units[$k], $info);
+	}
+	// pass 3: read each unit and log it (units that didn't answer above are logged as offline without another call)
+	foreach ($plan as $k => $why) {
+		$unit = $units[$k];
+		if (time() - $started > 45) { slog('warn', 'run took over 45 s, skipping remaining units'); break; }
+		try {
 			list($r, $res, $api) = sess_poll_one($db, $unit, $why);
 			if ($verbose) {
 				echo str_pad($unit['name'], 20) . ' ' . str_pad($api, 5) . ' ' . str_pad("[$why]", 20) . ' ';
