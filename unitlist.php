@@ -10,7 +10,7 @@ oev_require('admin');
 require_once __DIR__ . '/include_v5.php';
 require_once __DIR__ . '/collector/session_logic.php';   // sess_rapi()
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
-@set_time_limit(90);
+@set_time_limit(90);   // units are read in parallel (about 7 s worst case)
 
 $db = oev_db();
 $rows = $db->query('SELECT id, name, evseurl, loadgroupid, emon_mode, breaker FROM evses ORDER BY id')->fetchAll();
@@ -50,16 +50,15 @@ function nm_web($evseurl){
 	return $sc . '://' . $h . (isset($p['port']) ? ':' . (int)$p['port'] : '') . '/';
 }
 // one unit, read only -> plain values (+ what this site expects)
-function nm_read($u, $sug, $nodes, $arp){
+function nm_read($u, $sug, $nodes, $arp, $r, $x){   // $r / $x: GET /config and /status replies, read in parallel below
 	$id = (int)$u['id'];
 	$o = array('id' => $id, 'name' => $u['name'], 'ip' => '', 'host' => '', 'sug' => $sug, 'mac' => '', 'serial' => '', 'node' => '', 'node_exp' => '', 'topic' => '', 'topic_exp' => '', 'wifi' => '', 'ctl' => '', 'max' => '', 'pilot' => '', 'vol' => '', 'err' => '');
 	if (!empty($u['breaker'])) $o['max'] = (string)(int)$u['breaker'];   // MU Manager Max current (Settings > Units)
 	$h = (string)parse_url($u['evseurl'], PHP_URL_HOST); $o['ip'] = $h; $o['web'] = nm_web($u['evseurl']);
 	if (($u['emon_mode'] ?: 'internal') === 'internal' && isset($nodes[$id])) $o['node_exp'] = (string)$nodes[$id];
 	if ($u['loadgroupid']) $o['topic_exp'] = 'openevse/u' . $id;
-	$r = evse_http($u, 'GET', 'config');
 	if (!$r['ok'] || !is_array($r['json'])) { $o['err'] = $r['code'] ? 'HTTP ' . $r['code'] : 'no answer'; return $o; }
-	$c = $r['json']; $x = evse_http($u, 'GET', 'status'); $st = ($x['ok'] && is_array($x['json'])) ? $x['json'] : array();
+	$c = $r['json']; $st = ($x['ok'] && is_array($x['json'])) ? $x['json'] : array();
 	if (!empty($st['ipaddress'])) $o['ip'] = (string)$st['ipaddress'];
 	elseif (!filter_var($h, FILTER_VALIDATE_IP)) $o['ip'] = (string)gethostbyname($h);
 	$o['host'] = (string)($c['hostname'] ?? '');
@@ -78,7 +77,11 @@ function nm_read($u, $sug, $nodes, $arp){
 }
 $units = evse_units(array_map(function($r){ return (int)$r['id']; }, $rows));   // logins decrypted in memory only
 $data = array(); $t0 = microtime(true);
-foreach ($rows as $r) { $id = (int)$r['id']; $u = isset($units[$id]) ? array_merge($units[$id], array('loadgroupid' => $r['loadgroupid'], 'emon_mode' => $r['emon_mode'], 'breaker' => $r['breaker'])) : $r; $data[] = nm_read($u, $sug[$id] ?? '', $nodes, $arp); }
+$us = array(); $gens = array();
+foreach ($rows as $r) { $id = (int)$r['id']; $us[$id] = isset($units[$id]) ? array_merge($units[$id], array('loadgroupid' => $r['loadgroupid'], 'emon_mode' => $r['emon_mode'], 'breaker' => $r['breaker'])) : $r + array('username' => '', 'password' => '');
+	$gens[$id] = (function() { $c = yield from evse_par_get('config'); $s = ($c['ok'] && is_array($c['json'])) ? (yield from evse_par_get('status')) : null; return array($c, $s); })(); }
+$got = evse_par_run($us, $gens);   // all units at once (curl_multi, include_v5.php), so dead units don't add up
+foreach ($rows as $r) { $id = (int)$r['id']; $data[] = nm_read($us[$id], $sug[$id] ?? '', $nodes, $arp, $got[$id][0], $got[$id][1] ?? array('ok' => false, 'json' => null)); }
 $read_at = time();
 
 /* ---------- CSV ---------- */
