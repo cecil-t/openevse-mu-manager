@@ -1,13 +1,13 @@
 <?php
 /******************************************************************************
- * ws_lib.php - TEST WebSocket feed helpers (ws_bridge.php, unit.php?ws=1).
+ * ws_lib.php - WebSocket live feed helpers (ws_bridge.php, unit.php; ?ws=0 turns the feed off).
  * oev_ws_open(): the unit's /ws handshake (login sent from the server only).
  * oev_ws_capable(): does this unit have a working /ws? Probed once, kept in the
  * app's cache folder (run/cache/ws_cap_<id>.json); probed again after a day,
  * when the unit's WiFi firmware version changes, or after the feed fails.
  ******************************************************************************/
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
-define('OEV_WS_ENABLED', true);         // off switch for the whole test (unit.php then keeps its 5 s poll only)
+define('OEV_WS_ENABLED', true);         // kill switch for the live feed (unit.php then keeps its 5 s poll only)
 define('OEV_WS_CAP_TTL', 86400);        // re-probe after a day
 define('OEV_WS_FAIL_TTL', 3600);        // a failed unit is tried again after an hour
 

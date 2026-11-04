@@ -1,7 +1,7 @@
 <?php
 /******************************************************************************
- * ws_bridge.php - TEST: live feed from a unit's own WebSocket (/ws), relayed to
- * the browser as Server-Sent Events. unit.php uses it only with ?ws=1 and only
+ * ws_bridge.php - live feed from a unit's own WebSocket (/ws), relayed to
+ * the browser as Server-Sent Events. unit.php uses it by default (?ws=0 turns it off) and only
  * for units that passed the /ws check (ws_lib.php oev_ws_capable()).
  * The NAS opens the WebSocket (with the unit's login, which never leaves the
  * server), passes on each update for up to OEV_WS_SECONDS, then ends; the
@@ -11,7 +11,7 @@
  * Off switch: OEV_WS_ENABLED in ws_lib.php.
  ******************************************************************************/
 define('OEV_WS_SECONDS', 25);   // one PHP worker per open tab for this long, then a reconnect
-define('OEV_WS_SLOTS', 4);      // at most this many feeds at once (the NAS has 20 PHP workers)
+define('OEV_WS_SLOTS', 10);     // at most this many feeds at once (PHP-FPM allows 50 workers)
 require_once __DIR__ . '/auth_lib.php'; oev_require('public', true);   // login gate (auth_lib.php)
 include __DIR__ . '/include_v5.php';
 require_once __DIR__ . '/index_wide_lib.php';   // idx_temp_html()

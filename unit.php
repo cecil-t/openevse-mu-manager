@@ -44,7 +44,7 @@ function autoRefresh(){ var open = [].some.call(document.querySelectorAll('.slid
 	<?php foreach ($units as $u) { ?>
 		<option value="<?=(int)$u['id']?>" <?= $u['id'] == $unitid ? 'selected' : '' ?>><?=h($u['name'])?></option>
 	<?php } ?>
-	</select><?php if ($with) { ?><input type="hidden" name="with" value="<?=h(implode(',', $with))?>"><?php } ?><?php if (!empty($_GET['ws'])) { ?><input type="hidden" name="ws" value="1"><?php } ?>
+	</select><?php if ($with) { ?><input type="hidden" name="with" value="<?=h(implode(',', $with))?>"><?php } ?><?php if (($_GET['ws'] ?? '') === '0') { ?><input type="hidden" name="ws" value="0"><?php } ?>
 	<a href="javascript:void(0);" id="b_speak" title="Speak status" aria-label="Speak status" style="text-decoration:none;font-size:20px;vertical-align:middle;margin-left:4px;">&#128266;</a></form>
 <style>
 form#unit{white-space:nowrap}
@@ -104,6 +104,8 @@ table.stats tr.g2 td{background-color:#e3e7ec}
 }
 .lbdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:5px;vertical-align:middle;background:#bbb}
 .lbdot.g{background:#2a2}.lbdot.a{background:#e9a000}.lbdot.r{background:#d22}.lbdot.x{display:none}
+table.stats td.vchg{background-color:#fff4c2;transition:none}
+table.stats td.vfade{transition:background-color 1.2s ease-out}
 </style>
 <?php
 $e = evse_status($unit);
@@ -287,7 +289,15 @@ function ask(title, lines, ok){ var b = document.getElementById('pop_ask'); fill
 function askForm(f, msg){ ask('Confirm', [msg], function(){ if (f.elements.action && f.elements.action.value === 'restart') sentMsg('Reboot command sent\u2026 waiting for the unit'); f.submit(); }); return false; }
 // immediate note at the top while a slow action (reboot) runs; the result message replaces it when the page comes back
 function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.style.cssText = 'position:fixed;left:0;right:0;top:9px;z-index:50;text-align:center;pointer-events:none;'; var s = document.createElement('span'); s.style.cssText = 'display:inline-block;font-size:13px;line-height:18px;padding:1px 8px;color:#333;background:#fff;border:1px solid #ccc;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.25);'; s.textContent = t; d.appendChild(s); document.body.appendChild(d); }
-// WebSocket test feed (?ws=1, below): per value, when the feed last sent it; none = never
+// a value that changes (live feed or 5 s poll) flashes pale yellow and fades out (~1.2 s); Last check-in excluded
+(function(){
+	var cells = [].filter.call(document.querySelectorAll('table.stats td:nth-child(2)'), function(c){ return c.id !== 'v_seen'; });
+	cells.forEach(function(c){ c._t = c.textContent; c.classList.add('vfade'); new MutationObserver(function(){
+		if (c.textContent === c._t) return; c._t = c.textContent;
+		c.classList.add('vchg'); void c.offsetWidth; c.classList.remove('vchg');
+	}).observe(c, {childList: true, characterData: true, subtree: true}); });
+})();
+// WebSocket feed (on by default; ?ws=0 turns it off, below): per value, when the feed last sent it; none = never
 var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function(){}, wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
 // live update from the load balancer (lbstate.php?unit=N, read only) every 5 s while the tab is visible:
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
@@ -323,18 +333,21 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 	}
 	OEVLive.poll('lbstate.php?unit=<?=$unitid?>', apply, function(){ liveOK = false; })();
 })();
-<?php if (!empty($_GET['ws']) && is_file(__DIR__ . '/ws_lib.php')) { require_once __DIR__ . '/ws_lib.php'; if (oev_ws_capable($unit, $e['version'] ?? '')) { ?>
-// TEST (?ws=1, units that passed the /ws check in ws_lib.php): every value the unit's WebSocket sends is shown
+<?php if (($_GET['ws'] ?? '1') !== '0' && is_file(__DIR__ . '/ws_lib.php')) { require_once __DIR__ . '/ws_lib.php'; if (oev_ws_capable($unit, $e['version'] ?? '')) { ?>
+// Live feed (default; ?ws=0 off; units that passed the /ws check in ws_lib.php): every value the unit's WebSocket sends is shown
 // as it arrives (relayed by ws_bridge.php); the 5 s poll above fills the rest, and takes a value back once the feed
 // hasn't sent it for 15 s. EventSource reconnects by itself every 25 s.
 (function(){
 	var V = <?=(int)$e['volts']?>, SAVED = <?=json_encode(isset($psv) && $psv !== null ? (int)$psv : null)?>, CUR = <?=$cur ? 'true' : 'false'?>;
-	var es = new EventSource('ws_bridge.php?unit=<?=$unitid?>'), d = document.getElementById('lbdot'), n = 0;
+	var es, d = document.getElementById('lbdot'), n = 0, retry = null; var lastState = <?=(int)$e['statecode']?>;
 	function $(id){ return document.getElementById(id); }
 	function row(label){ var c = null; document.querySelectorAll('table.stats tr').forEach(function(tr){ var t = tr.cells[0]; if (t && !c && t.textContent.trim() === label) c = tr.cells[1]; }); return c; }
 	function num(x){ return String(Math.round(x * 100) / 100); }
 	var cV = row('Voltage'), cE = row('Energy'), cC = row('Charge Time'), cT = row('Temp');
-	es.addEventListener('u', function(m){ var j = JSON.parse(m.data), now = Date.now(); n++;
+	function again(ms){ if (!retry) retry = setTimeout(function(){ retry = null; start(); }, ms); }   // closed for good (non-200 answer): a new feed after ms
+	function start(){
+		es = new EventSource('ws_bridge.php?unit=<?=$unitid?>');
+		es.addEventListener('u', function(m){ var j = JSON.parse(m.data), now = Date.now(); n++;
 		for (var k in j) wsAt[k] = now;
 		if (j.state !== undefined) { $('v_st').textContent = j.state_text; $('v_state').title = j.state_text;
 			document.querySelectorAll('.r_head th').forEach(function(th){ th.className = j.state_cls; });
@@ -349,10 +362,11 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 		if (j.temp_html && cT) cT.innerHTML = j.temp_html;
 		if (j.srssi !== undefined) $('a_wifi').title = 'Signal: ' + j.srssi + ' dBm (live)';
 		wsState = 'live'; wsLast = now; d.style.outline = '2px solid #0077dd'; tip(); });
-	var lastState = <?=(int)$e['statecode']?>;
-	es.addEventListener('connected', function(){ wsAt[''] = Date.now(); wsState = 'live'; d.style.outline = '2px solid #0077dd'; tip(); });   // handshake done: ring at once
-	es.addEventListener('fail', function(){ es.close(); wsState = 'failed'; d.style.outline = '2px solid #e9a000'; tip(); });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
-	es.onerror = function(){ if (wsState === 'failed') return; if (!wsFresh('')) { d.style.outline = ''; wsState = 'reconnecting'; tip(); } };
+		es.addEventListener('connected', function(){ wsAt[''] = Date.now(); wsState = 'live'; d.style.outline = '2px solid #0077dd'; tip(); });   // handshake done: ring at once
+		es.addEventListener('fail', function(){ es.close(); wsState = 'failed'; d.style.outline = '2px solid #e9a000'; tip(); again(300000); });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
+		es.onerror = function(){ if (wsState === 'failed') return; if (es.readyState === 2) { d.style.outline = ''; wsState = 'reconnecting'; tip(); again(15000); } else if (!wsFresh('')) { d.style.outline = ''; wsState = 'reconnecting'; tip(); } };
+	}
+	start();
 })();
 <?php } else { ?>
 wsState = 'unsupported';
@@ -362,14 +376,14 @@ wsState = 'unsupported';
 	var d = document.getElementById('lbdot'), set = OEVLive.dot;
 	OEVLive.dot = function(cls, t){ set(cls, t); tip(); };
 	function secs(ms){ var s = Math.max(0, Math.round(ms / 1000)); return s < 120 ? s + ' s' : Math.round(s / 60) + ' min'; }
-	window.tip = function(){
-		var p = 'updating every 5 seconds' + (seenAt ? ' (last unit check-in ' + secs(Date.now() - seenAt) + ' ago)' : ''), f;
-		if (wsState === 'live') f = 'Live: updating instantly from the unit (' + (wsLast ? 'last update ' + secs(Date.now() - wsLast) + ' ago' : 'connected, no changes yet') + ')';
-		else if (wsState === 'connecting') f = 'Live feed connecting; ' + p;
-		else if (wsState === 'reconnecting') f = 'Live feed reconnecting; ' + p;
-		else if (wsState === 'failed') f = 'Live feed stopped (the unit did not accept it); ' + p;
-		else f = p.charAt(0).toUpperCase() + p.slice(1);
-		d.title = f;
+	window.tip = function(){   // two lines: how the unit connection is going, then its detail
+		var q = seenAt ? 'Last unit check-in ' + secs(Date.now() - seenAt) + ' ago' : '', f;
+		if (wsState === 'live') { f = 'Live: updating instantly from the unit'; q = wsLast ? 'Last update ' + secs(Date.now() - wsLast) + ' ago' : 'Connected, no changes yet'; }
+		else if (wsState === 'connecting') f = 'Live feed connecting; updating every 5 seconds';
+		else if (wsState === 'reconnecting') f = 'Live feed reconnecting; updating every 5 seconds';
+		else if (wsState === 'failed') f = 'Live feed stopped (the unit did not accept it); updating every 5 seconds';
+		else f = 'Updating every 5 seconds';
+		d.title = f + (q ? '\n' + q : '');
 	};
 	tip(); setInterval(tip, 1000);
 })();
