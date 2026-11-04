@@ -82,7 +82,7 @@ try {
 		if ($r['ok'] && is_array($r['json'])) {
 			$ver = isset($r['json']['version']) ? (string)$r['json']['version'] : '';
 			$info['version'] = $ver; $info['config'] = $r['json'];
-			$info['api'] = ((int)ltrim($ver, 'vV') >= 4) ? 'http' : 'rapi';
+			$info['api'] = ((int)ltrim($ver, 'vV') >= 4 || isset($r['json']['max_current_soft'])) ? 'http' : 'rapi';
 		} elseif ($r['code'] == 200) {
 			$info['api'] = 'rapi';
 		}
