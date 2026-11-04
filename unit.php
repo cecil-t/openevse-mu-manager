@@ -50,10 +50,10 @@ function autoRefresh(){ var open = [].some.call(document.querySelectorAll('.slid
 form#unit{white-space:nowrap}
 table.stats td.nw{white-space:nowrap}
 table.stats td:first-child{white-space:nowrap}
-form.inl button.chip{float:right;margin:0 0 0 6px;padding:0 6px;font-size:12px;line-height:17px;color:#000;background:#fff;border:1px solid #ccc;border-radius:2px}
+form.inl button.chip{float:right;margin:-1px 0 -1px 6px;padding:0 6px;font-size:13px;line-height:19px;color:#000;background:#fff;border:1px solid #ccc;border-radius:2px}
 form.inl button.chip:hover{background:#ccc}
 /* Sleep/Wake and Reboot sit right-aligned in the label column so value cells keep their full width */
-table.stats td:first-child form.inl button.chip{margin:0 0 0 8px}
+table.stats td:first-child form.inl button.chip{margin:-1px 0 -1px 8px}
 /* 310px phones: tighter cells so the longest state (Error: Over Temperature + plug) still fits on one line */
 @media (max-width:359px){table.stats td{padding:2px 3px;font-size:14px}table.stats td:first-child form.inl button.chip{margin-left:3px;padding:0 4px}}
 .slidecontainer .slidebox .pt{font-weight:bold;margin-bottom:6px}
