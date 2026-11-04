@@ -44,7 +44,7 @@ function autoRefresh(){ var open = [].some.call(document.querySelectorAll('.slid
 	<?php foreach ($units as $u) { ?>
 		<option value="<?=(int)$u['id']?>" <?= $u['id'] == $unitid ? 'selected' : '' ?>><?=h($u['name'])?></option>
 	<?php } ?>
-	</select><?php if ($with) { ?><input type="hidden" name="with" value="<?=h(implode(',', $with))?>"><?php } ?>
+	</select><?php if ($with) { ?><input type="hidden" name="with" value="<?=h(implode(',', $with))?>"><?php } ?><?php if (!empty($_GET['ws'])) { ?><input type="hidden" name="ws" value="1"><?php } ?>
 	<a href="javascript:void(0);" id="b_speak" title="Speak status" aria-label="Speak status" style="text-decoration:none;font-size:20px;vertical-align:middle;margin-left:4px;">&#128266;</a></form>
 <style>
 form#unit{white-space:nowrap}
@@ -287,6 +287,8 @@ function ask(title, lines, ok){ var b = document.getElementById('pop_ask'); fill
 function askForm(f, msg){ ask('Confirm', [msg], function(){ if (f.elements.action && f.elements.action.value === 'restart') sentMsg('Reboot command sent\u2026 waiting for the unit'); f.submit(); }); return false; }
 // immediate note at the top while a slow action (reboot) runs; the result message replaces it when the page comes back
 function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.style.cssText = 'position:fixed;left:0;right:0;top:9px;z-index:50;text-align:center;pointer-events:none;'; var s = document.createElement('span'); s.style.cssText = 'display:inline-block;font-size:13px;line-height:18px;padding:1px 8px;color:#333;background:#fff;border:1px solid #ccc;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.25);'; s.textContent = t; d.appendChild(s); document.body.appendChild(d); }
+// WebSocket test feed (?ws=1, below): per value, when the feed last sent it; none = never
+var wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
 // live update from the load balancer (lbstate.php?unit=N, read only) every 5 s while the tab is visible:
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
 // Same light as the home page: green live, amber late or a failed fetch, red load balancer down (values from page load)
@@ -305,13 +307,15 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 		// the load balancer's last read of this unit is older than this page's own read (e.g. right after a save): keep the page's state and pilot until it reads again
 		var newer = u.read !== null && u.read !== undefined && j.now - u.read >= pageAt;
 		if (newer) {
+		if (!wsFresh('state') || u.paused) {
 		var st = $('v_st'); st.textContent = u.pill; $('v_state').title = u.pill_title;
-		$('v_plug').style.display = u.plugged ? '' : 'none';
 		document.querySelectorAll('.r_head th').forEach(function(th){ th.className = u.paused ? 's254' : u.pill_cls; });
 		var asl = u.code == 254 || u.code == 255; $('b_wake').style.display = asl ? '' : 'none'; $('b_sleep').style.display = asl ? 'none' : '';
-		if (u.label) { var t = u.label + ((u.saved !== null && u.setting < u.saved) ? ' / ' + u.saved + ' A' : '') + ' \u00b7 ' + (u.setting * V / 1000).toFixed(1) + ' kW'; $('v_pilot').textContent = t; $('v_pilot').title = u.label_title; }
 		}
-		if (u.amps !== null && !(window.wsAt && Date.now() - wsAt < 15000)) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
+		if (!wsFresh('vehicle')) $('v_plug').style.display = u.plugged ? '' : 'none';
+		if (u.label && !wsFresh('pilot')) { var t = u.label + ((u.saved !== null && u.setting < u.saved) ? ' / ' + u.saved + ' A' : '') + ' \u00b7 ' + (u.setting * V / 1000).toFixed(1) + ' kW'; $('v_pilot').textContent = t; $('v_pilot').title = u.label_title; }
+		}
+		if (u.amps !== null && !wsFresh('amp')) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
 		$('v_age').textContent = ago(u.checkin);
 		if (u.stale) dot('a', 'No MQTT check-in for ' + ago(u.checkin).replace(' ago', ''));
 		else if (j.age > 15) dot('a', 'Load balancer data is ' + j.age + ' s old');
@@ -319,19 +323,38 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 	}
 	OEVLive.poll('lbstate.php?unit=<?=$unitid?>', apply, function(){ liveOK = false; })();
 })();
-<?php if (!empty($_GET['ws']) && is_file(__DIR__ . '/ws_bridge.php')) { ?>
-// TEST (?ws=1): current and power straight from the unit's WebSocket, relayed by ws_bridge.php; the 5 s poll above keeps everything else
-var wsAt = 0;
+<?php if (!empty($_GET['ws']) && is_file(__DIR__ . '/ws_lib.php')) { require_once __DIR__ . '/ws_lib.php'; if (oev_ws_capable($unit, $e['version'] ?? '')) { ?>
+// TEST (?ws=1, units that passed the /ws check in ws_lib.php): every value the unit's WebSocket sends is shown
+// as it arrives (relayed by ws_bridge.php); the 5 s poll above fills the rest, and takes a value back once the feed
+// hasn't sent it for 15 s. EventSource reconnects by itself every 25 s.
 (function(){
-	var V = <?=(int)$e['volts']?>, es = new EventSource('ws_bridge.php?unit=<?=$unitid?>'), d = document.getElementById('lbdot'), n = 0;
+	var V = <?=(int)$e['volts']?>, SAVED = <?=json_encode(isset($psv) && $psv !== null ? (int)$psv : null)?>, CUR = <?=$cur ? 'true' : 'false'?>;
+	var es = new EventSource('ws_bridge.php?unit=<?=$unitid?>'), d = document.getElementById('lbdot'), n = 0;
+	function $(id){ return document.getElementById(id); }
+	function row(label){ var c = null; document.querySelectorAll('table.stats tr').forEach(function(tr){ var t = tr.cells[0]; if (t && !c && t.textContent.trim() === label) c = tr.cells[1]; }); return c; }
 	function num(x){ return String(Math.round(x * 100) / 100); }
-	es.addEventListener('u', function(m){ var j = JSON.parse(m.data); n++; wsAt = Date.now();
-		if (typeof j.amp === 'number') { var a = j.amp / 1000; document.getElementById('v_amps').textContent = num(a) + ' amps'; document.getElementById('v_power').textContent = (Math.round(a * V / 100) / 10) + ' kW'; }
+	var cV = row('Voltage'), cE = row('Energy'), cC = row('Charge Time'), cT = row('Temp');
+	es.addEventListener('u', function(m){ var j = JSON.parse(m.data), now = Date.now(); n++;
+		for (var k in j) wsAt[k] = now;
+		if (j.state !== undefined) { $('v_st').textContent = j.state_text; $('v_state').title = j.state_text;
+			document.querySelectorAll('.r_head th').forEach(function(th){ th.className = j.state_cls; });
+			var asl = j.state == 254 || j.state == 255; if ($('b_wake')) $('b_wake').style.display = asl ? '' : 'none'; if ($('b_sleep')) $('b_sleep').style.display = asl ? 'none' : ''; }
+		if (j.vehicle !== undefined) $('v_plug').style.display = j.vehicle ? '' : 'none';
+		if (j.pilot !== undefined && j.pilot > 0) { var lbl = (SAVED !== null && j.pilot < SAVED) ? '(' + j.pilot + ' A) / ' + SAVED + ' A' : j.pilot + ' A'; $('v_pilot').textContent = lbl + ' \u00b7 ' + (j.pilot * V / 1000).toFixed(1) + ' kW'; }
+		if (j.amp !== undefined) { var a = j.amp / 1000; $('v_amps').textContent = num(a) + ' amps'; $('v_power').textContent = (Math.round(a * V / 100) / 10) + ' kW'; }
+		if (j.voltage !== undefined && cV && (j.state === 3 || (wsAt.state && lastState === 3)) && j.voltage >= 90 && j.voltage <= 260) cV.textContent = Math.round(j.voltage) + ' volts';
+		if (j.state !== undefined) lastState = j.state;
+		if (j.energy_text !== undefined && cE) cE.textContent = j.energy_text;
+		if (j.elapsed_text !== undefined && cC && !CUR && lastState === 3) cC.textContent = j.elapsed_text;
+		if (j.temp_html && cT) cT.innerHTML = j.temp_html;
+		if (j.srssi !== undefined) $('a_wifi').title = 'Signal: ' + j.srssi + ' dBm (live)';
 		d.title = 'WebSocket test: ' + n + ' updates, last ' + new Date().toLocaleTimeString(); d.style.outline = '2px solid #0077dd'; });
-	es.addEventListener('fail', function(){ d.style.outline = '2px solid #e9a000'; });
-	es.onerror = function(){ if (Date.now() - wsAt > 15000) d.style.outline = ''; };   // EventSource reconnects by itself
+	var lastState = <?=(int)$e['statecode']?>;
+	es.addEventListener('connected', function(){ wsAt[''] = Date.now(); d.style.outline = '2px solid #0077dd'; if (!n) d.title = 'WebSocket test: connected'; });   // handshake done: ring at once
+	es.addEventListener('fail', function(){ es.close(); d.style.outline = '2px solid #e9a000'; });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
+	es.onerror = function(){ if (!wsFresh('')) d.style.outline = ''; };
 })();
-<?php } ?>
+<?php } } ?>
 document.getElementById('a_state').onclick = function(){ pop('State', <?=json_encode($stl)?>, <?=oev_is_public() ? 'null' : "['Raw status dump', " . json_encode('dump.php?unitid=' . $unitid . '&with=' . implode(',', $with)) . ']'?>); }
 <?php if ($CAN) { ?>
 document.getElementById('a_pilot').onclick = function(){ openPop('setpilot'); }
