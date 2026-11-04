@@ -148,7 +148,7 @@ function evse_detect($unit, $refresh = false){
 		$info['version'] = $ver;
 		$info['config']  = $r['json'];
 		$major = (int)ltrim($ver, 'vV');
-		$info['api'] = ($major >= 4) ? 'http' : 'rapi';
+		$info['api'] = ($major >= 4 || isset($r['json']['max_current_soft'])) ? 'http' : 'rapi';
 	} elseif ($r['code'] == 200) {
 		$info['api'] = 'rapi';   // answered, but not with JSON: assume old firmware
 	}
@@ -970,7 +970,7 @@ function evse_par_summary_gen($unit){
 	if ($r['ok'] && is_array($r['json'])) {
 		$ver = isset($r['json']['version']) ? (string)$r['json']['version'] : '';
 		$info['version'] = $ver; $info['config'] = $r['json'];
-		$info['api'] = ((int)ltrim($ver, 'vV') >= 4) ? 'http' : 'rapi';
+		$info['api'] = ((int)ltrim($ver, 'vV') >= 4 || isset($r['json']['max_current_soft'])) ? 'http' : 'rapi';
 	} elseif ($r['code'] == 200) {
 		$info['api'] = 'rapi';
 	}

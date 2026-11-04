@@ -21,7 +21,7 @@ foreach ($ids as $id) {
 	$c = evse_http($u, 'GET', 'config');
 	if (!$c['ok']) { echo "u$id {$u['name']}: config read failed ({$c['code']}), skipped\n"; continue; }
 	$ver = (string)$c['json']['version'];
-	if ((int)ltrim($ver, 'vV') >= 4) {   // v4/v5 JSON API
+	if ((int)ltrim($ver, 'vV') >= 4 || isset($c['json']['max_current_soft'])) {   // v4/v5 JSON API
 		$r = evse_http($u, 'POST', 'config', ['mqtt_enabled'=>true, 'mqtt_protocol'=>'mqtt', 'mqtt_server'=>$broker, 'mqtt_port'=>$port,
 			'mqtt_topic'=>$topic, 'mqtt_user'=>$user, 'mqtt_pass'=>$users[$user], 'mqtt_retained'=>false]);
 		$ok = $r['ok'];
