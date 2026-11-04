@@ -125,7 +125,7 @@ var OEWide = (function(){
 		var ses = u.ses ? (u.ses.kwh === null ? '' : '<b>' + esc(u.ses.kwh) + '</b> kWh') + '<span class="t">' + esc(u.ses.dur) + '</span>' : DASH;
 		var sch = u.sch ? '<span' + (u.run ? ' class="run" title="Scheduled charge running"' : '') + '>' + esc(u.sch) + '</span>' : DASH;
 		return '<tr class="u' + (u.id === openId ? ' op' : '') + '" data-id="' + u.id + '" data-in="' + u.g + '"' + hid + '>'
-			+ '<td>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '<a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
+			+ '<td>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '<a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (window.OEWS ? OEWS.dot(u.id) : '') + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
 			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span></td>'
 			+ '<td class="num dp" data-k="drw">' + drawing(u) + '</td>'
 			+ '<td class="c-w ses">' + ses + '</td>'
@@ -184,6 +184,7 @@ var OEWide = (function(){
 		var t = document.getElementById('wt'); t.innerHTML = h;
 		document.querySelectorAll('#wide .chip').forEach(function(c){ c.classList.toggle('on', c.dataset.s === sort); });
 		bind(t);
+		if (window.OEWS) OEWS.rendered(t);   // index.php?ws=1 test only
 	}
 	function bind(t){
 		t.querySelectorAll('tr.g').forEach(function(r){ r.onclick = function(){
@@ -214,9 +215,12 @@ var OEWide = (function(){
 	// live update (index.php's 5 s load balancer poll)
 	function unit(x){
 		var u = U.filter(function(y){ return y.id === x.id; })[0]; if (!u || !x.ok) return;
-		u.code = x.code; u.pill = x.pill; u.pcls = x.pill_cls; u.plugged = x.plugged; u.stale = x.stale;
-		u.amps = x.charging && x.amps !== null ? Math.round(x.amps * 10) / 10 : 0;
-		if (x.setting !== null) u.pilot = x.setting;
+		var F = window.OEWS ? OEWS.fresh : function(){ return false; };   // index.php?ws=1 test: values the live feed sent in the last 15 s stay
+		u.paused = !!x.paused; u.stale = x.stale;
+		if (!F(u.id, 'state') || x.paused) { u.code = x.code; u.pill = x.pill; u.pcls = x.pill_cls; }
+		if (!F(u.id, 'vehicle')) u.plugged = x.plugged;
+		if (!F(u.id, 'amp') || !F(u.id, 'state')) u.amps = x.charging && x.amps !== null ? Math.round(x.amps * 10) / 10 : 0;
+		if (x.setting !== null && !F(u.id, 'pilot')) u.pilot = x.setting;
 		if (u.g && x.setting !== null) u.share = x.setting;
 		if (x.checkin !== null) { u.seen = Math.max(u.seen || 0, Math.round(Date.now() / 1000 - skew) - x.checkin); u.d.checkin = '<span class="lbd ' + (x.stale ? 'r' : 'g') + '"></span> ' + (x.checkin < 120 ? x.checkin + ' s ago' : x.checkin < 7200 ? Math.round(x.checkin / 60) + ' min ago' : (Math.round(x.checkin / 360) / 10) + ' h ago'); }
 		dirty = true;
@@ -233,6 +237,6 @@ var OEWide = (function(){
 	document.querySelectorAll('#wide .chip').forEach(function(c){ c.onclick = function(){ sort = c.dataset.s; try { localStorage.setItem('oemu-sort', sort); } catch (e) {} render(); }; });
 	render();
 	if (openId && window.matchMedia('(min-width:700px)').matches) { fetchInfo(openId); var r = document.querySelector('#wt tr.u[data-id="' + openId + '"]'); if (r && P.get('open')) r.scrollIntoView({block: 'center'}); }
-	return {unit: unit, group: group};
+	return {unit: unit, group: group, U: U, refresh: render};
 })();
 </script>
