@@ -2,21 +2,18 @@
 /******************************************************************************
  * home_ws_bridge.php - TEST (index.php?ws=1): live feed for the home page.
  * One Server-Sent Events stream per browser tab carries every requested unit:
- * the NAS opens each unit's own WebSocket (/ws, login kept on the server, as
- * ws_bridge.php) and multiplexes them with stream_select in this ONE PHP worker.
+ * every requested unit in this ONE PHP worker.
  * Limits:
- *  - the stream takes one of ws_bridge.php's OEV_WS_SLOTS (10) feed slots, shared
- *    NAS-wide with the unit pages; none free: 503 and the page stays on its 5 s poll
- *  - at most OEV_HWS_PER_UNIT home-page feeds per unit at once (lock files); a unit over
- *    that is reported 'busy' and that tab polls it every 5 s
+ *  - the units see ONE connection from the NAS each, however many tabs are open
+ *    (ws_lib.php oev_hub_run, shared with the unit pages)
+ *  - the stream takes one of the OEV_WS_SLOTS (ws_lib.php) stream slots, shared NAS-wide
+ *    with the unit pages (one PHP worker each); none free: 503, the page stays on its 5 s poll
  *  - at most OEV_HWS_MAX_UNITS units per stream; only units the page asked for
  *    (enabled, online, not test) that passed the /ws check (ws_lib.php)
  * Read only: nothing is sent to a unit except the handshake and pongs. Ends after
  * OEV_WS_SECONDS; the page opens the next one. Off switch: OEV_WS_ENABLED in ws_lib.php.
  ******************************************************************************/
 define('OEV_WS_SECONDS', 25);
-define('OEV_WS_SLOTS', 10);        // same slot files and count as ws_bridge.php
-define('OEV_HWS_PER_UNIT', 2);     // home-page feeds per unit at once (a unit page adds its own)
 define('OEV_HWS_MAX_UNITS', 40);   // units per stream
 require_once __DIR__ . '/auth_lib.php'; oev_require('public', true);   // login gate (auth_lib.php)
 include __DIR__ . '/include_v5.php';
@@ -48,39 +45,12 @@ function hws_view($j){   // same fields and formatting as ws_bridge.php wsb_view
 	return $o;
 }
 hws_send('hello', json_encode(array('slot'=>true)));
-$socks = array(); $bufs = array(); $locks = array();
-foreach ($ids as $id) {
-	if (connection_aborted()) break;
-	$u = $units[$id];
-	$lk = null;
-	for ($k = 0; $k < OEV_HWS_PER_UNIT && !$lk; $k++) { $f = fopen(oev_cache_dir() . '/ws_home_u' . $id . '_' . $k . '.lock', 'c'); if ($f && flock($f, LOCK_EX | LOCK_NB)) $lk = $f; elseif ($f) fclose($f); }
-	if (!$lk) { hws_send('busy', json_encode(array('id'=>$id))); continue; }
-	$ver = evse_detect($u)['version'] ?? '';
-	if (!oev_ws_capable($u, $ver)) { flock($lk, LOCK_UN); fclose($lk); hws_send('fail', json_encode(array('id'=>$id, 'why'=>'no /ws'))); continue; }
-	$s = oev_ws_open($u);
-	if (is_string($s)) { oev_ws_cap_put($id, $ver, false, $s); flock($lk, LOCK_UN); fclose($lk); hws_send('fail', json_encode(array('id'=>$id, 'why'=>$s))); continue; }
-	$socks[$id] = $s; $bufs[$id] = ''; $locks[$id] = $lk;
-	hws_send('connected', json_encode(array('id'=>$id)));   // handshake done: the page shows the blue ring now
-}
-$t0 = microtime(true); $beat = $t0;
-while ($socks && microtime(true) - $t0 < OEV_WS_SECONDS && !connection_aborted()) {
-	$r = array_values($socks); $w = $x = null;
-	if (!@stream_select($r, $w, $x, 1)) { if (microtime(true) - $beat > 10) { hws_send('ping', '1'); $beat = microtime(true); } continue; }
-	foreach ($r as $s) {
-		$id = array_search($s, $socks, true); if ($id === false) continue;
-		$d = fread($s, 8192); $drop = ($d === false || ($d === '' && feof($s)));
-		if (!$drop) {
-			$bufs[$id] .= $d;
-			while (($f = oev_ws_frame($bufs[$id]))) {
-				if ($f[0] == 9) { fwrite($s, oev_ws_out(10, $f[1])); continue; }
-				if ($f[0] == 8) { $drop = true; break; }
-				if ($f[0] == 1) { $j = json_decode($f[1], true); if (is_array($j) && ($v = hws_view($j))) { $v['id'] = $id; hws_send('u', json_encode($v)); $beat = microtime(true); } }
-			}
-			if ($f === false) $drop = true;
-		}
-		if ($drop) { @fclose($s); unset($socks[$id]); flock($locks[$id], LOCK_UN); fclose($locks[$id]); unset($locks[$id]); hws_send('drop', json_encode(array('id'=>$id))); }
-	}
-}
-foreach ($socks as $id => $s) { @fwrite($s, oev_ws_out(8, '')); fclose($s); }
-foreach ($locks as $lk) { flock($lk, LOCK_UN); fclose($lk); }
+$feed = array(); foreach ($ids as $id) $feed[$id] = $units[$id];
+// one shared connection per unit (ws_lib.php oev_hub_run), the same one the unit pages use
+oev_hub_run($feed, OEV_WS_SECONDS, function($id, $ev, $d){
+	if ($ev == 'connected') hws_send('connected', json_encode(array('id'=>$id)));   // the page shows the blue ring now
+	elseif ($ev == 'u') { $v = hws_view($d); if ($v) { $v['id'] = $id; hws_send('u', json_encode($v)); } }
+	elseif ($ev == 'fail') hws_send('fail', json_encode(array('id'=>$id, 'why'=>$d)));
+	elseif ($ev == 'ping') hws_send('ping', '1');
+});
 hws_send('end', '1');

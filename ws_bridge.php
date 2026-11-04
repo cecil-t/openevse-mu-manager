@@ -3,15 +3,14 @@
  * ws_bridge.php - live feed from a unit's own WebSocket (/ws), relayed to
  * the browser as Server-Sent Events. unit.php uses it by default (?ws=0 turns it off) and only
  * for units that passed the /ws check (ws_lib.php oev_ws_capable()).
- * The NAS opens the WebSocket (with the unit's login, which never leaves the
- * server), passes on each update for up to OEV_WS_SECONDS, then ends; the
- * browser reconnects. Read only: nothing is ever sent to the unit except the
+ * The NAS holds ONE WebSocket per unit (with the unit's login, which never leaves the
+ * server), shared by every open page (ws_lib.php oev_hub_run), passes on each update
+ * for up to OEV_WS_SECONDS, then ends; the browser reconnects. Read only: nothing is ever sent to the unit except the
  * WebSocket handshake and replies to its pings. Only display values are passed
  * on (no settings, no network details), with the page's own formatting.
  * Off switch: OEV_WS_ENABLED in ws_lib.php.
  ******************************************************************************/
 define('OEV_WS_SECONDS', 25);   // one PHP worker per open tab for this long, then a reconnect
-define('OEV_WS_SLOTS', 10);     // at most this many feeds at once (PHP-FPM allows 50 workers)
 require_once __DIR__ . '/auth_lib.php'; oev_require('public', true);   // login gate (auth_lib.php)
 include __DIR__ . '/include_v5.php';
 require_once __DIR__ . '/index_wide_lib.php';   // idx_temp_html()
@@ -43,21 +42,11 @@ function wsb_view($j){
 	return $o;
 }
 
-$s = oev_ws_open($u);
-if (is_string($s)) { oev_ws_cap_put($id, evse_detect($u)['version'] ?? '', false, $s); wsb_send('fail', json_encode($s)); exit; }   // the page drops back to its 5 s poll
-wsb_send('connected', '1');   // handshake done (the page shows its blue ring now)
-$buf = ''; $t0 = microtime(true); $beat = $t0;
-while (microtime(true) - $t0 < OEV_WS_SECONDS && !connection_aborted()) {
-	$r = array($s); $w = $x = null;
-	if (!@stream_select($r, $w, $x, 1)) { if (microtime(true) - $beat > 10) { wsb_send('ping', '1'); $beat = microtime(true); } continue; }
-	$d = fread($s, 8192); if ($d === false || ($d === '' && feof($s))) break;
-	$buf .= $d;
-	while (($f = oev_ws_frame($buf))) {   // unit -> us frames are not masked
-		if ($f[0] == 9) { fwrite($s, oev_ws_out(10, $f[1])); continue; }   // ping -> pong
-		if ($f[0] == 8) break 2;
-		if ($f[0] == 1) { $j = json_decode($f[1], true); if (is_array($j) && ($v = wsb_view($j))) { wsb_send('u', json_encode($v)); $beat = microtime(true); } }
-	}
-	if ($f === false) break;
-}
-@fwrite($s, oev_ws_out(8, '')); fclose($s);
+// one shared connection per unit (ws_lib.php oev_hub_run): this request owns it or relays the owner's events
+oev_hub_run(array($id => $u), OEV_WS_SECONDS, function($uid, $ev, $d){
+	if ($ev == 'connected') wsb_send('connected', '1');   // handshake done (the page shows its blue ring now)
+	elseif ($ev == 'u') { if (($v = wsb_view($d))) wsb_send('u', json_encode($v)); }
+	elseif ($ev == 'fail') wsb_send('fail', json_encode($d));   // the page drops back to its 5 s poll
+	elseif ($ev == 'ping') wsb_send('ping', '1');
+});
 wsb_send('end', '1');
