@@ -288,18 +288,18 @@ function askForm(f, msg){ ask('Confirm', [msg], function(){ if (f.elements.actio
 // immediate note at the top while a slow action (reboot) runs; the result message replaces it when the page comes back
 function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.style.cssText = 'position:fixed;left:0;right:0;top:9px;z-index:50;text-align:center;pointer-events:none;'; var s = document.createElement('span'); s.style.cssText = 'display:inline-block;font-size:13px;line-height:18px;padding:1px 8px;color:#333;background:#fff;border:1px solid #ccc;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.25);'; s.textContent = t; d.appendChild(s); document.body.appendChild(d); }
 // WebSocket test feed (?ws=1, below): per value, when the feed last sent it; none = never
-var wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
+var lbAge = null, wsState = 'connecting', wsLast = 0, tip = function(){}, wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
 // live update from the load balancer (lbstate.php?unit=N, read only) every 5 s while the tab is visible:
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
 // Same light as the home page: green live, amber late or a failed fetch, red load balancer down (values from page load)
 (function(){
-	var V = <?=(int)$e['volts']?>, dot = OEVLive.dot, pageAt = <?=time()?>;   // this page read the unit itself at pageAt
+	var V = <?=(int)$e['volts']?>, dot = function(c, t){ OEVLive.dot(c, t); }, pageAt = <?=time()?>;   // this page read the unit itself at pageAt
 	if (document.getElementById('lbdot').className.indexOf(' x') >= 0) return;   // no load balancer data for this unit
 	function $(id){ return document.getElementById(id); }
 	function ago(s){ return s === null ? '\u2014' : (s < 120 ? s + ' s ago' : (s < 7200 ? Math.round(s / 60) + ' min ago' : (s / 3600).toFixed(1) + ' h ago')); }
 	function num(x){ return String(Math.round(x * 100) / 100); }
 	function apply(j){
-		var u = j.u; liveOK = false;
+		var u = j.u; liveOK = false; lbAge = j.age;
 		if (!j.ok || !u) { dot('x', ''); return; }
 		if (!j.fresh) { dot('r', 'Load balancer down: values from page load'); return; }
 		if (!u.ok) { dot('a', 'The load balancer has no reply from this unit: values from page load'); return; }
@@ -348,13 +348,36 @@ var wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date
 		if (j.elapsed_text !== undefined && cC && !CUR && lastState === 3) cC.textContent = j.elapsed_text;
 		if (j.temp_html && cT) cT.innerHTML = j.temp_html;
 		if (j.srssi !== undefined) $('a_wifi').title = 'Signal: ' + j.srssi + ' dBm (live)';
-		d.title = 'WebSocket test: ' + n + ' updates, last ' + new Date().toLocaleTimeString(); d.style.outline = '2px solid #0077dd'; });
+		wsState = 'live'; wsLast = now; d.style.outline = '2px solid #0077dd'; tip(); });
 	var lastState = <?=(int)$e['statecode']?>;
-	es.addEventListener('connected', function(){ wsAt[''] = Date.now(); d.style.outline = '2px solid #0077dd'; if (!n) d.title = 'WebSocket test: connected'; });   // handshake done: ring at once
-	es.addEventListener('fail', function(){ es.close(); d.style.outline = '2px solid #e9a000'; });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
-	es.onerror = function(){ if (!wsFresh('')) d.style.outline = ''; };
+	es.addEventListener('connected', function(){ wsAt[''] = Date.now(); wsState = 'live'; d.style.outline = '2px solid #0077dd'; tip(); });   // handshake done: ring at once
+	es.addEventListener('fail', function(){ es.close(); wsState = 'failed'; d.style.outline = '2px solid #e9a000'; tip(); });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
+	es.onerror = function(){ if (wsState === 'failed') return; if (!wsFresh('')) { d.style.outline = ''; wsState = 'reconnecting'; tip(); } };
 })();
-<?php } } ?>
+<?php } else { ?>
+wsState = 'unsupported';
+<?php } ?>
+// ?ws=1: one owner of the dot's tooltip: the feed's state, then the load balancer's (OEVLive.dot only keeps its text here)
+(function(){
+	var d = document.getElementById('lbdot'), lb = d.title, lbCls = d.className, set = OEVLive.dot;
+	OEVLive.dot = function(cls, t){ set(cls, t); lb = t; lbCls = cls; tip(); };
+	function secs(ms){ var s = Math.max(0, Math.round(ms / 1000)); return s < 120 ? s + ' s' : Math.round(s / 60) + ' min'; }
+	window.tip = function(){
+		var f;
+		if (wsState === 'live') f = 'Live: updating instantly from the unit (' + (wsLast ? 'last update ' + secs(Date.now() - wsLast) + ' ago' : 'connected, no changes yet') + ')';
+		else if (wsState === 'connecting') f = 'Live feed connecting; using 5-second updates';
+		else if (wsState === 'reconnecting') f = 'Live feed reconnecting; using 5-second updates';
+		else if (wsState === 'failed') f = 'Live feed stopped (the unit did not accept it); updating every 5 seconds';
+		else f = 'Live feed not supported on this unit; updating every 5 seconds';
+		var l;
+		if (lbCls.indexOf('x') >= 0) l = 'No load balancer data for this unit';
+		else if (lbCls.indexOf('g') >= 0) l = 'Load balancer OK' + (lbAge !== null ? ', last heartbeat ' + Math.round(lbAge) + ' s ago' : '');
+		else l = 'Load balancer: ' + (lb ? lb.charAt(0).toLowerCase() + lb.slice(1) : 'no data yet');
+		d.title = f + '\n' + l;
+	};
+	tip(); setInterval(tip, 1000);
+})();
+<?php } ?>
 document.getElementById('a_state').onclick = function(){ pop('State', <?=json_encode($stl)?>, <?=oev_is_public() ? 'null' : "['Raw status dump', " . json_encode('dump.php?unitid=' . $unitid . '&with=' . implode(',', $with)) . ']'?>); }
 <?php if ($CAN) { ?>
 document.getElementById('a_pilot').onclick = function(){ openPop('setpilot'); }
