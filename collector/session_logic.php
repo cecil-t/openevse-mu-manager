@@ -497,10 +497,22 @@ function sess_process($db, $unit, $r, $now){
 			elseif ($r['cmax'] !== null && $r['pilot'] == $r['cmax']) $reason = 'setting change (user)';
 			sess_event($db, $unit, $sid, $segid, $now, 'pilot', "pilot $prev_pilot A -> {$r['pilot']} A", $prev_pilot, $r['pilot'], $temp, $reason);
 			if ($reason == 'thermal derate') sess_event($db, $unit, $sid, $segid, $now, 'thermal', "thermal derate, pilot $prev_pilot -> {$r['pilot']} A", $prev_pilot, $r['pilot'], $temp, 'thermal');
+			// the load starting or stopping in the same reading as the pilot change is still logged
+			$ea = $us['evt_amps'] !== null ? (float)$us['evt_amps'] : null;
+			if ($charging && $prev_charging && $r['amps'] !== null && $ea !== null && (($ea >= 2.0) !== ($r['amps'] >= 2.0)))
+				sess_event($db, $unit, $sid, $segid, $now, 'amps', 'current ' . round($ea, 1) . ' A -> ' . round($r['amps'], 1) . ' A', round($ea, 2), round($r['amps'], 2), $temp, $r['amps'] < $ea ? 'load stopped (same reading as pilot change)' : 'load started (same reading as pilot change)');
 			$set['evt_amps'] = null;
 		} elseif ($charging && $r['amps'] !== null) {
 			$ea = $us['evt_amps'] !== null ? (float)$us['evt_amps'] : null;
 			if ($ea === null || !$prev_charging) {
+				// baseline reset after a pilot change: still log a start/stop against the previous reading
+				if ($ea === null && $prev_charging) {
+					$pa = $db->query("SELECT amps FROM samples WHERE unit_id = $uid AND ts <= $now AND ts >= " . ($now - 180) . " AND amps IS NOT NULL ORDER BY id DESC LIMIT 1")->fetchColumn();
+					if ($pa !== false && $pa !== null && (((float)$pa >= 2.0) !== ($r['amps'] >= 2.0))) {
+						$pa = (float)$pa;
+						sess_event($db, $unit, $sid, $segid, $now, 'amps', 'current ' . round($pa, 1) . ' A -> ' . round($r['amps'], 1) . ' A', round($pa, 2), round($r['amps'], 2), $temp, $r['amps'] < $pa ? 'car-requested drop (pilot unchanged)' : 'car ramp up');
+					}
+				}
 				$set['evt_amps'] = $r['amps'];
 			} elseif (abs($r['amps'] - $ea) >= max(2.0, 0.15 * $ea)) {
 				$why = ($r['amps'] < $ea) ? 'car-requested drop (pilot unchanged)' : 'car ramp up';
