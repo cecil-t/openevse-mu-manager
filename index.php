@@ -47,8 +47,8 @@ dl.units dt a{color:teal}
 dl.units dd .st i{font-style:normal}
 dl.units dd .st{display:inline-block;height:16px;line-height:16px;padding:0 7px;border-radius:8px;align-self:center;background:rgba(136,136,136,.16);color:#555}
 dl.units dd .st.s1{background:rgba(0,170,0,.15);color:#060}
-dl.units dd .st.s2{background:rgba(0,170,119,.16);color:#064}
-dl.units dd .st.s3{background:rgba(0,119,221,.15);color:#035a9e}
+dl.units dd .st.s2{background:rgba(184,224,74,.28);color:#3d5208}
+dl.units dd .st.s3{background:rgba(0,170,170,.18);color:#045a5a}
 dl.units dd .st.s254,dl.units dd .st.s255{background:rgba(136,34,221,.13);color:#5a1a96}
 dl.units dd .st.serr{background:rgba(255,34,34,.13);color:#a11}
 /* card header: enabled-unit count */

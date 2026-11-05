@@ -87,26 +87,20 @@ table.stats th{
 	background-image: linear-gradient(#F22, #FAA); /* Red (error) - default, all cases not specified below */
 	}
 /**********************************************
- * OpenEVSE Official Display Colors
- * S1   Ready:     #01c40e (green)       #0C1
- * S2   Connected: #d5ff70 (light green) #DF7
- * S3   Charging:  #0092f7 (blue)        #09F
- * S254 Sleeping:  #9200f7 (purple)      #90F
- * S255 Disabled:  
- * Sxx  Error:     #F22, #FAA (red)
- ==============================================
- * Original Gradients
- * S1   Ready:     #666, #AAA (gray)
- * S2   Connected: #08B, #0CF (blue)  #0B8, teal
- * S3   Charging:  #0A0, #5E5 (green)
- * S254 Sleeping:  #74A, #B8E (purple) #82D, 
- * S255 Disabled:  
- * Sxx  Error:     #F22, #FAA (red)
+ * OpenEVSE state header colors (rough LCD match)
+ * S1   Ready:     #0A0 → #5E5 (green)
+ * S2   Connected: #9C0 → #CF6 (yellow-green LCD)
+ * S3   Charging:  #0AA → #3EE (teal/cyan LCD)
+ * S254 Sleeping:  #82D → #B8E (purple)
+ * S255 Disabled:  same as sleeping
+ * Sxx  Error:     #F22 → #FAA (red)  [default th]
+ * Official LCD refs (historical): Ready #01c40e, Connected #d5ff70,
+ * Charging was #0092f7 blue — units now show teal/cyan while charging.
 ***********************************************/
 table.stats th.sfe { background-image: linear-gradient(#888, #AAA); }
 table.stats th.s1, table.stats th.s01{ background-image: linear-gradient(#0A0, #5E5); }
-table.stats th.s2, table.stats th.s02{ background-image: linear-gradient(#0A7, #0D9); }
-table.stats th.s3, table.stats th.s03{ background-image: linear-gradient(#07D, #0CF); }
+table.stats th.s2, table.stats th.s02{ background-image: linear-gradient(#9C0, #CF6); }
+table.stats th.s3, table.stats th.s03{ background-image: linear-gradient(#0AA, #3EE); }
 table.stats th.s254, 
 table.stats th.s255{ background-image: linear-gradient(#82D, #B8E); }
 

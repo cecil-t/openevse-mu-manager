@@ -37,8 +37,8 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt .bal i.hi{background:#ffb74d}
 #wt .st{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:bold;background:rgba(136,136,136,.16);color:#555}
 #wt .st.s1{background:rgba(0,170,0,.15);color:#060}
-#wt .st.s2{background:rgba(0,170,119,.16);color:#064}
-#wt .st.s3{background:rgba(0,119,221,.15);color:#035a9e}
+#wt .st.s2{background:rgba(184,224,74,.28);color:#3d5208}
+#wt .st.s3{background:rgba(0,170,170,.18);color:#045a5a}
 #wt .st.s254,#wt .st.s255{background:rgba(136,34,221,.13);color:#5a1a96}
 #wt .st.serr{background:rgba(255,34,34,.13);color:#a11}
 #wt img.plug{height:1.4em;margin-left:6px;vertical-align:middle;opacity:.8}
