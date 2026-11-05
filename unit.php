@@ -361,10 +361,10 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 		if (j.elapsed_text !== undefined && cC && !CUR && lastState === 3) cC.textContent = j.elapsed_text;
 		if (j.temp_html && cT) cT.innerHTML = j.temp_html;
 		if (j.srssi !== undefined) $('a_wifi').title = 'Signal: ' + j.srssi + ' dBm (live)';
-		wsState = 'live'; wsLast = now; d.style.outline = '2px solid #0077dd'; tip(); });
-		es.addEventListener('connected', function(){ wsAt[''] = Date.now(); wsState = 'live'; d.style.outline = '2px solid #0077dd'; tip(); });   // handshake done: ring at once
-		es.addEventListener('fail', function(){ es.close(); wsState = 'failed'; d.style.outline = '2px solid #e9a000'; tip(); again(300000); });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
-		es.onerror = function(){ if (wsState === 'failed') return; if (es.readyState === 2) { d.style.outline = ''; wsState = 'reconnecting'; tip(); again(15000); } else if (!wsFresh('')) { d.style.outline = ''; wsState = 'reconnecting'; tip(); } };
+		wsState = 'live'; wsLast = now; d.style.boxShadow = 'inset 0 0 0 2px #0077dd'; tip(); });
+		es.addEventListener('connected', function(){ wsAt[''] = Date.now(); wsState = 'live'; d.style.boxShadow = 'inset 0 0 0 2px #0077dd'; tip(); });   // handshake done: ring at once
+		es.addEventListener('fail', function(){ es.close(); wsState = 'failed'; d.style.boxShadow = 'inset 0 0 0 2px #e9a000'; tip(); again(300000); });   // unit's /ws failed: 5 s poll only (re-checked within the hour)
+		es.onerror = function(){ if (wsState === 'failed') return; if (es.readyState === 2) { d.style.boxShadow = ''; wsState = 'reconnecting'; tip(); again(15000); } else if (!wsFresh('')) { d.style.boxShadow = ''; wsState = 'reconnecting'; tip(); } };
 	}
 	start();
 })();
