@@ -747,8 +747,19 @@ function evse_sync_time($unit, $epoch = null){
 // the only reboot they have), wait until it answers again over /r, then restart the WiFi module so it
 // boots cleanly against the running controller (stock 5.x can scramble its readings otherwise).
 function evse_restart_unit($unit){
+	if (!evse_is_http($unit)) {   // RAPI: the controller resets before it can answer $FR, so no reply = sent; then wait for it to answer again
+		if (rapi($unit, '$FR') === 'Error') return array('ok'=>false, 'msg'=>'Reboot failed (RAPI $FR refused)');
+		sleep(5); $back = false;   // past the reset (up to 3 s more while charging)
+		for ($i = 0; $i < 25 && !$back; $i++) {
+			unset($GLOBALS['__evse_rapi_budget'], $GLOBALS['__evse_rapi_memo']);   // fresh read each try
+			$gc = rapi($unit, '$GC');
+			$back = is_string($gc) && preg_match('/^\d+ \d+ \d+ \d+$/', trim($gc));
+			if (!$back) sleep(1);
+		}
+		return array('ok'=>true, 'msg'=>$back ? 'Controller restarted' : 'Reboot sent, no answer yet');
+	}
 	$r = evse_restart($unit, 'evse');
-	if (!evse_is_http($unit) || empty($r['ok'])) return $r;
+	if (empty($r['ok'])) return $r;
 	sleep(5); $back = false;
 	for ($i = 0; $i < 20 && !$back; $i++) {
 		unset($GLOBALS['__evse_rapi_budget'], $GLOBALS['__evse_rapi_memo']);   // fresh read each try
