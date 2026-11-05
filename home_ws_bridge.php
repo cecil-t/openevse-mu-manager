@@ -1,6 +1,6 @@
 <?php
 /******************************************************************************
- * home_ws_bridge.php - TEST (index.php?ws=1): live feed for the home page.
+ * home_ws_bridge.php - live feed for the home page.
  * One Server-Sent Events stream per browser tab carries every requested unit:
  * every requested unit in this ONE PHP worker.
  * Limits:

@@ -1,5 +1,5 @@
 <?php
-/* home_ws.php - TEST live feed for the home page (index.php?ws=1 only; the normal page doesn't include this).
+/* home_ws.php - live feed for the home page (on by default; index.php?ws=0 leaves it out).
  * One stream per tab (home_ws_bridge.php) for the enabled, online units; values from the feed show as they
  * arrive, the 5 s load balancer poll fills in the rest (and takes a value back 15 s after the feed last sent it).
  * Per unit: a small dot after its name, blue ring while its feed is live; its two-line tooltip has one owner (tip()).

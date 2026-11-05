@@ -14,12 +14,12 @@ include __DIR__ . '/include_lb.php';
 $with  = evse_with_param();
 $wq    = $with ? '?with=' . implode(',', $with) : '';
 $units = evse_units($with);
-// TEST: ?ws=1 adds live WebSocket feeds (home_ws.php); without it the page is unchanged
-$hws = ($_GET['ws'] ?? '') === '1' && is_file(__DIR__ . '/ws_lib.php') && (require_once __DIR__ . '/ws_lib.php') && OEV_WS_ENABLED;
+// live WebSocket feeds (home_ws.php) on by default; ?ws=0 falls back to the 5 s poll only
+$hws = ($_GET['ws'] ?? '') !== '0' && is_file(__DIR__ . '/ws_lib.php') && (require_once __DIR__ . '/ws_lib.php') && OEV_WS_ENABLED;
 include __DIR__ . '/_head.php';
 ?>
 <script>/* full reload every 5 min (sessions, schedules, lifetime); the load balancer's data updates in place every 5 s */
-setInterval(function(){ if (!document.hidden) location.href = './<?=$wq?><?=$hws ? ($wq ? '&' : '?') . 'ws=1' : ''?>'; }, 300000);</script>
+setInterval(function(){ if (!document.hidden) location.href = './<?=$wq?><?=($_GET['ws'] ?? '') === '0' ? ($wq ? '&' : '?') . 'ws=0' : ''?>'; }, 300000);</script>
 <div class="slidebox" style="text-align:left;" id="unit">
 <style>
 /* unit list: one block per unit, always exactly two lines.

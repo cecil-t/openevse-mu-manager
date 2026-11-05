@@ -190,7 +190,7 @@ var OEWide = (function(){
 		var t = document.getElementById('wt'); t.innerHTML = h;
 		document.querySelectorAll('#wide .chip').forEach(function(c){ c.classList.toggle('on', c.dataset.s === sort); });
 		bind(t);
-		if (window.OEWS) OEWS.rendered(t);   // index.php?ws=1 test only
+		if (window.OEWS) OEWS.rendered(t);   // home live feed (off with ?ws=0)
 	}
 	function bind(t){
 		t.querySelectorAll('tr.g').forEach(function(r){ r.onclick = function(){
@@ -221,7 +221,7 @@ var OEWide = (function(){
 	// live update (index.php's 5 s load balancer poll)
 	function unit(x){
 		var u = U.filter(function(y){ return y.id === x.id; })[0]; if (!u || !x.ok) return;
-		var F = window.OEWS ? OEWS.fresh : function(){ return false; };   // index.php?ws=1 test: values the live feed sent in the last 15 s stay
+		var F = window.OEWS ? OEWS.fresh : function(){ return false; };   // home live feed: values the live feed sent in the last 15 s stay
 		u.paused = !!x.paused; u.stale = x.stale;
 		if (!F(u.id, 'state') || x.paused) { u.code = x.code; u.pill = x.pill; u.pcls = x.pill_cls; }
 		if (!F(u.id, 'vehicle')) u.plugged = x.plugged;
