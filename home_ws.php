@@ -8,10 +8,7 @@ if (!isset($W) || !function_exists('h')) { http_response_code(404); exit; }
 $hws_ids = array(); foreach ($W as $x) if (!$x['test'] && $x['code'] !== -1) $hws_ids[] = (int)$x['id'];
 ?>
 <style>
-#wt .wsd{display:inline-block;width:8px;height:8px;border-radius:50%;background:#bbb;margin-left:6px;vertical-align:1px;box-sizing:border-box}
-#wt .wsd.live{background:#2a2;outline:2px solid #0077dd;outline-offset:0}
-#wt .lbd.live{outline:2px solid #0077dd}
-#wt .wsd.fail{background:#e9a000}
+#lbdot.wslive{box-shadow:inset 0 0 0 2px #0077dd}
 #wt td.vchg,#wt .dg td.vchg{background-color:#fff8d1 !important;transition:none}
 #wt td.vfade{transition:background-color 1.2s ease-out}
 </style>
@@ -34,11 +31,8 @@ var OEWS = (function(){
 		if (s.st === 'full') return 'Live feeds all in use on the server\nUpdating every 5 seconds';
 		return 'Live feed stopped (the unit did not accept it)\nUpdating every 5 seconds';
 	}
-	function cls(id){ var s = S[id]; return 'wsd' + (s && s.st === 'live' ? ' live' : (s && s.st === 'fail' ? ' fail' : '')); }
-	function dot(id){ return S[id] ? '<span class="' + cls(id) + '" data-ws="' + id + '" title="' + tip(id).replace(/"/g, '&quot;') + '"></span>' : ''; }
-	function paint(){ document.querySelectorAll('#wt .wsd').forEach(function(d){ var id = +d.dataset.ws; d.className = cls(id); d.title = tip(id); });
-		document.querySelectorAll('#wt tr.det').forEach(function(r){ var p = r.previousElementSibling, s = p && S[+p.dataset.id]; r.querySelectorAll('.lbd').forEach(function(b){ b.classList.toggle('live', !!s && s.st === 'live'); }); });   // Last check-in dot: blue ring while live, like the Unit page
-	}
+	function dot(){ return ''; }   // no per-unit dots: one ring on the "as of" dot while any feed is live
+	function paint(){ var d = document.getElementById('lbdot'); if (d) d.classList.toggle('wslive', IDS.some(function(id){ return S[id].st === 'live'; })); }
 	setInterval(paint, 1000);
 	function refresh(){ var n = Date.now(); if (n - last >= 250) { last = n; W.refresh(); } else if (!pend) { pend = true; setTimeout(function(){ pend = false; last = Date.now(); W.refresh(); }, 250); } }
 	// after each table render: flash the cells whose text really changed (not Last seen / Last check-in)
