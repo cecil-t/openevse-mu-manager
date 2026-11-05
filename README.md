@@ -1,4 +1,4 @@
-# OpenEVSE MU Manager
+# OpenEVSE Multi-Unit Manager and Load Balancer
 
 **Multi-Unit Manager with Load Balancing**
 
@@ -183,7 +183,7 @@ the steps are also written out so you can do them by hand.
      live from the units, with a CSV download. Settings > Units suggests a hostname made from the name (rule
      in Help), and "Set hostname on unit" saves it and restarts only the unit's WiFi module.
    - **Site name:** Settings > Preferences. Used in page titles, under the logo, and in email subjects and
-     the from-name. Default: OpenEVSE MU Manager.
+     the from-name. Default: OpenEVSE Multi-Unit Manager and Load Balancer.
    - **Site web address:** Settings > Preferences (for example `https://example.com/openevse/`, or
      `https://evse.example.com/` at the root). Used for the link in emails, view-only links, and the
      Emoncms server given to units on Internal logging (`<site web address>emoncms`). Blank = detected:

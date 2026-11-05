@@ -9,7 +9,7 @@ require_once __DIR__ . '/secret_lib.php';
 if (!defined('OEV_DB_FILE')) define('OEV_DB_FILE', __DIR__ . '/openevse.db');
 if (!defined('OEV_SERVER_TZ')) define('OEV_SERVER_TZ', date_default_timezone_get());   // before any override
 
-if (!defined('OEV_SITE_NAME_DEFAULT')) define('OEV_SITE_NAME_DEFAULT', 'OpenEVSE MU Manager');
+if (!defined('OEV_SITE_NAME_DEFAULT')) define('OEV_SITE_NAME_DEFAULT', 'OpenEVSE Multi-Unit Manager and Load Balancer');
 function oev_settings_defaults(){
 	return array(
 		'site_name' => OEV_SITE_NAME_DEFAULT,         // page titles, header, email subjects and from-name
