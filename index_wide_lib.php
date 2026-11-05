@@ -85,7 +85,7 @@ function idx_wide_unit($unit, $e, $lu, $lv, $gid, $s, $us, $vv, $link){
 			'checkin'=>$ca === null ? '' : '<span class="lbd ' . ($ca > 90 ? 'r' : 'g') . '"></span> ' . h($ca < 120 ? $ca . ' s ago' : ($ca < 7200 ? round($ca / 60) . ' min ago' : round($ca / 3600, 1) . ' h ago')),
 			'uptime'=>h($upt),
 			'api'=>h($e['api'] ?? ''),
-			'ip'=>h($host ?: ''),
+			'ip'=>oev_is_admin() ? h($host ?: '') : '',   // unit address: admins only
 			'rssi'=>idx_bars_html($us['srssi'] ?? null),
 			'last'=>$ls,
 			'life'=>(!$pub && isset($e['lifetimeKWH']) && $e['lifetimeKWH'] !== null && !$off) ? round((float)$e['lifetimeKWH'] / 1000, 2) . ' MWh' : '',

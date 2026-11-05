@@ -35,8 +35,10 @@ $upt = evse_uptime_info($unit, $e); $d['uptime'] = $upt['text'] === "\u{2014}" ?
 $fw = trim((string)($e['firmware'] ?? '')); $wv = trim((string)($e['version'] ?? ''));
 if ($fw !== '' || $wv !== '') $d['fw'] = ($fw !== '' ? h($fw) : '&mdash;') . ' / ' . ($wv !== '' ? h($wv) : '&mdash;');
 $d['api'] = $v($e['api'] ?? '');
-$d['host'] = $v($e['hostname'] ?? '');
-if (!empty($e['ipaddress'])) $d['ip'] = h($e['ipaddress']);
+if (oev_is_admin()) {   // unit address: admins only
+	$d['host'] = $v($e['hostname'] ?? '');
+	if (!empty($e['ipaddress'])) $d['ip'] = h($e['ipaddress']);
+}
 $d['ssid'] = $v($e['ssid'] ?? '');
 if (isset($e['srssi']) && $e['srssi'] !== null) $d['rssi'] = idx_bars_html($e['srssi']);
 if (isset($e['timerstart']) && $e['timerstart'] !== '') $d['start'] = ($e['timerstart'] === 'None') ? 'None' : h($e['timerstart'] . ' / ' . $e['timerend']);

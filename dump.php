@@ -5,5 +5,6 @@ $units = evse_units(evse_with_param());
 $unitid = isset($_GET['unitid']) ? $_GET['unitid'] : '';
 if (!ctype_digit((string)$unitid) || !isset($units[(int)$unitid])) die('Missing or invalid unit id.');
 $e = evse_status($units[(int)$unitid]);
+if (is_array($e) && !oev_is_admin()) unset($e['ipaddress'], $e['hostname']);   // unit address: admins only
 header('Content-Type: text/plain; charset=utf-8');
 echo is_array($e) ? print_r($e, true) : "Connection error: $e\n";

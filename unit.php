@@ -110,7 +110,7 @@ table.stats td.vfade.vchg{background-color:#fff8d1;transition:none}
 </style>
 <?php
 $e = evse_status($unit);
-if (!is_array($e)) die('Can\'t connect to ' . h($unit['evseurl']) . ', response code: ' . h($e) . '</div></div></div></body></html>');
+if (!is_array($e)) die('Can\'t connect to ' . (oev_is_admin() ? h($unit['evseurl']) : 'the unit') . ', response code: ' . h($e) . '</div></div></div></body></html>');
 $plugimg = $e['connected'] ? '<img src="media/plug.svg" alt="EV Connected" title="EV Connected" class="plug" /> ' : '';
 // both buttons are on the page; the live update shows the one that fits the current state
 $asl = evse_sleep_class($e['statecode']) == 'asleep';
@@ -404,7 +404,7 @@ document.getElementById('a_level').onclick = function(){ pop('Service level', [<
 <?php } ?>
 document.getElementById('a_time').onclick = function(){ pop('Clock', <?=json_encode($clk)?>); }
 document.getElementById('a_checks').onclick = function(){ pop('Safety checks', <?=json_encode($ckl)?>); }
-document.getElementById('a_wifi').onclick = function(){ pop('WiFi', <?=json_encode(array_values(array_filter(array('SSID: ' . $e['ssid'], 'IP address: ' . $e['ipaddress'], $e['hostname'] !== '' ? 'Hostname: ' . $e['hostname'] : null, $e['srssi'] !== null ? 'Signal: ' . $e['srssi'] . ' dBm' : null, 'API: ' . $e['api']))))?>); }
+document.getElementById('a_wifi').onclick = function(){ pop('WiFi', <?=json_encode(array_values(array_filter(array('SSID: ' . $e['ssid'], oev_is_admin() ? 'IP address: ' . $e['ipaddress'] : null, (oev_is_admin() && $e['hostname'] !== '') ? 'Hostname: ' . $e['hostname'] : null, $e['srssi'] !== null ? 'Signal: ' . $e['srssi'] . ' dBm' : null, 'API: ' . $e['api']))))?>); }
 if (document.getElementById('a_faults')) document.getElementById('a_faults').onclick = function(){ pop('Fault counts (since reset)', <?=json_encode(array('GFCI: ' . (int)($e['gfcicount'] ?? 0), 'No ground: ' . (int)($e['nogndcount'] ?? 0), 'Stuck relay: ' . (int)($e['stuckcount'] ?? 0)))?>); }
 window.speechSynthesis.onvoiceschanged = function(){ window.speechSynthesis.getVoices(); };
 document.getElementById('b_speak').onclick = function(){
