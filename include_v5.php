@@ -749,7 +749,7 @@ function evse_sync_time($unit, $epoch = null){
 function evse_restart_unit($unit){
 	if (!evse_is_http($unit)) {   // RAPI: the controller resets before it can answer $FR, so no reply = sent; then wait for it to answer again
 		if (rapi($unit, '$FR') === 'Error') return array('ok'=>false, 'msg'=>'Reboot failed (RAPI $FR refused)');
-		sleep(5); $back = false;   // past the reset (up to 3 s more while charging)
+		sleep(8); $back = false;   // an old unit takes 8+ s to reboot: no point asking sooner
 		for ($i = 0; $i < 25 && !$back; $i++) {
 			unset($GLOBALS['__evse_rapi_budget'], $GLOBALS['__evse_rapi_memo']);   // fresh read each try
 			$gc = rapi($unit, '$GC');
