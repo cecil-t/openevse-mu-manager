@@ -34,6 +34,7 @@ var OEWS = (function(){
 	function dot(){ return ''; }   // no per-unit dots: one ring on the "as of" dot while any feed is live
 	function paint(){ var d = document.getElementById('lbdot'); if (d) d.classList.toggle('wslive', IDS.some(function(id){ return S[id].st === 'live'; })); }
 	setInterval(paint, 1000);
+	if (window.OEVLive) { var od = OEVLive.dot; OEVLive.dot = function(c, t){ od(c, t); paint(); }; }   // the 5 s poll resets the dot's class: put the ring back at once
 	function refresh(){ var n = Date.now(); if (n - last >= 250) { last = n; W.refresh(); } else if (!pend) { pend = true; setTimeout(function(){ pend = false; last = Date.now(); W.refresh(); }, 250); } }
 	// after each table render: flash the cells whose text really changed (not Last seen / Last check-in)
 	function rendered(t){
@@ -73,7 +74,7 @@ var OEWS = (function(){
 		es.addEventListener('busy', function(m){ var id = JSON.parse(m.data).id; S[id].st = 'busy'; S[id].until = Date.now() + 15000; paint(); });
 		es.addEventListener('fail', function(m){ var id = JSON.parse(m.data).id; S[id].st = 'fail'; S[id].until = Date.now() + 300000; paint(); });   // refused: try again in 5 min
 		es.addEventListener('drop', function(m){ var id = JSON.parse(m.data).id; S[id].st = 'reconnecting'; paint(); });
-		es.addEventListener('end', function(){ es.close(); es = null; ids.forEach(function(id){ if (S[id].st === 'live') S[id].st = 'reconnecting'; }); start(); });   // next stream at once
+		es.addEventListener('end', function(){ es.close(); es = null; start(); });   // planned 25 s rollover: next stream at once, live units stay live (ring steady)
 		es.onerror = function(){   // closed for good (503 = all server feed slots in use, or no answer): 5 s poll, a new try after 15 s
 			if (!es) return;
 			if (es.readyState === 2 || !got) { ids.forEach(function(id){ if (S[id].st !== 'fail' && S[id].st !== 'busy') S[id].st = got ? 'reconnecting' : 'full'; }); paint(); again(15000); }
