@@ -10,6 +10,7 @@ $hws_ids = array(); foreach ($W as $x) if (!$x['test'] && $x['code'] !== -1) $hw
 <style>
 #wt .wsd{display:inline-block;width:8px;height:8px;border-radius:50%;background:#bbb;margin-left:6px;vertical-align:1px;box-sizing:border-box}
 #wt .wsd.live{background:#2a2;outline:2px solid #0077dd;outline-offset:0}
+#wt .lbd.live{outline:2px solid #0077dd}
 #wt .wsd.fail{background:#e9a000}
 #wt td.vchg,#wt .dg td.vchg{background-color:#fff8d1 !important;transition:none}
 #wt td.vfade{transition:background-color 1.2s ease-out}
@@ -35,11 +36,14 @@ var OEWS = (function(){
 	}
 	function cls(id){ var s = S[id]; return 'wsd' + (s && s.st === 'live' ? ' live' : (s && s.st === 'fail' ? ' fail' : '')); }
 	function dot(id){ return S[id] ? '<span class="' + cls(id) + '" data-ws="' + id + '" title="' + tip(id).replace(/"/g, '&quot;') + '"></span>' : ''; }
-	function paint(){ document.querySelectorAll('#wt .wsd').forEach(function(d){ var id = +d.dataset.ws; d.className = cls(id); d.title = tip(id); }); }
+	function paint(){ document.querySelectorAll('#wt .wsd').forEach(function(d){ var id = +d.dataset.ws; d.className = cls(id); d.title = tip(id); });
+		document.querySelectorAll('#wt tr.det').forEach(function(r){ var p = r.previousElementSibling, s = p && S[+p.dataset.id]; r.querySelectorAll('.lbd').forEach(function(b){ b.classList.toggle('live', !!s && s.st === 'live'); }); });   // Last check-in dot: blue ring while live, like the Unit page
+	}
 	setInterval(paint, 1000);
 	function refresh(){ var n = Date.now(); if (n - last >= 250) { last = n; W.refresh(); } else if (!pend) { pend = true; setTimeout(function(){ pend = false; last = Date.now(); W.refresh(); }, 250); } }
 	// after each table render: flash the cells whose text really changed (not Last seen / Last check-in)
 	function rendered(t){
+		paint();
 		var now = {};
 		t.querySelectorAll('tr.u').forEach(function(r){ var id = r.dataset.id; [].forEach.call(r.cells, function(c, i){ if (c.dataset.k === 'seen') return; key(now, 'r' + id + ':' + i, c); }); });
 		t.querySelectorAll('tr.det').forEach(function(r){ var p = r.previousElementSibling, id = p ? p.dataset.id : ''; r.querySelectorAll('.dg table tr').forEach(function(tr){ var l = tr.cells[0] ? tr.cells[0].textContent : ''; if (l === 'Last check-in' || !tr.cells[1]) return; key(now, 'd' + id + ':' + l, tr.cells[1]); }); });
