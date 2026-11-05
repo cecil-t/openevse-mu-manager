@@ -192,10 +192,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	}
 	/* ---- groups ---- */
 	if ($a === 'group_save' || $a === 'group_add') {
-		$id = (int)$P('id'); $name = $P('name'); $cap = (int)$P('cap');
+		$id = (int)$P('id'); $name = $P('name'); $cap = (int)$P('cap'); $gv = trim((string)$P('volts')); $gv = $gv === '' ? null : (int)$gv;
 		if ($name === '' || $cap < 6 || $cap > 999) back('groups', 'A load group needs a name and a capacity from 6 to 999 A.', $id ? "g$id" : '');
-		if ($a === 'group_save') $db->prepare('UPDATE load_groups SET name = ?, max_load = ? WHERE id = ?')->execute(array($name, $cap, $id));
-		else $db->prepare('INSERT INTO load_groups (name, max_load) VALUES (?, ?)')->execute(array($name, $cap));
+		if ($gv !== null && ($gv < 90 || $gv > 260)) back('groups', 'The voltage must be from 90 to 260 V, or blank to use the Preferences voltage.', $id ? "g$id" : '');
+		if ($a === 'group_save') $db->prepare('UPDATE load_groups SET name = ?, max_load = ?, volts_override = ? WHERE id = ?')->execute(array($name, $cap, $gv, $id));
+		else $db->prepare('INSERT INTO load_groups (name, max_load, volts_override) VALUES (?, ?, ?)')->execute(array($name, $cap, $gv));
 		back('groups', 'Saved. The load balancer picks up the change within a minute.');
 	}
 	if ($a === 'group_delete') {
@@ -464,7 +465,8 @@ if ($sec === 'groups') {
 	foreach ($groups as $g) {
 		$gid = (int)$g['id']; $in = array(); foreach ($units as $u) if ((int)$u['loadgroupid'] === $gid) $in[] = $u['name'];
 		?><div class="card" id="g<?=$gid?>"><form method="post" action="settings.php?s=groups"><?=$CS?><input type="hidden" name="a" value="group_save"><input type="hidden" name="id" value="<?=$gid?>">
-		<div class="row2"><div style="flex:2"><label>Name</label><input type="text" name="name" value="<?=h($g['name'])?>" required></div><div><label>Capacity (A)</label><input type="number" name="cap" min="6" max="999" value="<?=(int)$g['max_load']?>"></div></div>
+		<div class="row2"><div style="flex:2"><label>Name</label><input type="text" name="name" value="<?=h($g['name'])?>" required></div><div><label>Capacity (A)</label><input type="number" name="cap" min="6" max="999" value="<?=(int)$g['max_load']?>"></div><div><label>Voltage (V)</label><input type="number" name="volts" min="90" max="260" placeholder="Preferences" value="<?=isset($g['volts_override']) && $g['volts_override'] !== null ? (int)$g['volts_override'] : ''?>"></div></div>
+		<div class="note">Voltage: optional. It overrides the Level 1 / Level 2 voltage in Preferences for the units in this group (for power and kWh). Leave blank to use the Preferences voltage. A unit's own voltage setting still wins.</div>
 		<div class="note">Units: <?=$in ? oev_v(implode(', ', $in)) : 'none yet'?></div>
 		<button type="submit" class="go">Save</button></form>
 		<form method="post" action="settings.php?s=groups" onsubmit="return confirm('Delete the load group <?=h(addslashes($g['name']))?>?')"><?=$CS?><input type="hidden" name="a" value="group_delete"><input type="hidden" name="id" value="<?=$gid?>"><button type="submit" class="del"<?=$in ? ' disabled style="opacity:.45;cursor:not-allowed"' : ''?>>Delete group</button>
@@ -472,7 +474,8 @@ if ($sec === 'groups') {
 		</div><?php
 	}
 	?><details class="card"><summary>Add a load group</summary><form method="post" action="settings.php?s=groups"><?=$CS?><input type="hidden" name="a" value="group_add">
-	<div class="row2"><div style="flex:2"><label>Name</label><input type="text" name="name" required></div><div><label>Capacity (A)</label><input type="number" name="cap" min="6" max="999" value="80"></div></div>
+	<div class="row2"><div style="flex:2"><label>Name</label><input type="text" name="name" required></div><div><label>Capacity (A)</label><input type="number" name="cap" min="6" max="999" value="80"></div><div><label>Voltage (V)</label><input type="number" name="volts" min="90" max="260" placeholder="Preferences"></div></div>
+	<div class="note">Voltage: optional. It overrides the Level 1 / Level 2 voltage in Preferences for the units in this group (for power and kWh). Leave blank to use the Preferences voltage. A unit's own voltage setting still wins.</div>
 	<div class="note">Then add units to it under Units.</div><button type="submit" class="go">Add group</button></form></details><?php
 }
 /* ----------------------------- PREFERENCES ----------------------------- */

@@ -9,6 +9,7 @@
  * default until it has read $GG (which it only does while charging).
  *
  * Order: per-unit override -> measured (only if the unit has a voltmeter) ->
+ * its load group's voltage (load_groups.volts_override, if set) ->
  * the assumed voltage for its service level (below).
  * Per-unit settings are nullable columns in openevse.db 'evses':
  *   volts_override  e.g. 208 (3-phase commercial) or 230 (abroad); NULL = use the defaults
@@ -30,10 +31,22 @@ function evse_volts_v($x){   // V or mV -> V, or null if implausible
 	return ($v >= EVSE_VOLTS_MIN && $v <= EVSE_VOLTS_MAX) ? (int)round($v) : null;
 }
 
-// returns array(volts or null, source: 'override' | 'measured' | 'L1 assumed' | 'L2 assumed' | '')
+// a load group's voltage override (openevse.db load_groups.volts_override; NULL = the Preferences voltage), re-read at most once a minute
+function evse_group_volts($gid){
+	static $m = null, $at = 0;
+	if (!$gid) return null;
+	if ($m === null || time() - $at > 60) {
+		$m = array(); $at = time();
+		try { $db = new PDO('sqlite:' . OEV_DB_FILE, null, null, array(PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
+			foreach ($db->query('SELECT id, volts_override FROM load_groups') as $g) $m[(int)$g['id']] = evse_volts_v($g['volts_override']); } catch (Exception $e) {}   // no column yet: none
+	}
+	return $m[(int)$gid] ?? null;
+}
+// returns array(volts or null, source: 'override' | 'measured' | 'group' | 'L1 assumed' | 'L2 assumed' | '')
 function evse_volts_info($unit, $level, $measured = null){
 	if (is_array($unit) && ($v = evse_volts_v($unit['volts_override'] ?? null)) !== null) return array($v, 'override');
 	if (evse_has_voltmeter($unit) && ($v = evse_volts_v($measured)) !== null) return array($v, 'measured');
+	if (is_array($unit) && ($v = evse_group_volts($unit['loadgroupid'] ?? null)) !== null) return array($v, 'group');
 	if ((int)$level === 1) return array(EVSE_VOLTS_L1, 'L1 assumed');
 	if ((int)$level === 2) return array(EVSE_VOLTS_L2, 'L2 assumed');
 	return array(null, '');

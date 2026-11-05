@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, uni
 CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY, unit_id INTEGER NOT NULL, at_time TEXT NOT NULL, extra_to TEXT, enabled INTEGER DEFAULT 1);");
 $cols = array_column($db->query('PRAGMA table_info(evses)')->fetchAll(), 'name');
 foreach (array('volts_override' => 'REAL', 'voltmeter' => 'INTEGER', 'emon_mode' => 'TEXT', 'emon_ext_server' => 'TEXT', 'emon_ext_node' => 'TEXT', 'emon_ext_key' => 'TEXT', 'hw_max' => 'INTEGER') as $c => $t) if (!in_array($c, $cols)) { $db->exec("ALTER TABLE evses ADD COLUMN $c $t"); echo "evses.$c added\n"; }
+$cols = array_column($db->query('PRAGMA table_info(load_groups)')->fetchAll(), 'name');
+if (!in_array('volts_override', $cols)) { $db->exec('ALTER TABLE load_groups ADD COLUMN volts_override REAL'); echo "load_groups.volts_override added\n"; }
 $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
 foreach (array('first_name', 'last_name') as $c) if (!in_array($c, $cols)) { $db->exec("ALTER TABLE users ADD COLUMN $c TEXT DEFAULT ''"); echo "users.$c added\n"; }
 // sessions.db (readings and sessions): made or brought up to date here (sessions_lib.php)
