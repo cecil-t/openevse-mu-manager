@@ -6,7 +6,7 @@
     <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker>
   </defs>
   <rect width="1000" height="610" fill="#ffffff"/>
-  <text x="500" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#222">OpenEVSE Multi-Unit Manager and Load Balancer: how it fits together</text>
+  <text x="500" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#222">OpenEVSE MU Manager: how it fits together</text>
 
   <!-- Internet side -->
   <rect x="20" y="70" width="190" height="500" rx="14" fill="#f3f6fb" stroke="#9fb3cf" stroke-dasharray="6 4"/>

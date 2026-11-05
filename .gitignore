@@ -1,4 +1,4 @@
-# OpenEVSE Multi-Unit Manager and Load Balancer: never publish anything made on the server.
+# OpenEVSE MU Manager: never publish anything made on the server.
 # Databases (units, users, settings, readings) and their side files
 *.db
 *.db-wal

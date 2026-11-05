@@ -1,6 +1,6 @@
 {
 	"short_name": "OpenEVSE",
-	"name": "OpenEVSE Multi-Unit Manager and Load Balancer",
+	"name": "OpenEVSE MU Manager",
 	"icons": [
 		{
 			"src": "media/openevse-icon.png",

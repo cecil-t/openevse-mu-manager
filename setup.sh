@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenEVSE Multi-Unit Manager and Load Balancer: set up or check a new install on a Linux server. Run as root from
+# OpenEVSE MU Manager: set up or check a new install on a Linux server. Run as root from
 # anywhere; it works on the folder it is in. Safe to run again: it never overwrites the
 # key, the databases, .env or the MQTT logins once they exist.
 #   sudo sh setup.sh --check                         check the requirements only (no changes)
@@ -24,7 +24,7 @@ WARN=0; FAIL=0
 [ "$(id -u)" = 0 ] || { echo "Run this as root (sudo sh setup.sh ...)."; exit 1; }
 [ -f "$SITE/index.php" ] && [ -f "$SITE/collector/setup_auth.php" ] || { echo "$SITE does not look like the OpenEVSE site folder."; exit 1; }
 
-echo "OpenEVSE Multi-Unit Manager and Load Balancer setup: $SITE"
+echo "OpenEVSE MU Manager setup: $SITE"
 echo "Requirements"
 # the web server's user: --web-user, else the usual names
 if [ -z "$WU" ]; then for u in www-data apache http; do id "$u" >/dev/null 2>&1 && { WU=$u; break; }; done; fi
