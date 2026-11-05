@@ -772,6 +772,13 @@ function evse_restart_unit($unit){
 	return array('ok'=>!empty($g['ok']), 'msg'=>'Controller restarted' . ($back ? '' : ' (no answer yet)') . (!empty($g['ok']) ? ', then the WiFi module' : '; WiFi module restart failed (' . $g['msg'] . ')'));
 }
 
+// Boot lock (newer WiFi firmware: 'boot_lock' in /config): the controller stays locked after power-up
+// until the WiFi module is running, so a load-balanced unit can't start at full current first.
+// Writes only that one key; null = not supported (key absent), no write.
+function evse_boot_lock_on($unit){
+	return evse_result(evse_http($unit, 'POST', 'config', array('boot_lock'=>true)), 'Boot lock on');
+}
+
 // Reboot. 'evse' = controller (old $FR), 'gateway' = WiFi module.
 function evse_restart($unit, $device = 'evse'){
 	if (!evse_is_http($unit)) return evse_rapi_action($unit, '$FR', 'Reboot');
@@ -834,7 +841,8 @@ function evse_last_session($unit, $open = false){
 	try {
 		$db = oev_sess_ro();
 		// seg_seconds: charging time so far from the logger's segments (open segment counted to now)
-		$st = $db->prepare('SELECT id, plug_in_at, kwh, kwh_meter, open, charge_seconds,
+		$st = $db->prepare('SELECT id, plug_in_at, kwh, kwh_meter, open, charge_seconds, max_temp_c, unit_temp_max_c,
+			(SELECT count(*) FROM events e WHERE e.session_id = sessions.id AND e.kind = \'fault\' AND e.reason = \'thermal\') ot_faults,
 			(SELECT coalesce(sum(CASE WHEN g.open = 1 THEN max(0, ? - g.start_at) ELSE g.seconds END), 0) FROM segments g WHERE g.session_id = sessions.id) seg_seconds,
 			(SELECT count(*) FROM segments g WHERE g.session_id = sessions.id AND g.open = 1) seg_open
 			FROM sessions WHERE unit_id = ? AND open = ? ORDER BY plug_in_at DESC LIMIT 1');

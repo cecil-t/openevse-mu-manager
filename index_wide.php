@@ -64,7 +64,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 #wt .strip b{color:#035a5a}
 #wt .strip a.open{color:#035a5a;font-weight:bold}
 #wt .td{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-#wt .td.g{background:#2a2}#wt .td.y{background:#e6b800}#wt .td.r{background:#d22}#wt .td.b{background:#1e6fd9}
+#wt .td.g{background:#2a2}#wt .td.y{background:#e6b800}#wt .td.o{background:#ef7d00}#wt .td.r{background:#d22}#wt .td.b{background:#1e6fd9}
 #wt .lbd{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2a2;vertical-align:1px}#wt .lbd.r{background:#d22}
 #wt .bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;vertical-align:middle}
 #wt .bars i{width:4px;background:#ccc}#wt .bars i:nth-child(1){height:20%}#wt .bars i:nth-child(2){height:40%}#wt .bars i:nth-child(3){height:60%}#wt .bars i:nth-child(4){height:80%}#wt .bars i:nth-child(5){height:100%}#wt .bars i.on{background:#035a5a}

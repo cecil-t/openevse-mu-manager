@@ -749,6 +749,7 @@ function sess_poll_one($db, $unit, $why = ''){
 		$us2 = $db->query("SELECT * FROM unit_state WHERE unit_id = $uid")->fetch();
 		$u = sess_check_reboot($db, $unit, $us2, $r, $now);
 		$u['last_full_poll_at'] = $now;
+		if (is_array($d['config'])) $u['boot_lock'] = array_key_exists('boot_lock', $d['config']) ? (!empty($d['config']['boot_lock']) ? 1 : 0) : null;   // from the /config this run already read
 		$recent_push = $us2['last_push_at'] && $now - (int)$us2['last_push_at'] <= 90;
 		if ($r['ok']) {
 			$u['poll_due'] = 0;
@@ -773,7 +774,26 @@ function sess_poll_one($db, $unit, $why = ''){
 		throw $e;
 	}
 	sess_unit_unlock($lk);
+	sess_boot_lock_check($db, $unit, $d);
 	return array($r, $res, $api);
+}
+
+// Load-balanced units own boot lock: supported (key in this run's /config) and off -> turn it on,
+// at most once per 10 min per unit, and log it. No extra reads; unsupported units: nothing.
+function sess_boot_lock_check($db, $unit, $d, $force = false){
+	if (!is_array($d['config'] ?? null) || !array_key_exists('boot_lock', $d['config'])) return null;
+	if (!empty($d['config']['boot_lock'])) return true;
+	if (empty($unit['loadgroupid']) && !$force) return false;
+	$uid = (int)$unit['id']; $now = time();
+	$last = (int)$db->query("SELECT coalesce(boot_lock_set_at, 0) FROM unit_state WHERE unit_id = $uid")->fetchColumn();
+	if ($now - $last < 600) return false;
+	$res = evse_boot_lock_on($unit);
+	sess_begin($db);
+	sess_update_row($db, 'unit_state', 'unit_id', $uid, array('boot_lock_set_at'=>$now) + (!empty($res['ok']) ? array('boot_lock'=>1) : array()));
+	sess_event($db, $unit, null, null, $now, 'config', 'boot lock was off: ' . (!empty($res['ok']) ? 'turned back on (load balancer)' : 'turning it on failed (' . $res['msg'] . ')'), 0, !empty($res['ok']) ? 1 : 0, null, 'boot lock');
+	sess_commit($db);
+	slog(!empty($res['ok']) ? 'info' : 'warn', "{$unit['name']}: boot lock was off, " . (!empty($res['ok']) ? 'turned back on' : 'turning it on failed: ' . $res['msg']));
+	return !empty($res['ok']);
 }
 
 /*------------------------------------------------------------------------------

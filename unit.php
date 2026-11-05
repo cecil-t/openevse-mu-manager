@@ -92,7 +92,7 @@ table.stats tr.g2 td{background-color:#e3e7ec}
 /* readings: darker text, a little larger; the temperature dot as on the home page (index_wide.php) */
 #ucard table.stats td{color:#222;font-size:16px}@media screen and (min-width:700px){#ucard table.stats td{font-size:17px}}#ucard table.stats td:first-child{color:#444}#ucard table.stats td a{color:inherit}
 @media (max-width:359px){#ucard table.stats td{font-size:15px}}
-.td{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}.td.g{background:#2a2}.td.y{background:#e6b800}.td.r{background:#d22}.td.b{background:#1e6fd9}.td.ta{margin:0 0 0 5px;vertical-align:middle}
+.td{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}.td.g{background:#2a2}.td.y{background:#e6b800}.td.o{background:#ef7d00}.td.r{background:#d22}.td.b{background:#1e6fd9}.td.ta{margin:0 0 0 5px;vertical-align:middle}
 /* phones: the two tables read as one list */
 #ucard table.stats{table-layout:fixed}#ucard table.stats th{width:auto}#ucard col.cn{width:42%}#ucard table.st2{margin-top:0}#ucard tr.r_head2{display:none}#ucard table.st2 tr:nth-child(2) td{border-top:2px solid #9a9a9a}
 /* desktop: two name/value tables side by side; name columns only as wide as their text */
@@ -150,7 +150,9 @@ if ($e['api'] == 'http') {
 	if ($ovj) $stl[] = 'Override: ' . (isset($ovj['state']) ? $ovj['state'] : 'custom') . (isset($ovj['auto_release']) ? ($ovj['auto_release'] ? ' (clears on unplug)' : ' (stays after unplug)') : '');
 }
 $ckl = array();
+$bl = evse_detect($unit)['config'] ?? null;   // boot lock (newer WiFi firmware only)
 foreach (array('diode'=>'Diode','vent'=>'Vent required','ground'=>'Ground','relay'=>'Stuck relay','gfci'=>'GFCI','temp'=>'Temperature') as $k => $l) $ckl[] = strtoupper($l[0]) . ' - ' . $l . ': ' . (!empty($e['check_' . $k]) ? 'on' : 'OFF');
+$ckl[] = 'Boot lock: ' . (!is_array($bl) || !array_key_exists('boot_lock', $bl) ? 'not supported by this WiFi firmware' : (!empty($bl['boot_lock']) ? 'On' : 'Off') . (!empty($unit['loadgroupid']) ? ' (managed by load balancer)' : ''));
 // Time row: the collector keeps unit clocks on server time (clock_logic.php); this only reports it
 $cs = evse_clock_state($unit);
 $fs = function($s){ $s = (float)$s; return (abs($s) < 0.05 ? '0' : sprintf('%+.1f', $s)) . ' s'; };
@@ -225,6 +227,12 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 		if ($ls) {
 			$lsk = ($ls['kwh'] !== null && (float)$ls['kwh'] > 0) ? $ls['kwh'] : $ls['kwh_meter'];
 			echo '<a href="sessions.php?id=' . (int)$ls['id'] . '" title="' . h(date('D M j g:ia', (int)$ls['plug_in_at'])) . '">' . h(date('n/j', (int)$ls['plug_in_at'])) . '</a>' . ($lsk !== null ? ' &middot; ' . h(round($lsk, 1)) . ' kWh' : '');
+			// temperature derate during that session: orange from 65 C (half current), red from 71 C or an over-temperature fault
+			$lsm = max((float)($ls['max_temp_c'] ?? -99), (float)($ls['unit_temp_max_c'] ?? -99)); $lsf = (int)($ls['ot_faults'] ?? 0);
+			if ($lsf || $lsm >= IDX_THROTTLE_C) {
+				$lst = 'Reached ' . round($lsm) . "\u{00B0}C (" . round($lsm * 9 / 5 + 32) . "\u{00B0}F)" . ' during this session; ' . (($lsf || $lsm >= IDX_OVERTEMP_C) ? 'the unit went over temperature and stopped charging until it cooled.' : ($lsm >= IDX_QUARTER_C ? 'the unit cut current to a quarter to cool down.' : 'the unit cut current to half to cool down.'));
+				echo ' <span class="td ' . (($lsf || $lsm >= IDX_OVERTEMP_C) ? 'r' : 'o') . ' ta" title="' . h($lst) . '"></span>';
+			}
 		} else echo "\u{2014}";
 	?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>

@@ -17,7 +17,7 @@
 
 if (!defined('SESS_DB_PATH')) define('SESS_DB_PATH', __DIR__ . '/sessions.db');
 require_once __DIR__ . '/volts_lib.php';
-define('SESS_SCHEMA_VERSION', 6);
+define('SESS_SCHEMA_VERSION', 7);
 
 function sess_db($readonly = false){
 	$db = new PDO('sqlite:' . SESS_DB_PATH, null, null, array(
@@ -149,6 +149,8 @@ function sess_schema($db){
 	// ---- v6: every push stored; raw pushed state; arrival time of the push that first flagged plug-in / unplug
 	sess_add_cols($db, 'samples', array('push_state'=>'INTEGER'));
 	sess_add_cols($db, 'sessions', array('first_push_at'=>'INTEGER', 'unplug_push_at'=>'INTEGER'));
+	// ---- v7: boot lock (WiFi firmware that has it): NULL = not supported, else 0/1 as last read; when we last turned it on
+	sess_add_cols($db, 'unit_state', array('boot_lock'=>'INTEGER', 'boot_lock_set_at'=>'INTEGER'));
 	// ---- v4: kW is no longer stored (derived = amps x volts, computed at report time).
 	// One-off: give old samples their voltage (from the stored kW, else the unit's),
 	// then clear the stored kW / avg / peak kW so nothing reads stale derived values.
