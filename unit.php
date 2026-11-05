@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_lib.php'; oev_require('public');   // login gate (auth_lib.php)
 include __DIR__ . '/include_v5.php';
+require_once __DIR__ . '/util_lib.php';   // nm_local(), nm_web(): Unit Web Admin row
 require_once __DIR__ . '/index_wide_lib.php';   // idx_temp_html(): the home page's temperature dot and thresholds
 $with  = evse_with_param();
 $wq    = $with ? '?with=' . implode(',', $with) : '';
@@ -225,7 +226,8 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 			$lsk = ($ls['kwh'] !== null && (float)$ls['kwh'] > 0) ? $ls['kwh'] : $ls['kwh_meter'];
 			echo '<a href="sessions.php?id=' . (int)$ls['id'] . '" title="' . h(date('D M j g:ia', (int)$ls['plug_in_at'])) . '">' . h(date('n/j', (int)$ls['plug_in_at'])) . '</a>' . ($lsk !== null ? ' &middot; ' . h(round($lsk, 1)) . ' kWh' : '');
 		} else echo "\u{2014}";
-	?></td></tr><?php } ?>
+	?></td></tr>
+	<tr><td>Unit Web Admin</td><td class="nw"><?php $uw = nm_web($unit['evseurl']); echo (oev_is_admin() && $uw !== '' && nm_local($_SERVER['REMOTE_ADDR'] ?? '', (string)parse_url($unit['evseurl'], PHP_URL_HOST))) ? '<a href="' . h($uw) . '" target="_blank" rel="noopener noreferrer">' . h($uw) . '</a>' : '<span class="api" title="Admins on the units\' own network only">Unavailable</span>'; ?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>
 </table></div>
 </div><?php /* #ucard */ ?>

@@ -20,35 +20,7 @@ try { $s = oev_sess_ro(3); $nodes = $s->query('SELECT unit_id, node FROM emon_no
 $arp = array();
 foreach ((@file('/proc/net/arp', FILE_IGNORE_NEW_LINES) ?: array()) as $l) { $p = preg_split('/\s+/', trim($l)); if (isset($p[3]) && preg_match('/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i', $p[3]) && $p[3] !== '00:00:00:00:00:00') $arp[$p[0]] = strtoupper($p[3]); }
 
-// the browser is on the units' own network: REMOTE_ADDR (the app trusts no proxy headers) is a private IPv4 address in the same /24 as the unit's IP
-function nm_same_net($client, $ip){
-	$f = FILTER_FLAG_IPV4;
-	if (!is_string($client) || !is_string($ip) || filter_var($client, FILTER_VALIDATE_IP, $f) !== $client || filter_var($ip, FILTER_VALIDATE_IP, $f) !== $ip) return false;
-	if (filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // public or Tailscale (100.64/10): not private
-	return (ip2long($client) & 0xFFFFFF00) === (ip2long($ip) & 0xFFFFFF00);
-}
-// or the browser comes in from this site's own public address (it shares the units' home internet connection): the site name's DNS A records, as set by the web server (not the browser's Host header)
-function nm_home_public($client){
-	static $pub = null; $f = FILTER_FLAG_IPV4;
-	if (!is_string($client) || filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== $client) return false;
-	if ($pub === null) {
-		$pub = array(); $n = (string)($_SERVER['SERVER_NAME'] ?? '');
-		if ($n !== '' && filter_var($n, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === $n && strpos($n, '.') !== false)
-			foreach ((@dns_get_record($n, DNS_A) ?: array()) as $r) if (isset($r['ip']) && filter_var($r['ip'], FILTER_VALIDATE_IP, $f) === $r['ip']) $pub[] = $r['ip'];
-	}
-	return in_array($client, $pub, true);
-}
-function nm_local($client, $ip){
-	if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== $ip || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // the unit must be on a private network
-	return nm_same_net($client, $ip) || nm_home_public($client);
-}
-// the unit's own web page, from its Address (Settings > Units): scheme, host and port only, never a login
-function nm_web($evseurl){
-	$p = parse_url((string)$evseurl); if (!is_array($p) || empty($p['host'])) return '';
-	$sc = strtolower($p['scheme'] ?? 'http'); if ($sc !== 'http' && $sc !== 'https') return '';
-	$h = $p['host']; if (filter_var(trim($h, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) $h = '[' . trim($h, '[]') . ']';
-	return $sc . '://' . $h . (isset($p['port']) ? ':' . (int)$p['port'] : '') . '/';
-}
+// nm_local() / nm_web(): util_lib.php (shared with the Unit page's Unit Web Admin row)
 // one unit, read only -> plain values (+ what this site expects)
 function nm_read($u, $sug, $nodes, $arp, $r, $x){   // $r / $x: GET /config and /status replies, read in parallel below
 	$id = (int)$u['id'];

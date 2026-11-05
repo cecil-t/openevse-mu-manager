@@ -22,3 +22,33 @@ function oev_sess_ro($timeout = 2, $dir = null){
 	$db->exec('PRAGMA temp_store = MEMORY');   // big sorts never spill into the NAS temp folder
 	return $db;
 }
+
+// the browser is on the units' own network: REMOTE_ADDR (the app trusts no proxy headers) is a private IPv4 address in the same /24 as the unit's IP
+function nm_same_net($client, $ip){
+	$f = FILTER_FLAG_IPV4;
+	if (!is_string($client) || !is_string($ip) || filter_var($client, FILTER_VALIDATE_IP, $f) !== $client || filter_var($ip, FILTER_VALIDATE_IP, $f) !== $ip) return false;
+	if (filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // public or Tailscale (100.64/10): not private
+	return (ip2long($client) & 0xFFFFFF00) === (ip2long($ip) & 0xFFFFFF00);
+}
+// or the browser comes in from this site's own public address (it shares the units' home internet connection): the site name's DNS A records, as set by the web server (not the browser's Host header)
+function nm_home_public($client){
+	static $pub = null; $f = FILTER_FLAG_IPV4;
+	if (!is_string($client) || filter_var($client, FILTER_VALIDATE_IP, $f | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== $client) return false;
+	if ($pub === null) {
+		$pub = array(); $n = (string)($_SERVER['SERVER_NAME'] ?? '');
+		if ($n !== '' && filter_var($n, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === $n && strpos($n, '.') !== false)
+			foreach ((@dns_get_record($n, DNS_A) ?: array()) as $r) if (isset($r['ip']) && filter_var($r['ip'], FILTER_VALIDATE_IP, $f) === $r['ip']) $pub[] = $r['ip'];
+	}
+	return in_array($client, $pub, true);
+}
+function nm_local($client, $ip){
+	if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== $ip || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE) !== false) return false;   // the unit must be on a private network
+	return nm_same_net($client, $ip) || nm_home_public($client);
+}
+// the unit's own web page, from its Address (Settings > Units): scheme, host and port only, never a login
+function nm_web($evseurl){
+	$p = parse_url((string)$evseurl); if (!is_array($p) || empty($p['host'])) return '';
+	$sc = strtolower($p['scheme'] ?? 'http'); if ($sc !== 'http' && $sc !== 'https') return '';
+	$h = $p['host']; if (filter_var(trim($h, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) $h = '[' . trim($h, '[]') . ']';
+	return $sc . '://' . $h . (isset($p['port']) ? ':' . (int)$p['port'] : '') . '/';
+}
