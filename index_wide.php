@@ -110,6 +110,12 @@ var OEWide = (function(){
 		var s = Math.max(0, Math.round(Date.now() / 1000 - skew - t));
 		return s < 120 ? s + ' s' : s < 7200 ? Math.round(s / 60) + ' min' : s < 172800 ? Math.round(s / 3600) + ' h' : Math.round(s / 86400) + ' d';
 	}
+	// kW = amps x the unit's volts (its configured voltage; no voltmeter), 240 if unknown; stale Xm once 2+ min since check-in
+	function kw(u){
+		var s = u.seen ? Math.round(Date.now() / 1000 - skew - u.seen) : 0;
+		var st = s >= 120 ? ' <small class="x" title="No check-in for ' + Math.round(s / 60) + ' min">stale ' + Math.round(s / 60) + 'm</small>' : '';
+		return (u.amps ? (Math.round(u.amps * (u.volts || 240) / 100) / 10).toFixed(1) + ' kW' : '<span class="x">0.0 kW</span>') + st;
+	}
 	function problem(u){ return u.code === -1 || u.pcls === 'serr' || u.stale || u.clock_off; }
 	function gOpen(k, us){
 		if (forceId && us.some(function(u){ return u.id === forceId; })) return true;
@@ -131,7 +137,7 @@ var OEWide = (function(){
 			+ '<td class="c-w ses">' + ses + '</td>'
 			+ '<td class="c-x">' + sch + (u.clock_off ? '<small class="ck" title="Unit clock is off from server time">clock off</small>' : '') + '</td>'
 			+ '<td class="c-x" data-k="shr">' + share(u) + '</td>'
-			+ '<td class="c-w num' + (u.code === -1 ? ' x' : '') + '" data-k="seen">' + ago(u.seen) + '</td></tr>';
+			+ '<td class="c-w num' + (u.code === -1 ? ' x' : '') + '" data-k="kw">' + kw(u) + '</td></tr>';
 	}
 	function det(u, hid){
 		var d = Object.assign({}, u.d, info[u.id] || {}), ld = loading[u.id] ? '<span class="ld">reading\u2026</span>' : DASH;
@@ -162,7 +168,7 @@ var OEWide = (function(){
 	function byName(a, b){ return a.name.localeCompare(b.name, undefined, {numeric: true}); }
 	function render(){
 		var h = '<colgroup><col class="cu"><col class="cs"><col class="cd"><col class="ce c-w"><col class="ch c-x"><col class="cl c-x"><col class="cn c-w"></colgroup>'
-			+ '<tr><th>Unit</th><th>Status</th><th class="num dp"><span class="dw">Drawing / Pilot</span><span class="pw">Draw</span></th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">Last seen</th></tr>';
+			+ '<tr><th>Unit</th><th>Status</th><th class="num dp"><span class="dw">Drawing / Pilot</span><span class="pw">Draw</span></th><th class="c-w ses">Session</th><th class="c-x">Schedule</th><th class="c-x">LB share / actual</th><th class="c-w num">kW</th></tr>';
 		var qq = q.trim().toLowerCase();
 		var us = U.filter(function(u){ return !qq || u.name.toLowerCase().indexOf(qq) >= 0 || (G[u.g] && G[u.g].name.toLowerCase().indexOf(qq) >= 0); });
 		function rows(list, hid){ var o = ''; list.forEach(function(u){ o += row(u, hid); if (u.id === openId) o += det(u, hid); }); return o; }
@@ -230,7 +236,7 @@ var OEWide = (function(){
 	setInterval(function(){
 		if (document.hidden) return;
 		if (dirty) { dirty = false; render(); }
-		else document.querySelectorAll('#wt td[data-k="seen"]').forEach(function(c){ var u = U.filter(function(y){ return y.id == c.parentNode.dataset.id; })[0]; if (u) c.innerHTML = ago(u.seen); });
+		else document.querySelectorAll('#wt td[data-k="kw"]').forEach(function(c){ var u = U.filter(function(y){ return y.id == c.parentNode.dataset.id; })[0]; if (u) c.innerHTML = kw(u); });
 	}, 5000);
 	var qi = document.getElementById('wq'); qi.value = q;
 	qi.oninput = function(){ q = qi.value; try { sessionStorage.setItem('oemu-q', q); } catch (e) {} render(); };
