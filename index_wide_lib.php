@@ -35,7 +35,7 @@ function idx_wide_unit($unit, $e, $lu, $lv, $gid, $s, $us, $vv, $link){
 	$amps = $off ? null : (($code == 3 && isset($e['amps']) && $e['amps'] !== null) ? round((float)$e['amps'], 1) : 0);
 	$pilot = (!$off && isset($e['pilot']) && (int)$e['pilot'] > 0) ? (int)$e['pilot'] : null;
 	$saved = isset($e['saved_current']) ? (int)$e['saved_current'] : null;
-	$volts = $vv ?: (is_array($us) && $us['volts'] ? (int)$us['volts'] : null);
+	$volts = $vv ?: evse_volts($unit, $e['level'] ?? (is_array($us) ? $us['level'] : null));   // volts_lib.php: override, else the Level 1 / Level 2 voltage in Settings > Preferences
 	// session: plugged in with an open logger session
 	$ses = null; $cur = null;
 	if (!$off && !empty($e['connected']) && !empty($s['open'])) {

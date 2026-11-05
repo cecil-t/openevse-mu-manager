@@ -110,11 +110,11 @@ var OEWide = (function(){
 		var s = Math.max(0, Math.round(Date.now() / 1000 - skew - t));
 		return s < 120 ? s + ' s' : s < 7200 ? Math.round(s / 60) + ' min' : s < 172800 ? Math.round(s / 3600) + ' h' : Math.round(s / 86400) + ' d';
 	}
-	// kW = amps x the unit's volts (its configured voltage; no voltmeter), 240 if unknown; stale Xm once 2+ min since check-in
+	// kW = amps x u.volts (evse_volts(): per-unit override, else the Level 1 / Level 2 pref for its service level); stale Xm once 2+ min since check-in
 	function kw(u){
 		var s = u.seen ? Math.round(Date.now() / 1000 - skew - u.seen) : 0;
 		var st = s >= 120 ? ' <small class="x" title="No check-in for ' + Math.round(s / 60) + ' min">stale ' + Math.round(s / 60) + 'm</small>' : '';
-		return (u.amps ? (Math.round(u.amps * (u.volts || 240) / 100) / 10).toFixed(1) + ' kW' : '<span class="x">0.0 kW</span>') + st;
+		return (!u.amps ? '<span class="x">0.0 kW</span>' : u.volts ? (Math.round(u.amps * u.volts / 100) / 10).toFixed(1) + ' kW' : DASH) + st;
 	}
 	function problem(u){ return u.code === -1 || u.pcls === 'serr' || u.stale || u.clock_off; }
 	function gOpen(k, us){
