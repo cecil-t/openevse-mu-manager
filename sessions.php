@@ -29,6 +29,7 @@ form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.pilot{border-color:#07d}.ev.amps{border-color:#0a7}.ev.limit{border-color:#82d}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
 svg text{font-family:Arial,sans-serif}
 .chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
+@media screen and (min-width:700px){body.pgw .sec>svg{max-width:400px;height:auto;display:block}}   /* session amp/pilot/temp graph: keep the phone-card size on wide pages (viewBox+width:100% would scale with body.pgw) */
 .sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
 .sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
 /* style.css boxes every 'a span' (old button look); undo that inside the session cards */
