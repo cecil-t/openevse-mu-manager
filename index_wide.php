@@ -14,6 +14,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 	body{zoom:100% !important}
 	.container{max-width:1200px}
 	#unit.slidebox{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
+	#wt tr.u td:first-child{padding-right:0}
 }
 #wide .bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:10px}
 #wide .bar input{padding:6px 8px;border:1px solid #bbb;border-radius:5px;font-size:15px;flex:1;min-width:140px;max-width:260px}
