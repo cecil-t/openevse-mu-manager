@@ -192,7 +192,7 @@ foreach ($sec[1] as $k) {
 		<?php
 			// grouped units: the load balancer's view (paused / note / check-in), updated in place every 5 s by the script below
 			$stx = ($lv && $lv['paused']) ? 'Paused' : $e['state'];
-			$sttl = ($lv && $lv['paused']) ? $lv['pill_title'] : $e['state'];
+			$sttl = ($lv && $lv['paused']) ? $lv['pill_title'] : evse_state_tip((int)$e['statecode']);
 		?><dd><span class="st <?=in_array((int)$e['statecode'], array(1, 2, 3, 254, 255)) ? 's' . (int)$e['statecode'] : 'serr'?>" title="<?=h($sttl)?>"><i><?=h($stx)?></i></span><?php
 			if ($isg) {
 				echo '<span class="mqx"' . ($lv && $lv['stale'] ? '' : ' style="display:none"') . ' title="' . h($lv && $lv['checkin'] !== null ? 'No MQTT check-in for ' . idx_dur($lv['checkin']) : 'No MQTT check-in from this unit') . '">&#9679;</span>';

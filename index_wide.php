@@ -132,7 +132,7 @@ var OEWide = (function(){
 		var sch = u.sch ? '<span' + (u.run ? ' class="run" title="Scheduled charge running"' : '') + '>' + esc(u.sch) + '</span>' : DASH;
 		return '<tr class="u' + (u.id === openId ? ' op' : '') + '" data-id="' + u.id + '" data-in="' + u.g + '"' + hid + '>'
 			+ '<td>' + (u.plugged ? '<img src="media/plug.svg" class="plug" alt="Connected" title="EV Connected">' : '') + '<a href="' + esc(u.link) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' + (window.OEWS ? OEWS.dot(u.id) : '') + (u.test ? ' <span class="x">(test)</span>' : '') + '</td>'
-			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.pill) + '">' + esc(u.pill) + '</span></td>'
+			+ '<td class="stc"><span class="st ' + u.pcls + '" title="' + esc(u.ptip || u.pill) + '">' + esc(u.pill) + '</span></td>'
 			+ '<td class="num dp" data-k="drw">' + drawing(u) + '</td>'
 			+ '<td class="c-w ses">' + ses + '</td>'
 			+ '<td class="c-x">' + sch + (u.clock_off ? '<small class="ck" title="Unit clock is off from server time">clock off</small>' : '') + '</td>'
@@ -223,7 +223,7 @@ var OEWide = (function(){
 		var u = U.filter(function(y){ return y.id === x.id; })[0]; if (!u || !x.ok) return;
 		var F = window.OEWS ? OEWS.fresh : function(){ return false; };   // home live feed: values the live feed sent in the last 15 s stay
 		u.paused = !!x.paused; u.stale = x.stale;
-		if (!F(u.id, 'state') || x.paused) { u.code = x.code; u.pill = x.pill; u.pcls = x.pill_cls; }
+		if (!F(u.id, 'state') || x.paused) { u.code = x.code; u.pill = x.pill; u.pcls = x.pill_cls; if (x.pill_title) u.ptip = x.pill_title; }
 		if (!F(u.id, 'vehicle')) u.plugged = x.plugged;
 		if (!F(u.id, 'amp') || !F(u.id, 'state')) u.amps = x.charging && x.amps !== null ? Math.round(x.amps * 10) / 10 : 0;
 		if (x.setting !== null && !F(u.id, 'pilot')) u.pilot = x.setting;

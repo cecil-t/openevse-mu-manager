@@ -180,6 +180,26 @@ function evse_state_text($code){
 	return 'Error';
 }
 
+// short tooltip for the home-page state pill (and unit.php); keeps fault text as-is
+function evse_state_tip($code){
+	switch ((int)$code) {
+		case 0:   return 'Starting up';
+		case 1:   return 'Available to charge';
+		case 2:   return 'Plug is in but car is not asking for power yet';
+		case 3:   return 'Actively supplying power';
+		case 254: return 'EVSE sleep mode';
+		case 255: return 'Not enabled for charging';
+		case -1:  return 'Not responding';
+	}
+	return evse_state_text($code);   // faults already say what went wrong
+}
+
+// title on the status pill: paused by the load balancer, else the state tip
+function evse_pill_title($code, $paused = false){
+	if ($paused) return 'Load balancer temporarily disabled it to free electrical capacity';
+	return evse_state_tip($code);
+}
+
 function evse_elapsed_text($sec){
 	$sec = (int)$sec;
 	if ($sec <= 120) return $sec . ' seconds';

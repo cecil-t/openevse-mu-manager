@@ -89,7 +89,7 @@ function evse_lb_view($u){
 		'id'=>(int)$u['id'], 'ok'=>!empty($u['ok']), 'code'=>$code,
 		'pill'=>$paused ? 'Paused' : ($code == -1 ? 'Connection Error' : evse_state_text($code)),
 		'pill_cls'=>in_array($code, array(1, 2, 3, 254, 255), true) ? 's' . $code : 'serr',
-		'pill_title'=>$paused ? 'Paused by the load balancer (idle; its amps go to the charging cars)' : ($code == -1 ? 'Not responding' : evse_state_text($code)),
+		'pill_title'=>evse_pill_title($code, $paused),
 		'plugged'=>!empty($u['plugged']), 'charging'=>$code == 3, 'amps'=>$u['amps'] ?? null,
 		'label'=>($set !== null && (int)$set > 0) ? evse_amps_label($set, $sv) : '',
 		'label_title'=>($set !== null && $sv !== null && (int)$set < (int)$sv) ? 'Temporary ' . (int)$set . ' A (saved ' . (int)$sv . ' A)' : 'Saved setting',
