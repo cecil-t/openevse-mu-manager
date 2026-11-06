@@ -30,7 +30,8 @@ form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
 svg text{font-family:Arial,sans-serif}
 .chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
 @media screen and (min-width:700px){
-/* session amp/pilot/temp graph: full card width on desktop; pin label/stroke physical size (viewBox+width:100% would otherwise scale phone fonts/strokes ~3x under body.pgw) */
+/* session amp/pilot/temp graph: full card width on desktop at a compact ~340px height (viewBox 360x190 alone would scale to ~625px tall under body.pgw); pin label/stroke physical size */
+body.pgw .sec>svg{width:100%;height:340px;display:block}
 body.pgw .sec>svg text{font-size:11px}
 body.pgw .sec>svg text[font-size="8"]{font-size:9px}
 body.pgw .sec>svg text[font-size="9"]{font-size:10px}
