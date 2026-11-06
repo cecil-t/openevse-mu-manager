@@ -288,8 +288,26 @@ while (true) {
 			if ($r['setting'] !== null) $us['setting'] = $r['setting'];
 			if ($r['saved'] !== null) $us['saved'] = $r['saved'];
 			if ($r['hmax'] !== null) $us['hmax'] = $r['hmax'];
-			// we paused it, but it is running again (restarted / someone re-enabled it): forget our pause
-			if (!empty($us['lb_paused']) && $r['state'] !== null && $r['state'] !== (($r['api'] ?? '') === 'http' ? 254 : 255)) { lb_log("u$id {$u['name']}: no longer paused (now " . lb_state_name($r['state']) . ': restart or manual)'); unset($us['lb_paused']); }
+			// reconcile pause flag with the live state (asleep 254 is never "paused by us")
+			if ($DRY && !empty($us['dry_paused'])) {
+				$dact = lb_pause_flag_next($r['state'], $r['api'] ?? 'rapi');
+				if ($dact !== 'keep') { lb_log("test mode: u$id {$u['name']}: dropping dry pause flag ($dact, " . lb_state_name($r['state']) . ')'); unset($us['dry_paused']); }
+			}
+			if (!empty($us['lb_paused'])) {
+				$act = lb_pause_flag_next($r['state'], $r['api'] ?? 'rapi');
+				if ($act === 'clear_asleep') {
+					lb_log("u$id {$u['name']}: asleep while paused by us: dropping pause flag (schedule or manual sleep, not resumed)");
+					unset($us['lb_paused']);
+					// HTTP: drop our disabled claim so a later Wake is not held disabled by us
+					if (($r['api'] ?? '') === 'http' && !$DRY) {
+						$cr = lb_claim_release($u);
+						lb_log("u$id {$u['name']}: released pause claim after sleep takeover: " . (!empty($cr['ok']) ? 'ok' : ('FAILED (' . ($cr['msg'] ?? '') . ')')));
+					}
+				} elseif ($act === 'clear_awake') {
+					lb_log("u$id {$u['name']}: no longer paused (now " . lb_state_name($r['state']) . ': restart or manual)');
+					unset($us['lb_paused']);
+				}
+			}
 			$us['last_ok'] = $now; $us['fails'] = 0;
 		} else {
 			$us['fails'] = ($us['fails'] ?? 0) + 1;
@@ -315,8 +333,8 @@ while (true) {
 			$raw = $r['ok'] ? $r['plugged'] : ((isset($us['last_ok']) && $now - $us['last_ok'] <= 2 * (int)$cfg['poll_sec'] + 5) ? ($us['plugged'] ?? null) : null);
 			$plugged = lb_effective_plugged($raw, $r['ok'] ? $r['state'] : ($us['state'] ?? null), !empty($us[$pk]));
 			if (!empty($r['pretend'])) $plugged = true;
-			// may be paused while idle: readable, nothing plugged in, awake (state 1) or already paused by us; never a unit asleep on its schedule
-			$pausable[$id] = $r['ok'] && $raw === false && empty($r['pretend']) && ($r['state'] === 1 || !empty($us[$pk]));
+			// may be paused while idle: awake (state 1) or already paused by us; never asleep (254), even with a stale lb_paused
+			$pausable[$id] = lb_pausable($r['ok'], $raw, $r['ok'] ? $r['state'] : ($us['state'] ?? null), !empty($us[$pk]), !empty($r['pretend']));
 			$in[] = ['id'=>$id, 'rating'=>lb_rating($id), 'plugged'=>$plugged, 'plug_since'=>$us['plug_since'] ?? (!empty($r['pretend']) ? $now : null), 'prio'=>$units[$id]['prio'], 'setting'=>$us['setting'] ?? null,
 				'cap'=>$plugged ? ($us['hr']['cap'] ?? null) : null, 'charging'=>!empty($r['charging']) && $plugged, 'lbpause'=>false];
 		}
@@ -362,7 +380,10 @@ while (true) {
 		if ($DRY) foreach ($g['units'] as $id) {
 			$us = &$state['units'][$id]; $want = in_array($id, $p['pauses']);
 			if ($want && empty($us['dry_paused'])) $us['dry_paused'] = $now;
-			elseif (!$want && !empty($us['dry_paused'])) { lb_log("test mode: would resume u$id {$units[$id]['name']}: " . lb_steps_text(lb_pause_steps($api[$id] ?? 'rapi', false, $p['units'][$id]['target'] ?? LB_MIN_AMPS))); unset($us['dry_paused']); }
+			elseif (!$want && !empty($us['dry_paused'])) {
+				if (($readings[$id]['state'] ?? null) === 254) { lb_log("test mode: would drop pause flag u$id {$units[$id]['name']} (asleep, not resumed)"); unset($us['dry_paused']); }
+				else { lb_log("test mode: would resume u$id {$units[$id]['name']}: " . lb_steps_text(lb_pause_steps($api[$id] ?? 'rapi', false, $p['units'][$id]['target'] ?? LB_MIN_AMPS))); unset($us['dry_paused']); }
+			}
 			unset($us);
 		}
 		if ($DRY) continue;
@@ -411,7 +432,9 @@ while (true) {
 			if ($want && empty($us['lb_paused'])) {
 				if (lb_do_steps($units[$id], lb_pause_steps($api[$id] ?? 'rapi', true, $us['setting'] ?? LB_MIN_AMPS), 'paused (' . ($p['units'][$id]['pause'] ? 'no room' : 'idle') . ')')) { $us['lb_paused'] = $now; $force = true; }
 			} elseif (!$want && !empty($us['lb_paused'])) {
-				if ($skipped || $now - $lastLower < LB_HR['settle_sec'] || ($us['setting'] ?? 99) > $tg) { $force = true; }
+				// asleep (254): never resume/wake — just drop the flag (claim already released on clear_asleep)
+				if (($readings[$id]['state'] ?? null) === 254) { unset($us['lb_paused']); $force = true; }
+				elseif ($skipped || $now - $lastLower < LB_HR['settle_sec'] || ($us['setting'] ?? 99) > $tg) { $force = true; }
 				elseif (lb_do_steps($units[$id], lb_pause_steps($api[$id] ?? 'rapi', false, $us['setting'] ?? $tg), 'resumed' . (!empty($readings[$id]['plugged']) ? ' (car plugged in)' : ' (not needed)'))) { unset($us['lb_paused']); $force = true; }
 			}
 			unset($us);

@@ -266,6 +266,29 @@ function lb_effective_plugged($plugged, $state, $pausedByLb){
 	return (bool)$plugged;
 }
 
+// Reconcile our pause flag with the unit's reported state.
+// Returns 'keep' | 'clear_awake' | 'clear_asleep'.
+// Sleeping (254) is never "paused by us": schedule or manual sleep owns it. The caller
+// must drop the flag WITHOUT sending resume ($FE / claim-enable), so sleep is left alone.
+// RAPI pause is $FD -> Disabled (255). HTTP pause is our claim with state disabled; the
+// live state often stays Ready (1), so 1 keeps the flag. 254 always means sleep took over.
+function lb_pause_flag_next($state, $api){
+	if ($state === null) return 'keep';
+	$state = (int)$state;
+	if ($state === 254) return 'clear_asleep';
+	if ($api === 'http') return ($state === 1) ? 'keep' : 'clear_awake';
+	return ($state === 255) ? 'keep' : 'clear_awake';
+}
+
+// May we idle-pause this unit? Awake with nothing plugged in (state 1), or already paused
+// by us and still not asleep. State 254 is never pausable (blocks a stale lb_paused flag
+// from promoting manual/schedule sleep into a wanted pause / blocking sleep-free).
+function lb_pausable($ok, $rawPlugged, $state, $pausedByLb, $pretend = false){
+	if (!$ok || $pretend || $rawPlugged !== false) return false;
+	if ($state === 254) return false;
+	return ($state === 1 || $pausedByLb);
+}
+
 // The only commands the coordinator may send. Anything else (schedule $ST, sleep $FS,
 // reboot $FR, ...) is refused by lb_cmd_allowed().
 const LB_RAPI_ALLOWED = ['$SC', '$FD', '$FE', '$GE', '$GS', '$GG', '$GC'];

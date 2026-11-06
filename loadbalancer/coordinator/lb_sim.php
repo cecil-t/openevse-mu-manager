@@ -12,6 +12,7 @@
  * Outage: every controller restarts from its SAVED value (full rating), cars stop ~10 s;
  * the coordinator re-applies the shares when it is back (accepted risk).
  * $opt['sleep'] = [id => wake second]: asleep on its schedule until then (never paused).
+ * $opt['sleep_from'] = [id => start second]: become asleep at/after this time (with sleep[] wake).
  * $opt['sleep_free'] = true: MQTT up, sleep-free on (lb_sleep_free). $opt['wake_delay'] = s a car
  * waits after its unit wakes before drawing (default 0 = worst case; one EV measured ~5 s, 6 A at ~9 s).
  ******************************************************************************/
@@ -34,7 +35,9 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 			$c = $cars[$id] ?? null;
 			$pl = $c && $t >= $c['plug'] && $t < ($c['unplug'] ?? PHP_INT_MAX);
 			$restart = isset($opt['outage']) && $t >= $opt['outage'][0] && $t < $opt['outage'][0] + 10;
-			$asleep = isset($opt['sleep'][$id]) && $t < $opt['sleep'][$id];
+			$wakeAt = $opt['sleep'][$id] ?? null;
+			$sleepFrom = $opt['sleep_from'][$id] ?? 0;
+			$asleep = ($wakeAt !== null) && ($t >= $sleepFrom) && ($t < $wakeAt);
 			$awake[$id] = !$asleep;
 			$wd = isset($opt['sleep'][$id]) && $t < $opt['sleep'][$id] + ($opt['wake_delay'] ?? 0);
 			$dem = ($pl && !$restart && !$asleep && !$wd && !$paused[$id]) ? (float)($c['demand'])($t) : 0.0;
@@ -93,6 +96,11 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 		foreach ($ratings as $id => $r) {
 			$wantP = $arm['armed'] && $pausable[$id];
 			if ($wantP && !$paused[$id]) { $paused[$id] = true; $st['pauses']++; $st['pause_t'][] = $t; $st['cmds'][] = '$FD'; $log($t, "pause u$id (idle)"); $pending = true; }
+			elseif ($paused[$id] && !$awake[$id]) {
+				// asleep took over: drop pause flag without resume ($FE would wake it)
+				$paused[$id] = false; $st['sleep_takeover'] = ($st['sleep_takeover'] ?? 0) + 1; $st['sleep_takeover_t'][] = $t;
+				$log($t, "pause flag dropped u$id (asleep: schedule or manual, not resumed)"); $pending = true;
+			}
 			elseif (!$wantP && $paused[$id]) {
 				if ($pending || $didDown || $t - $lastDown < $H['settle_sec'] || $live[$id] > ($p['units'][$id]['target'] ?? 0)) { $pending = true; continue; }
 				$paused[$id] = false; $st['resumes']++; $st['resume_t'][] = $t; $st['cmds'][] = '$FE'; $log($t, "resume u$id" . ($plugged[$id] ? ' (car plugged in)' : ''));

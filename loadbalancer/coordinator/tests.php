@@ -61,6 +61,10 @@ check('2.9.1 pause = $FD (never $FS); resume = $FE', $ps == [['rapi','$FD',0]] &
 $ok = true; foreach ([lb_pause_steps('rapi', true), lb_pause_steps('rapi', false)] as $st0) foreach ($st0 as $x) if (!lb_cmd_allowed($x[1])) $ok = false;
 check('pause/resume commands pass the whitelist', $ok);
 check('v5 pause = our claim with state disabled; resume = our claim without a state (POST replaces the claim)', lb_pause_steps('http', true, 6)[0][1] == ['state'=>'disabled', 'charge_current'=>6, 'max_current'=>6, 'auto_release'=>false] && !isset(lb_pause_steps('http', false, 20)[0][1]['state']), lb_steps_text(lb_pause_steps('http', true)));
+check('pause flag: Sleeping 254 clears as asleep on both APIs (never kept as our pause)', lb_pause_flag_next(254, 'http') === 'clear_asleep' && lb_pause_flag_next(254, 'rapi') === 'clear_asleep');
+check('pause flag: HTTP Ready 1 keeps our pause; Connected/Charging/Disabled clear awake', lb_pause_flag_next(1, 'http') === 'keep' && lb_pause_flag_next(2, 'http') === 'clear_awake' && lb_pause_flag_next(3, 'http') === 'clear_awake' && lb_pause_flag_next(255, 'http') === 'clear_awake');
+check('pause flag: RAPI Disabled 255 keeps; Ready/Sleeping already covered', lb_pause_flag_next(255, 'rapi') === 'keep' && lb_pause_flag_next(1, 'rapi') === 'clear_awake');
+check('pausable: awake idle yes; asleep 254 never, even with stale lb_paused', lb_pausable(true, false, 1, false) && lb_pausable(true, false, 1, true) && !lb_pausable(true, false, 254, true) && !lb_pausable(true, false, 254, false) && lb_pausable(true, false, 255, true) && !lb_pausable(true, true, 1, false));
 echo "== idle pause condition\n";
 $cu = function($id, $chg, $cap = null, $rating = 48){ return ['id'=>$id,'rating'=>$rating,'plugged'=>$chg,'plug_since'=>$chg ? $id : null,'prio'=>null,'setting'=>20,'cap'=>$cap,'charging'=>$chg]; };
 check('2 cars at 34 (below 48) + 2 idle: pause wanted', lb_pause_wanted(80, [$cu(1,true),$cu(3,true),$cu(4,false),$cu(5,false)]) === true);
@@ -136,6 +140,17 @@ $p2 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C,
 check('one car leaves: condition ends, idle units resumed (after 60 s), car alone gets 48', $p2['final_paused'] == [] && $p2['final_live'][1] == 48 && $p2['over_s'] == 0, sprintf('resumes at %s; end %s', json_encode($p2['resume_t']), json_encode($p2['final_live'])));
 $p3 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['sleep'=>[5=>99999]]);
 check('a unit asleep on its schedule is never paused', !in_array(5, $p3['final_paused']) && in_array(4, $p3['final_paused']), 'paused ' . json_encode($p3['final_paused']));
+// unit 4 is paused while idle, then manually/schedule-sleeps at t=600: flag drops, no resume, sleep-free
+$p3b = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['sleep'=>[4=>99999], 'sleep_from'=>[4=>600], 'sleep_free'=>true]);
+$feAfter = false; foreach ($p3b['log'] as $l) if (preg_match('/^(\d+):(\d+):(\d+) resume u4/', $l, $m) && ($m[1]*3600+$m[2]*60+$m[3]) >= 600) $feAfter = true;
+$took = $p3b['sleep_takeover_t'][0] ?? null;
+check('paused then manual/schedule sleep: pause flag dropped without resume, not left paused', ($p3b['sleep_takeover'] ?? 0) >= 1 && $took !== null && $took >= 600 && $took <= 640 && !in_array(4, $p3b['final_paused']) && !$feAfter,
+	sprintf('takeover at %s; final paused %s; resumes %s', json_encode($took), json_encode($p3b['final_paused']), json_encode($p3b['resume_t'])));
+check('paused then sleep with MQTT: unit 4 becomes sleep-free (cars can use its 6 A)', $p3b['final_live'][1] + $p3b['final_live'][3] == 80 && $p3b['over_s'] == 0, json_encode($p3b['final_live']));
+// after sleep takeover on u4, a later plug-in on paused u5 still resumes normally
+$p3c = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C], 5=>['plug'=>900, 'demand'=>$C, 'unplug'=>1500]], 1800, ['sleep'=>[4=>99999], 'sleep_from'=>[4=>400], 'sleep_free'=>true]);
+$rs5 = null; foreach ($p3c['log'] as $l) if (preg_match('/^(\d+):(\d+):(\d+) resume u5/', $l, $m)) { $rs5 = $m[1]*3600+$m[2]*60+$m[3]; break; }
+check('after another unit slept, car plug-in still resumes the paused unit', $rs5 !== null && $rs5 - 900 <= 10 && !in_array(4, $p3c['final_paused']), 'u5 resumed at ' . ($rs5 ?? '-') . '; paused ' . json_encode($p3c['final_paused']));
 $p4 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 600, ['saved'=>[1=>34, 3=>27, 4=>6, 5=>6], 'start'=>[1=>34, 3=>27, 4=>6, 5=>6]]);
 $capd = true; foreach ($p4['final_live'] as $id => $v) if ($v > [1=>34, 3=>27, 4=>6, 5=>6][$id]) $capd = false;
 check('user saved values (34/27/6/6) are kept and every share stays at or below them, never over 80 A', $p4['over_s'] == 0 && $p4['max_live'] <= 80 && $p4['final_saved'] == [1=>34, 3=>27, 4=>6, 5=>6] && $capd, 'saved ' . json_encode($p4['final_saved']) . ' live ' . json_encode($p4['final_live']));
