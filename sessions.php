@@ -66,8 +66,8 @@ body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px
 .kvw{display:table;width:max-content;max-width:100%;border-collapse:collapse}
 .kvw .kv{display:table-row;border-bottom:0;padding:0;gap:0}
 .kvw .kv>span{display:table-cell;padding:2px 0;border-bottom:1px dotted #ccc;vertical-align:baseline;white-space:nowrap}
-.kvw .kv>span:first-child{padding-right:32px;color:#888}
-.kvw .kv>span:last-child{text-align:right;overflow:visible;text-overflow:clip;min-width:auto}
+.kvw .kv>span:first-child{padding-right:40px;color:#888}
+.kvw .kv>span:last-child{text-align:left;overflow:visible;text-overflow:clip;min-width:auto}
 }
 </style>
 <?php
