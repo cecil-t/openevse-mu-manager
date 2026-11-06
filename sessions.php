@@ -61,8 +61,14 @@ body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px
 .card a.blk span.tag{display:inline-block;font-size:11px;padding:1px 5px;margin:2px 2px 0 0;border-radius:4px;background:#ddd;color:#444}
 .card a.blk span.tag.f{background:#f99;color:#600}.card a.blk span.tag.o{background:#9cf;color:#035}
 .kv{gap:10px}.kv span{white-space:nowrap}.kv span:first-child{flex:0 0 auto}.kv span:last-child{overflow:hidden;text-overflow:ellipsis;text-align:right;min-width:0}
-/* session detail status rows: natural width on desktop, full width on phone */
-@media screen and (min-width:700px){.kvw{width:fit-content;max-width:100%}}
+/* session detail status: desktop = 2 aligned columns (table); phone keeps flex full width */
+@media screen and (min-width:700px){
+.kvw{display:table;width:max-content;max-width:100%;border-collapse:collapse}
+.kvw .kv{display:table-row;border-bottom:0;padding:0;gap:0}
+.kvw .kv>span{display:table-cell;padding:2px 0;border-bottom:1px dotted #ccc;vertical-align:baseline;white-space:nowrap}
+.kvw .kv>span:first-child{padding-right:32px;color:#888}
+.kvw .kv>span:last-child{text-align:right;overflow:visible;text-overflow:clip;min-width:auto}
+}
 </style>
 <?php
 if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div></div></body></html>'; exit; }
