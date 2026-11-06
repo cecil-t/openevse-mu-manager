@@ -29,25 +29,30 @@ form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.pilot{border-color:#07d}.ev.amps{border-color:#0a7}.ev.limit{border-color:#82d}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
 svg text{font-family:Arial,sans-serif}
 .chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
+/* phone keeps the 30/30-margin SVG; desktop shows the tighter-margin twin */
+.sgd{display:none}
 @media screen and (min-width:700px){
+.sgp{display:none}.sgd{display:block}
 /* session amp/pilot/temp graph (.sessgraph): full card width, independent 340px height.
-   preserveAspectRatio=none fills the 1164×340 box (default meet letterboxed to ~645px wide).
+   preserveAspectRatio=none fills the ~1164×340 box. Desktop twin uses pl/pr=14 (not 30)
+   so the plot reaches closer to the card edges; phone twin is unchanged.
    scaleY=340/190≈1.79 so CSS font-size is in user units under the CTM: 5.5→~10px physical.
    scaleX≈3.23 at the 1200px card; scaleX(0.55) on labels counters the non-uniform stretch. */
-body.pgw .sec>svg.sessgraph{width:100%;height:340px;display:block}
-body.pgw .sec>svg.sessgraph text{font-size:5.5px;transform:scaleX(.55);transform-box:fill-box;transform-origin:center}
-body.pgw .sec>svg.sessgraph text[text-anchor="end"]{transform-origin:right center}
-body.pgw .sec>svg.sessgraph text[text-anchor="start"]{transform-origin:left center}
-body.pgw .sec>svg.sessgraph text[font-size="8"]{font-size:4.5px}
-body.pgw .sec>svg.sessgraph text[font-size="9"]{font-size:5px}
-body.pgw .sec>svg.sessgraph path,body.pgw .sec>svg.sessgraph line{vector-effect:non-scaling-stroke}
-body.pgw .sec>svg.sessgraph path[stroke="#07d"]{stroke-width:1.8px}
-body.pgw .sec>svg.sessgraph path[stroke-dasharray]{stroke-width:1.2px;stroke-dasharray:4px 3px}
-body.pgw .sec>svg.sessgraph path:not([stroke="#07d"]):not([stroke-dasharray]){stroke-width:1.1px}
-body.pgw .sec>svg.sessgraph line{stroke-width:1px}
-body.pgw .sec>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px}
+body.pgw .sec .sgd>svg.sessgraph{width:100%;height:340px;display:block}
+body.pgw .sec .sgd>svg.sessgraph text{font-size:5.5px;transform:scaleX(.55);transform-box:fill-box;transform-origin:center}
+body.pgw .sec .sgd>svg.sessgraph text[text-anchor="end"]{transform-origin:right center}
+body.pgw .sec .sgd>svg.sessgraph text[text-anchor="start"]{transform-origin:left center}
+body.pgw .sec .sgd>svg.sessgraph text[font-size="8"]{font-size:4.5px}
+body.pgw .sec .sgd>svg.sessgraph text[font-size="9"]{font-size:5px}
+body.pgw .sec .sgd>svg.sessgraph path,body.pgw .sec .sgd>svg.sessgraph line{vector-effect:non-scaling-stroke}
+body.pgw .sec .sgd>svg.sessgraph path[stroke="#07d"]{stroke-width:1.8px}
+body.pgw .sec .sgd>svg.sessgraph path[stroke-dasharray]{stroke-width:1.2px;stroke-dasharray:4px 3px}
+body.pgw .sec .sgd>svg.sessgraph path:not([stroke="#07d"]):not([stroke-dasharray]){stroke-width:1.1px}
+body.pgw .sec .sgd>svg.sessgraph line{stroke-width:1px}
+body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px}
 }
 .sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
+@media screen and (min-width:700px){body.pgw .sec:has(>.sgd){padding-left:4px;padding-right:4px}}
 .sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
 /* style.css boxes every 'a span' (old button look); undo that inside the session cards */
 .card a.blk span{display:inline;background:none;border:0;padding:0;margin:0;width:auto;text-align:inherit;color:inherit}
@@ -156,9 +161,9 @@ function svg_bars_wide($labels, $values, $unit, $ymax, $step, $dec){
 // fitted temperature sensor (right axis). Works on any sample density: push rows
 // (~30 s), poll rows (60 s / 5 min) and thinned 10-minute rows (res = 600). Lines
 // break where samples are further apart than the data's own resolution allows.
-function svg_session($samples, $segments, $t0, $t1, $volts){
+function svg_session($samples, $segments, $t0, $t1, $volts, $pl = 30, $pr = 30){
 	if (count($samples) < 2 || $t1 <= $t0) return '<p class="sm">Not enough samples for a graph yet.</p>';
-	$W = 360; $H = 190; $pl = 30; $pr = 30; $pt = 10; $pb = 22;
+	$W = 360; $H = 190; $pt = 10; $pb = 22;
 	// more points than pixels: bucket (avg amps, last pilot, max temps)
 	$maxpts = 720;
 	if (count($samples) > $maxpts) {
@@ -230,7 +235,15 @@ function svg_session($samples, $segments, $t0, $t1, $volts){
 	$l2 = array();
 	foreach ($series as $k => $l) $l2[] = "<span style='color:{$colors[$k]};white-space:nowrap'>&#9644; $l " . temp_sym() . "</span>";
 	$l2[] = "<span style='background:#e6f3ff;white-space:nowrap'>&nbsp;charging&nbsp;</span>";
-	return $o . "</svg><div class='sm'>$leg" . implode(' &nbsp;', $l2) . "</div>";
+	$leg_html = "<div class='sm'>$leg" . implode(' &nbsp;', $l2) . "</div>";
+	return array($o . '</svg>', $leg_html);
+}
+// phone (30/30) + desktop (14/14) twins; legend once. Falls back to a single notice if not enough samples.
+function svg_session_pair($samples, $segments, $t0, $t1, $volts){
+	$phone = svg_session($samples, $segments, $t0, $t1, $volts, 30, 30);
+	if (!is_array($phone)) return $phone;   // "Not enough samples…" string
+	$desk = svg_session($samples, $segments, $t0, $t1, $volts, 14, 14);
+	return "<div class='sgp'>" . $phone[0] . "</div><div class='sgd'>" . $desk[0] . "</div>" . $phone[1];
 }
 function ftemp($c){ return temp_txt($c); }
 
@@ -285,7 +298,7 @@ if (isset($_GET['id'])) {
 		<div class="sm" style="margin-top:4px">kW = amps &times; <?=oev_v($v . ' V')?>, worked out when shown (the unit's voltage override if set; its own reading if it has a voltage sensor; else the assumed <?=oev_v(EVSE_VOLTS_L1 . ' V')?> for L1 / <?=oev_v(EVSE_VOLTS_L2 . ' V')?> for L2).</div>
 	</div>
 	<div class="sec"><h4>Graph</h4>
-	<?=svg_session($smp, $segs, $t0, $t1, $v)?>
+	<?=svg_session_pair($smp, $segs, $t0, $t1, $v)?>
 	<div class="sm"><?=count($smp)?> samples<?=$s['pushes'] ? ' &middot; ' . (int)$s['pushes'] . ' pushes' : ''?></div></div>
 	<div class="sec"><h4>Charging segments</h4>
 	<?php if (!$segs) echo '<p class="sm">No charging in this session.</p>'; ?>
