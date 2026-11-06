@@ -19,6 +19,8 @@ include_once __DIR__ . '/include_lb.php';
 $lbhb = oev_filter_hb(evse_lb_heartbeat()); $lbu = null;
 if (is_array($lbhb)) { $all = (array)($lbhb['monitor'] ?? array()); foreach ((array)$lbhb['groups'] as $g) foreach ((array)$g['units'] as $x) $all[] = $x; foreach ($all as $x) if ((int)$x['id'] === $unitid) $lbu = $x; }
 $lbca = is_array($lbu) ? evse_lb_checkin_age($lbu) : null;
+// fresh heartbeat only: idle LB pause shows as Paused on first paint (raw unit state stays Sleeping)
+$lv = (is_array($lbhb) && !empty($lbhb['fresh']) && is_array($lbu)) ? evse_lb_view($lbu) : null;
 
 // small POST button
 // $small: true = text link, 'chip' = compact button floated right in a table cell
@@ -180,7 +182,8 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 </script><?php } ?>
 <div class="ustats"><table class="stats"><colgroup><col class="cn"><col></colgroup>
 	<tr id="r_head" class="r_head"><th class="s<?=h($e['statecode'])?>">Name</th><th class="s<?=h($e['statecode'])?>">Value</th></tr>
-	<tr><td><?=$sleepbtn?><a id="a_state" href="javascript:void(0);">State</a></td><td id="v_state" class="nw"<?=!empty($e['state_title']) ? ' title="' . h($e['state_title']) . '"' : ''?>><img src="media/plug.svg" alt="EV Connected" title="EV Connected" class="plug" id="v_plug"<?=$e['connected'] ? '' : ' style="display:none"'?> /><?=$e['connected'] ? ' ' : ''?><span id="v_st"><?=h($e['state'])?></span></td></tr>
+	<?php $st_txt = ($lv && !empty($lv['paused'])) ? 'Paused' : $e['state']; $st_ttl = ($lv && !empty($lv['paused'])) ? $lv['pill_title'] : ($e['state_title'] ?? ''); ?>
+	<tr><td><?=$sleepbtn?><a id="a_state" href="javascript:void(0);">State</a></td><td id="v_state" class="nw"<?=$st_ttl !== '' ? ' title="' . h($st_ttl) . '"' : ''?>><img src="media/plug.svg" alt="EV Connected" title="EV Connected" class="plug" id="v_plug"<?=$e['connected'] ? '' : ' style="display:none"'?> /><?=$e['connected'] ? ' ' : ''?><span id="v_st"><?=h($st_txt)?></span></td></tr>
 	<?php if ($e['api'] == 'http') { ?>
 	<tr><td>Override</td><?php
 		// compact: "Sleep"/"Awake" (+ "*" if it persists past unplug), full override JSON in the tooltip
@@ -308,7 +311,7 @@ function sentMsg(t){ var d = document.createElement('div'); d.id = 'sentmsg'; d.
 	}).observe(c, {childList: true, characterData: true, subtree: true}); });
 })();
 // WebSocket feed (on by default; ?ws=0 turns it off, below): per value, when the feed last sent it; none = never
-var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function(){}, wsAt = {}; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
+var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function(){}, wsAt = {}, lbPaused = <?=($lv && !empty($lv['paused'])) ? 'true' : 'false'?>; function wsFresh(k){ if (k === '') { for (var x in wsAt) if (Date.now() - wsAt[x] < 15000) return true; return false; } return !!wsAt[k] && Date.now() - wsAt[k] < 15000; }
 // live update from the load balancer (lbstate.php?unit=N, read only) every 5 s while the tab is visible:
 // state, current, power, pilot setting and last check-in; everything else stays as loaded.
 // Same light as the home page: green live, amber late or a failed fetch, red load balancer down (values from page load)
@@ -323,7 +326,7 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 		if (!j.ok || !u) { dot('x', ''); return; }
 		if (!j.fresh) { dot('r', 'Load balancer down: values from page load'); return; }
 		if (!u.ok) { dot('a', 'The load balancer has no reply from this unit: values from page load'); return; }
-		liveOK = true;
+		liveOK = true; lbPaused = !!u.paused;
 		// the load balancer's last read of this unit is older than this page's own read (e.g. right after a save): keep the page's state and pilot until it reads again
 		var newer = u.read !== null && u.read !== undefined && j.now - u.read >= pageAt;
 		if (newer) {
@@ -359,7 +362,7 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 		es = new EventSource('ws_bridge.php?unit=<?=$unitid?>');
 		es.addEventListener('u', function(m){ var j = JSON.parse(m.data), now = Date.now(); n++;
 		for (var k in j) wsAt[k] = now;
-		if (j.state !== undefined) { $('v_st').textContent = j.state_text; $('v_state').title = j.state_text;
+		if (j.state !== undefined && !lbPaused) { $('v_st').textContent = j.state_text; $('v_state').title = j.state_text;
 			document.querySelectorAll('.r_head th').forEach(function(th){ th.className = j.state_cls; });
 			var asl = j.state == 254 || j.state == 255; if ($('b_wake')) $('b_wake').style.display = asl ? '' : 'none'; if ($('b_sleep')) $('b_sleep').style.display = asl ? 'none' : ''; }
 		if (j.vehicle !== undefined) $('v_plug').style.display = j.vehicle ? '' : 'none';

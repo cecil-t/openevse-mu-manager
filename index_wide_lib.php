@@ -73,6 +73,7 @@ function idx_wide_unit($unit, $e, $lu, $lv, $gid, $s, $us, $vv, $link){
 	return array(
 		'id'=>(int)$unit['id'], 'name'=>(string)$unit['name'], 'link'=>$link, 'g'=>(int)$gid, 'test'=>!empty($unit['_test']),
 		'code'=>$code, 'pill'=>$paused ? 'Paused' : (string)$e['state'],
+		'paused'=>$paused,
 		'ptip'=>evse_pill_title($code, $paused),
 		'pcls'=>in_array($code, array(1, 2, 3, 254, 255), true) ? 's' . $code : 'serr',
 		'plugged'=>!empty($e['connected']), 'amps'=>$amps, 'pilot'=>$pilot, 'saved'=>$saved, 'volts'=>$volts,
