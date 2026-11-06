@@ -61,6 +61,8 @@ body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px
 .card a.blk span.tag{display:inline-block;font-size:11px;padding:1px 5px;margin:2px 2px 0 0;border-radius:4px;background:#ddd;color:#444}
 .card a.blk span.tag.f{background:#f99;color:#600}.card a.blk span.tag.o{background:#9cf;color:#035}
 .kv{gap:10px}.kv span{white-space:nowrap}.kv span:first-child{flex:0 0 auto}.kv span:last-child{overflow:hidden;text-overflow:ellipsis;text-align:right;min-width:0}
+/* session detail status rows: natural width on desktop, full width on phone */
+@media screen and (min-width:700px){.kvw{width:fit-content;max-width:100%}}
 </style>
 <?php
 if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div></div></body></html>'; exit; }
@@ -278,7 +280,7 @@ if (isset($_GET['id'])) {
 		$srcq = $db->prepare("SELECT src FROM samples WHERE unit_id = ? AND ts = ? AND src IN ('push', 'poll') ORDER BY src = 'poll' DESC LIMIT 1");
 		$tag = function($ts) use ($srcq, $s){ if (!$ts) return ''; $srcq->execute(array((int)$s['unit_id'], (int)$ts)); $v = $srcq->fetchColumn(); $srcq->closeCursor(); return $v ? " <span class='sm' style='color:#999'>$v</span>" : ''; };
 		// an earlier push that flagged the change but could not date it (2.8.2 state 0)
-		$fps = !empty($s['first_push_at']) && (int)$s['first_push_at'] < (int)$s['plug_in_at']; ?><div class="kv"><span>Plugged in</span><span><?=fdt($s['plug_in_at'], $fps ? 'g:i:s a' : 'g:i a') . $tag($s['plug_in_at'])?></span></div>
+		$fps = !empty($s['first_push_at']) && (int)$s['first_push_at'] < (int)$s['plug_in_at']; ?><div class="kvw"><div class="kv"><span>Plugged in</span><span><?=fdt($s['plug_in_at'], $fps ? 'g:i:s a' : 'g:i a') . $tag($s['plug_in_at'])?></span></div>
 		<?php if ($fps) { ?><div class="kv"><span>First push notice</span><span><?=date('g:i:s a', (int)$s['first_push_at'])?></span></div><?php } ?>
 		<div class="kv"><span>First charge start</span><span><?=fdd($s['charge_start_at'], $s['plug_in_at']) . $tag($s['charge_start_at'])?></span></div>
 		<div class="kv"><span>Last charge stop</span><span><?php $chg_open = $s['open'] && $db->query("SELECT count(*) FROM segments WHERE session_id = " . (int)$s['id'] . " AND open = 1")->fetchColumn(); ?><?=($chg_open || !$s['charge_end_at']) ? "\u{2014}" : fdd($s['charge_end_at'], $s['plug_in_at']) . $tag($s['charge_end_at'])?></span></div>
@@ -294,7 +296,7 @@ if (isset($_GET['id'])) {
 		<div class="kv"><span>Max temp</span><span><?=ftemp($s['max_temp_c'])?></span></div>
 		<div class="kv"><span>Avg temp (plugged in)</span><span><?=ftemp($s['avg_temp_c'])?></span></div>
 		<?php if ($s['unit_elapsed'] !== null || $s['unit_temp_max_c'] !== null) { ?><div class="kv"><span>Unit's own timer / max temp</span><span><?=$s['unit_elapsed'] !== null ? sess_fmt_dur($s['unit_elapsed']) : '-'?> / <?=ftemp($s['unit_temp_max_c'])?></span></div><?php } ?>
-		<div class="kv"><span>End reason</span><span><?=h($s['end_reason'] ?: ($s['open'] ? '-' : 'unknown'))?></span></div>
+		<div class="kv"><span>End reason</span><span><?=h($s['end_reason'] ?: ($s['open'] ? '-' : 'unknown'))?></span></div></div>
 		<?php if ($s['notes']) { ?><div class="sm" style="margin-top:4px">Notes: <?=h($s['notes'])?></div><?php } ?>
 		<div class="sm" style="margin-top:4px">kW = amps &times; <?=oev_v($v . ' V')?>, worked out when shown (the unit's voltage override if set; its own reading if it has a voltage sensor; else the assumed <?=oev_v(EVSE_VOLTS_L1 . ' V')?> for L1 / <?=oev_v(EVSE_VOLTS_L2 . ' V')?> for L2).</div>
 	</div>
