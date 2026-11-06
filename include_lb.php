@@ -35,8 +35,13 @@ function evse_lb_note($u){
 	if (!empty($u['sleepfree'])) return 'not counted';
 	return '';
 }
-// seconds since the unit's last MQTT check-in (null = never)
-function evse_lb_checkin_age($u){ return (is_array($u) && !empty($u['mqtt_seen'])) ? max(0, time() - (int)$u['mqtt_seen']) : null; }
+// seconds since the unit last checked in over MQTT or a successful HTTP read (null = never).
+// MQTT-off units (e.g. monitor-only) still have last_ok from the coordinator's poll.
+function evse_lb_checkin_age($u){
+	if (!is_array($u)) return null;
+	$t = max((int)($u['mqtt_seen'] ?? 0), (int)($u['last_ok'] ?? 0));
+	return $t ? max(0, time() - $t) : null;
+}
 
 require_once __DIR__ . '/run_lib.php';
 function evse_home_slow_file($unit){ return oev_cache_dir() . '/oev_home_slow_' . md5((string)$unit['evseurl']) . '.json'; }

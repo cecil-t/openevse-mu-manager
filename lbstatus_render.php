@@ -61,7 +61,7 @@ function lbs_render($hb){
 			$st = ($v['paused'] ? 'Paused' : $v['pill']) . (($v['code'] == 254 && $v['plugged']) ? ', car in' : '') . ($v['charging'] && $v['amps'] !== null ? ' <b>' . number_format((float)$v['amps'], 1) . ' A</b>' : '');
 			echo '<div class="u"><div class="l1"><span class="n"><a href="unit.php?unitid=' . $id . '">' . h(preg_replace('/^.*?:\s*/', '', $u['name'])) . '</a></span><span class="a">' . $amp . '</span></div>';
 			echo '<div class="l2"><span class="s">' . $st . '</span>' . ($why !== '' ? '<span class="x">' . h($why) . '</span>' : '')
-				. ($v['stale'] ? '<span class="mq stale">no MQTT' . ($v['checkin'] !== null ? ' ' . h(lbs_dur($v['checkin'])) : '') . '</span>' : '') . '</div>';
+				. ($v['stale'] ? '<span class="mq stale">no check-in' . ($v['checkin'] !== null ? ' ' . h(lbs_dur($v['checkin'])) : '') . '</span>' : '') . '</div';
 			$r = array(); foreach ($chg[$id] ?? array() as $c) $r[] = '<span class="' . ($c[3] ? 'c-ok' : 'c-bad') . '">' . h(date('g:i', strtotime($c[0]))) . ' ' . ($c[4] ? 'saved ' . $c[2] : $c[1] . '&rarr;' . $c[2]) . ($c[3] ? ' &#10003;' : ' &#10007;') . '</span>';
 			if ($r) echo '<div class="l4">' . implode(' ', $r) . '</div>';
 			echo '</div>';

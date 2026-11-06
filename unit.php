@@ -206,7 +206,7 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 	<tr><td>Energy</td><td><?=$e['energy'] === null ? "\u{2014}" : h($e['energy']) . ' kWh'?></td></tr>
 	<tr><td>Charge Time</td><td><?=($cur && $ctsec && !oev_is_public()) ? '<a href="sessions.php?id=' . (int)$cur['id'] . '" title="Current session report">' . h($cttxt) . '</a>' : h($cttxt)?></td></tr>
 	<tr><td>Temp</td><td class="nw"><?=is_numeric($e['temp']) ? idx_temp_html(((float)$e['temp'] - 32) * 5 / 9, true) : temp_txt_f($e['temp'])?></td></tr>
-	<tr><td>Last check-in</td><td id="v_seen" class="nw" title="When this unit last reported over MQTT. The light: green = live, updated every 5 s; amber = late; red = load balancer down (values from page load)"><span id="v_age"><?=$lbca === null ? "\u{2014}" : h($lbca < 120 ? $lbca . ' s ago' : ($lbca < 7200 ? round($lbca / 60) . ' min ago' : round($lbca / 3600, 1) . ' h ago'))?></span><span id="lbdot" class="lbdot <?=is_array($lbhb) && $lbu ? ($lbhb['fresh'] ? 'g' : 'r') : 'x'?>"></span></td></tr>
+	<tr><td>Last check-in</td><td id="v_seen" class="nw" title="When this unit last checked in (MQTT or HTTP). The light: green = live, updated every 5 s; amber = late; red = load balancer down (values from page load)"><span id="v_age"><?=$lbca === null ? "\u{2014}" : h($lbca < 120 ? $lbca . ' s ago' : ($lbca < 7200 ? round($lbca / 60) . ' min ago' : round($lbca / 3600, 1) . ' h ago'))?></span><span id="lbdot" class="lbdot <?=is_array($lbhb) && $lbu ? ($lbhb['fresh'] ? 'g' : 'r') : 'x'?>"></span></td></tr>
 </table><table class="stats st2"><colgroup><col class="cn"><col></colgroup><?php /* desktop: settings and info beside the live readings; phones: one list */ ?>
 	<tr class="r_head r_head2"><th class="s<?=h($e['statecode'])?>">Name</th><th class="s<?=h($e['statecode'])?>">Value</th></tr>
 	<tr class="g g2"><td><a id="a_timer" href="javascript:void(0);">Start / Stop</a></td><td><?=h($e['timerstart'] . ' / ' . $e['timerend'])?></td></tr>
@@ -340,7 +340,7 @@ var lbAge = null, seenAt = 0, wsState = 'connecting', wsLast = 0, tip = function
 		}
 		if (u.amps !== null && !wsFresh('amp')) { $('v_amps').textContent = num(u.amps) + ' amps'; $('v_power').textContent = (Math.round(u.amps * V / 100) / 10) + ' kW'; }
 		$('v_age').textContent = ago(u.checkin);
-		if (u.stale) dot('a', 'No MQTT check-in for ' + ago(u.checkin).replace(' ago', ''));
+		if (u.stale) dot('a', 'No check-in for ' + ago(u.checkin).replace(' ago', ''));
 		else if (j.age > 15) dot('a', 'Load balancer data is ' + j.age + ' s old');
 		else dot('g', 'Live: updated every 5 s');
 	}

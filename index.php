@@ -69,7 +69,7 @@ dl.units dd .st.serr{background:rgba(255,34,34,.13);color:#a11}
 .lgw{background:#fdd;color:#a11;font-size:85%;padding:2px 6px;border-radius:4px;margin:3px 0 0 0;white-space:normal}
 /* load balancer note on line 2 (capped / amps lent / not counted / waiting); dropped by the script below when it doesn't fit */
 dl.units dd .nt{flex:none;margin-left:6px;color:#888;font-size:85%;font-style:italic}
-/* no MQTT check-in from a grouped unit for 90 s+ */
+/* no check-in (MQTT or HTTP) from a grouped unit for 90 s+ */
 .lbdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:3px;vertical-align:middle;background:#bbb}
 .lbdot.g{background:#2a2}.lbdot.a{background:#e9a000}.lbdot.r{background:#d22}.lbdot.x{display:none}
 dl.units dd .mqx{flex:none;margin-left:5px;color:#c22;font-size:80%}
@@ -195,7 +195,7 @@ foreach ($sec[1] as $k) {
 			$sttl = ($lv && $lv['paused']) ? $lv['pill_title'] : evse_state_tip((int)$e['statecode']);
 		?><dd><span class="st <?=in_array((int)$e['statecode'], array(1, 2, 3, 254, 255)) ? 's' . (int)$e['statecode'] : 'serr'?>" title="<?=h($sttl)?>"><i><?=h($stx)?></i></span><?php
 			if ($isg) {
-				echo '<span class="mqx"' . ($lv && $lv['stale'] ? '' : ' style="display:none"') . ' title="' . h($lv && $lv['checkin'] !== null ? 'No MQTT check-in for ' . idx_dur($lv['checkin']) : 'No MQTT check-in from this unit') . '">&#9679;</span>';
+				echo '<span class="mqx"' . ($lv && $lv['stale'] ? '' : ' style="display:none"') . ' title="' . h($lv && $lv['checkin'] !== null ? 'No check-in for ' . idx_dur($lv['checkin']) : 'No check-in from this unit') . '">&#9679;</span>';
 				echo '<span class="ex pl"' . ($connected ? '' : ' style="display:none"') . '><img src="media/plug.svg" alt="Connected" title="EV Connected" class="plug" /></span>';
 				echo '<span class="ex kw"' . ($power !== '' ? '' : ' style="display:none"') . '><i>' . $power . '</i></span>';
 				echo '<span class="nt"' . ($lv && $lv['note'] !== '' ? '' : ' style="display:none"') . ' title="' . h($lv['why'] ?? '') . '">' . h($lv['note'] ?? '') . '</span>';
@@ -250,7 +250,7 @@ foreach ($sec[1] as $k) {
 					var pc = b.querySelector('dt .pc'); if (pc) { pc.textContent = u.label; pc.title = u.label_title; }
 					show(b.querySelector('.pl'), u.plugged);
 					var kw = b.querySelector('.kw'); if (kw) { var on = u.charging && u.amps !== null; if (on) kw.querySelector('i').innerHTML = (u.amps * parseFloat(b.dataset.v) / 1000).toFixed(1) + '&nbsp;kW'; show(kw, on); }
-					var mq = b.querySelector('.mqx'); if (mq) { show(mq, u.stale); mq.title = u.checkin === null ? 'No MQTT check-in from this unit' : 'No MQTT check-in for ' + Math.round(u.checkin / 60) + 'm'; }
+					var mq = b.querySelector('.mqx'); if (mq) { show(mq, u.stale); mq.title = u.checkin === null ? 'No check-in from this unit' : 'No check-in for ' + Math.round(u.checkin / 60) + 'm'; }
 					var nt = b.querySelector('.nt'); if (nt) { nt.textContent = u.note; nt.title = u.why; show(nt, u.note !== ''); }
 			}
 			document.getElementById('asof').innerHTML = hhmm(j.time);

@@ -58,7 +58,7 @@ function idx_wide_unit($unit, $e, $lu, $lv, $gid, $s, $us, $vv, $link){
 	$share = ($gid && is_array($lu) && isset($lu['setting'])) ? (int)$lu['setting'] : null;
 	// last seen: newest of the MQTT check-in, the load balancer's read, the logger's read
 	$seen = max((int)($lu['mqtt_seen'] ?? 0), (int)($lu['last_ok'] ?? 0), (int)($us['last_ok_at'] ?? 0));
-	$ca = is_array($lu) ? evse_lb_checkin_age($lu) : null;
+	$ca = $seen ? max(0, time() - $seen) : null;
 	$upt = '';
 	if (is_array($us) && $us['wifi_uptime'] !== null && $us['last_poll_at']) $upt = evse_uptime_text((int)$us['wifi_uptime'] + max(0, time() - (int)$us['last_poll_at']));
 	$ct = '';
