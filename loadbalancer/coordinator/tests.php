@@ -61,10 +61,22 @@ check('2.9.1 pause = $FD (never $FS); resume = $FE', $ps == [['rapi','$FD',0]] &
 $ok = true; foreach ([lb_pause_steps('rapi', true), lb_pause_steps('rapi', false)] as $st0) foreach ($st0 as $x) if (!lb_cmd_allowed($x[1])) $ok = false;
 check('pause/resume commands pass the whitelist', $ok);
 check('v5 pause = our claim with state disabled; resume = our claim without a state (POST replaces the claim)', lb_pause_steps('http', true, 6)[0][1] == ['state'=>'disabled', 'charge_current'=>6, 'max_current'=>6, 'auto_release'=>false] && !isset(lb_pause_steps('http', false, 20)[0][1]['state']), lb_steps_text(lb_pause_steps('http', true)));
-check('pause flag: Sleeping 254 clears as asleep on both APIs (never kept as our pause)', lb_pause_flag_next(254, 'http') === 'clear_asleep' && lb_pause_flag_next(254, 'rapi') === 'clear_asleep');
+check('pause flag: RAPI Sleeping 254 clears as asleep; HTTP 254 without override KEEPS (our disabled claim)', lb_pause_flag_next(254, 'rapi') === 'clear_asleep' && lb_pause_flag_next(254, 'http') === 'keep' && lb_pause_flag_next(254, 'http', false) === 'keep');
+check('pause flag: HTTP 254 + manual_override clears as asleep (Sleep button /override)', lb_pause_flag_next(254, 'http', true) === 'clear_asleep');
 check('pause flag: HTTP Ready 1 keeps our pause; Connected/Charging/Disabled clear awake', lb_pause_flag_next(1, 'http') === 'keep' && lb_pause_flag_next(2, 'http') === 'clear_awake' && lb_pause_flag_next(3, 'http') === 'clear_awake' && lb_pause_flag_next(255, 'http') === 'clear_awake');
-check('pause flag: RAPI Disabled 255 keeps; Ready/Sleeping already covered', lb_pause_flag_next(255, 'rapi') === 'keep' && lb_pause_flag_next(1, 'rapi') === 'clear_awake');
-check('pausable: awake idle yes; asleep 254 never, even with stale lb_paused', lb_pausable(true, false, 1, false) && lb_pausable(true, false, 1, true) && !lb_pausable(true, false, 254, true) && !lb_pausable(true, false, 254, false) && lb_pausable(true, false, 255, true) && !lb_pausable(true, true, 1, false));
+check('pause flag: RAPI Disabled 255 keeps; Ready clears awake', lb_pause_flag_next(255, 'rapi') === 'keep' && lb_pause_flag_next(1, 'rapi') === 'clear_awake');
+check('pausable: awake idle yes; true sleep 254 without flag no; HTTP our-pause at 254 yes', lb_pausable(true, false, 1, false) && lb_pausable(true, false, 1, true) && lb_pausable(true, false, 254, true) && !lb_pausable(true, false, 254, false) && lb_pausable(true, false, 255, true) && !lb_pausable(true, true, 1, false));
+// HTTP poll-loop regression: idle pause claim reports 254 with no override — must not flap
+$paused = true; $releases = 0; $keeps = 0;
+for ($i = 0; $i < 10; $i++) {
+	$act = lb_pause_flag_next(254, 'http', false);
+	if ($act === 'keep' && lb_pausable(true, false, 254, $paused)) { $keeps++; }
+	elseif ($act === 'clear_asleep') { $paused = false; $releases++; }
+}
+check('HTTP poll loop: our pause at 254 stays paused across 10 polls (no claim-release flap)', $keeps === 10 && $releases === 0 && $paused === true, "keeps=$keeps releases=$releases paused=" . (int)$paused);
+// then manual override arrives once: single clear_asleep
+$act = lb_pause_flag_next(254, 'http', true);
+check('HTTP poll: manual override while paused => one clear_asleep', $act === 'clear_asleep');
 echo "== idle pause condition\n";
 $cu = function($id, $chg, $cap = null, $rating = 48){ return ['id'=>$id,'rating'=>$rating,'plugged'=>$chg,'plug_since'=>$chg ? $id : null,'prio'=>null,'setting'=>20,'cap'=>$cap,'charging'=>$chg]; };
 check('2 cars at 34 (below 48) + 2 idle: pause wanted', lb_pause_wanted(80, [$cu(1,true),$cu(3,true),$cu(4,false),$cu(5,false)]) === true);
@@ -151,6 +163,19 @@ check('paused then sleep with MQTT: unit 4 becomes sleep-free (cars can use its 
 $p3c = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C], 5=>['plug'=>900, 'demand'=>$C, 'unplug'=>1500]], 1800, ['sleep'=>[4=>99999], 'sleep_from'=>[4=>400], 'sleep_free'=>true]);
 $rs5 = null; foreach ($p3c['log'] as $l) if (preg_match('/^(\d+):(\d+):(\d+) resume u5/', $l, $m)) { $rs5 = $m[1]*3600+$m[2]*60+$m[3]; break; }
 check('after another unit slept, car plug-in still resumes the paused unit', $rs5 !== null && $rs5 - 900 <= 10 && !in_array(4, $p3c['final_paused']), 'u5 resumed at ' . ($rs5 ?? '-') . '; paused ' . json_encode($p3c['final_paused']));
+
+// HTTP v5: our pause reports 254 — must stay paused (regression: a3d170a flapped by releasing claim)
+$pHttp = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['http_pause'=>true, 'sleep_free'=>true]);
+check('HTTP idle pause at 254 stays paused (no false sleep takeover / no flap)', in_array(4, $pHttp['final_paused']) && in_array(5, $pHttp['final_paused']) && ($pHttp['sleep_takeover'] ?? 0) === 0 && $pHttp['over_s'] == 0 && $pHttp['final_live'][1] + $pHttp['final_live'][3] == 80, sprintf('paused %s takeovers %s live %s', json_encode($pHttp['final_paused']), json_encode($pHttp['sleep_takeover'] ?? 0), json_encode($pHttp['final_live'])));
+// HTTP: paused, then manual override Sleep on u4 at t=600 — one takeover, cars keep 40+40 via sleep-free
+$pHttp2 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['http_pause'=>true, 'override_sleep'=>[4=>600], 'sleep_free'=>true]);
+$feHttp = false; foreach ($pHttp2['log'] as $l) if (preg_match('/^(\d+):(\d+):(\d+) resume u4/', $l, $m) && ($m[1]*3600+$m[2]*60+$m[3]) >= 600) $feHttp = true;
+$tookH = $pHttp2['sleep_takeover_t'][0] ?? null;
+check('HTTP paused then manual override: one takeover, no resume, u4 not left paused', ($pHttp2['sleep_takeover'] ?? 0) === 1 && $tookH !== null && $tookH >= 600 && $tookH <= 640 && !in_array(4, $pHttp2['final_paused']) && !$feHttp, sprintf('takeovers %s at %s; paused %s', json_encode($pHttp2['sleep_takeover'] ?? 0), json_encode($tookH), json_encode($pHttp2['final_paused'])));
+check('HTTP override sleep-free: cars use freed amps, never over 80 A', $pHttp2['final_live'][1] + $pHttp2['final_live'][3] == 80 && $pHttp2['over_s'] == 0, json_encode($pHttp2['final_live']));
+// schedule sleep_from while HTTP-paused cannot beat our claim (no takeover)
+$pHttp3 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 1200, ['http_pause'=>true, 'sleep'=>[4=>99999], 'sleep_from'=>[4=>600], 'sleep_free'=>true]);
+check('HTTP: schedule sleep while paused does not steal our pause claim', in_array(4, $pHttp3['final_paused']) && ($pHttp3['sleep_takeover'] ?? 0) === 0, sprintf('paused %s takeovers %s', json_encode($pHttp3['final_paused']), json_encode($pHttp3['sleep_takeover'] ?? 0)));
 $p4 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$C], 3=>['plug'=>0, 'demand'=>$C]], 600, ['saved'=>[1=>34, 3=>27, 4=>6, 5=>6], 'start'=>[1=>34, 3=>27, 4=>6, 5=>6]]);
 $capd = true; foreach ($p4['final_live'] as $id => $v) if ($v > [1=>34, 3=>27, 4=>6, 5=>6][$id]) $capd = false;
 check('user saved values (34/27/6/6) are kept and every share stays at or below them, never over 80 A', $p4['over_s'] == 0 && $p4['max_live'] <= 80 && $p4['final_saved'] == [1=>34, 3=>27, 4=>6, 5=>6] && $capd, 'saved ' . json_encode($p4['final_saved']) . ' live ' . json_encode($p4['final_live']));

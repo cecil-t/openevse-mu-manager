@@ -13,6 +13,8 @@
  * the coordinator re-applies the shares when it is back (accepted risk).
  * $opt['sleep'] = [id => wake second]: asleep on its schedule until then (never paused).
  * $opt['sleep_from'] = [id => start second]: become asleep at/after this time (with sleep[] wake).
+ * $opt['http_pause'] = true: idle pause looks like state 254 (v5 claim disabled), not RAPI 255.
+ * $opt['override_sleep'] = [id => start second]: manual override Sleep (beats our HTTP pause claim).
  * $opt['sleep_free'] = true: MQTT up, sleep-free on (lb_sleep_free). $opt['wake_delay'] = s a car
  * waits after its unit wakes before drawing (default 0 = worst case; one EV measured ~5 s, 6 A at ~9 s).
  ******************************************************************************/
@@ -38,6 +40,8 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 			$wakeAt = $opt['sleep'][$id] ?? null;
 			$sleepFrom = $opt['sleep_from'][$id] ?? 0;
 			$asleep = ($wakeAt !== null) && ($t >= $sleepFrom) && ($t < $wakeAt);
+			// manual override Sleep (priority 1000) beats our pause claim
+			if (isset($opt['override_sleep'][$id]) && $t >= $opt['override_sleep'][$id]) $asleep = true;
 			$awake[$id] = !$asleep;
 			$wd = isset($opt['sleep'][$id]) && $t < $opt['sleep'][$id] + ($opt['wake_delay'] ?? 0);
 			$dem = ($pl && !$restart && !$asleep && !$wd && !$paused[$id]) ? (float)($c['demand'])($t) : 0.0;
@@ -73,8 +77,13 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 		if (!$replan && !$pending) continue;
 		$in = []; $pausable = [];
 		foreach ($ratings as $id => $r) {
-			$pausable[$id] = !$plugged[$id] && $awake[$id];
-			$in[] = ['id'=>$id, 'rating'=>min($r, $saved[$id]), 'plugged'=>lb_effective_plugged($plugged[$id], $paused[$id] ? 255 : ($awake[$id] ? 1 : 254), $paused[$id]), 'plug_since'=>$plugSince[$id] ?? null, 'prio'=>null, 'setting'=>$live[$id], 'cap'=>$hr[$id]['cap'] ?? null, 'charging'=>$charging[$id]];
+			$http = !empty($opt['http_pause']);
+			$ov = isset($opt['override_sleep'][$id]) && $t >= $opt['override_sleep'][$id];
+			// HTTP our-pause reports 254 (same as sleep); RAPI pause is 255
+			$stCode = $paused[$id] ? ($http ? 254 : 255) : ($awake[$id] ? 1 : 254);
+			if ($ov) $stCode = 254;
+			$pausable[$id] = lb_pausable(true, $plugged[$id] ? true : false, $stCode, $paused[$id] && !$ov);
+			$in[] = ['id'=>$id, 'rating'=>min($r, $saved[$id]), 'plugged'=>lb_effective_plugged($plugged[$id], $stCode, $paused[$id] && !$ov), 'plug_since'=>$plugSince[$id] ?? null, 'prio'=>null, 'setting'=>$live[$id], 'cap'=>$hr[$id]['cap'] ?? null, 'charging'=>$charging[$id]];
 		}
 		$sf = lb_sleep_free(array_keys(array_filter($awake, function($a){ return !$a; })), $limit, !empty($opt['sleep_free']));
 		foreach ($in as $k => $u) $in[$k]['sleepfree'] = in_array($u['id'], $sf, true);
@@ -97,9 +106,14 @@ function lb_sim($limit, array $ratings, array $cars, $T, array $opt = []){
 			$wantP = $arm['armed'] && $pausable[$id];
 			if ($wantP && !$paused[$id]) { $paused[$id] = true; $st['pauses']++; $st['pause_t'][] = $t; $st['cmds'][] = '$FD'; $log($t, "pause u$id (idle)"); $pending = true; }
 			elseif ($paused[$id] && !$awake[$id]) {
-				// asleep took over: drop pause flag without resume ($FE would wake it)
-				$paused[$id] = false; $st['sleep_takeover'] = ($st['sleep_takeover'] ?? 0) + 1; $st['sleep_takeover_t'][] = $t;
-				$log($t, "pause flag dropped u$id (asleep: schedule or manual, not resumed)"); $pending = true;
+				$ov = isset($opt['override_sleep'][$id]) && $t >= $opt['override_sleep'][$id];
+				// HTTP: our pause is also 254 — only a manual override takes over (schedule cannot beat claim)
+				if (!empty($opt['http_pause']) && !$ov) { /* keep our pause */ }
+				else {
+					// asleep took over: drop pause flag without resume ($FE would wake it)
+					$paused[$id] = false; $st['sleep_takeover'] = ($st['sleep_takeover'] ?? 0) + 1; $st['sleep_takeover_t'][] = $t;
+					$log($t, "pause flag dropped u$id (asleep: schedule or manual, not resumed)"); $pending = true;
+				}
 			}
 			elseif (!$wantP && $paused[$id]) {
 				if ($pending || $didDown || $t - $lastDown < $H['settle_sec'] || $live[$id] > ($p['units'][$id]['target'] ?? 0)) { $pending = true; continue; }

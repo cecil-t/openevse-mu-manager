@@ -268,24 +268,29 @@ function lb_effective_plugged($plugged, $state, $pausedByLb){
 
 // Reconcile our pause flag with the unit's reported state.
 // Returns 'keep' | 'clear_awake' | 'clear_asleep'.
-// Sleeping (254) is never "paused by us": schedule or manual sleep owns it. The caller
-// must drop the flag WITHOUT sending resume ($FE / claim-enable), so sleep is left alone.
-// RAPI pause is $FD -> Disabled (255). HTTP pause is our claim with state disabled; the
-// live state often stays Ready (1), so 1 keeps the flag. 254 always means sleep took over.
-function lb_pause_flag_next($state, $api){
+// RAPI pause is $FD -> Disabled (255); Sleeping (254) is schedule/manual sleep.
+// HTTP pause is our claim with state disabled: the controller reports that as Sleeping
+// (254) too — same code as real sleep. Distinguish with $manualOverride (status
+// manual_override / Sleep button POST /override at priority 1000). Our claim is
+// priority 500 and leaves manual_override false. clear_asleep: drop the flag WITHOUT
+// resume ($FE / claim-enable); caller releases the HTTP pause claim so Wake is not held.
+function lb_pause_flag_next($state, $api, $manualOverride = false){
 	if ($state === null) return 'keep';
 	$state = (int)$state;
+	if ($api === 'http') {
+		if ($state === 254) return $manualOverride ? 'clear_asleep' : 'keep';
+		return ($state === 1) ? 'keep' : 'clear_awake';
+	}
 	if ($state === 254) return 'clear_asleep';
-	if ($api === 'http') return ($state === 1) ? 'keep' : 'clear_awake';
 	return ($state === 255) ? 'keep' : 'clear_awake';
 }
 
-// May we idle-pause this unit? Awake with nothing plugged in (state 1), or already paused
-// by us and still not asleep. State 254 is never pausable (blocks a stale lb_paused flag
-// from promoting manual/schedule sleep into a wanted pause / blocking sleep-free).
+// May we idle-pause this unit? Awake idle (state 1), or already paused by us.
+// True sleep (254) without our flag is never pausable. HTTP our-pause also reports
+// 254 — with $pausedByLb keep pausable so we retain the pause (no flap).
 function lb_pausable($ok, $rawPlugged, $state, $pausedByLb, $pretend = false){
 	if (!$ok || $pretend || $rawPlugged !== false) return false;
-	if ($state === 254) return false;
+	if ($state === 254 && !$pausedByLb) return false;
 	return ($state === 1 || $pausedByLb);
 }
 
