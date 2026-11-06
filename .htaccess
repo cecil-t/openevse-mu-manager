@@ -2,7 +2,8 @@
 <FilesMatch "^(run_lib|include|include_v5|include_lb|connection|volts_lib|evse_prefs|sessions_lib|sess_path|lbstatus_render|mail_lib|util_lib|auth_lib|settings_lib|secret_lib|sys_lib|_head|phpliteadmin\.config)\.php$">
 	Require all denied
 </FilesMatch>
-# Notes, logs, keys, scripts, the databases (and their -wal/-shm/-journal files), config files.
+# Notes, logs, keys, scripts, SQLite DBs by extension (*.db and -wal/-shm/-journal sidecars), config/archives.
+# Extension deny only — no per-file DB names.
 <FilesMatch "\.(txt|md|bak|log|lock|key|sh|db|db-wal|db-shm|db-journal|sqlite|sqlite3|env|ini|example|yml|tar|gz|xz|zip)$">
 	Require all denied
 </FilesMatch>

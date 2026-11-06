@@ -74,9 +74,8 @@ relative, and the cookies and the home-screen app use the folder the site is in.
 <site>/                   the web site (index.php, unit.php, settings.php, help.php, ...)
   setup.sh                checks the requirements and does setup steps 2 to 5 (run as root)
   openevse.db             units, load groups, users, settings (SQLite, made by setup)
-  sessions.db             legacy path for readings (until moved to data/)
-  data/                   protected session DB folder (sessions.db after cutover; deny-all .htaccess)
-  sess_path.php           resolves SESS_DB_PATH (override → data/ → root)
+  data/                   protected session DB (sessions.db + sidecars; deny-all .htaccess)
+  sess_path.php           resolves SESS_DB_PATH (override → data/ → legacy root if present)
   emoncms/receiver.php    where units send their 30-second readings ("Internal logging")
   collector/              scheduled scripts: collector.php, jobs.php, notifier.php, setup_auth.php
   loadbalancer/           docker-compose.yml, env.example, coordinator/ (load balancer code), mosquitto/,

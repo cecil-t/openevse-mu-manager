@@ -1,5 +1,5 @@
 # OpenEVSE session database folder: never served over the web.
-# Holds sessions.db and its -wal/-shm sidecars. Apache 2.4 + 2.2.
+# Session SQLite file and any -wal/-shm sidecars live here. Apache 2.4 + 2.2.
 <IfModule mod_authz_core.c>
 	Require all denied
 </IfModule>
