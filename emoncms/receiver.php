@@ -20,6 +20,20 @@ $key = isset($q['apikey']) ? (string)$q['apikey'] : (isset($q['devicekey']) ? (s
 if ($key === '' && isset($_SERVER['HTTP_AUTHORIZATION']) && preg_match('/^Bearer\s+(\S+)/', $_SERVER['HTTP_AUTHORIZATION'], $m)) $key = $m[1];
 $node = isset($q['node']) ? substr(preg_replace('/[^A-Za-z0-9_.-]/', '', (string)$q['node']), 0, 32) : '';
 unset($q['apikey'], $q['devicekey']);
+// Maintenance freeze: private/sess_writers_pause (cutover). Do not open sessions.db.
+// 503 + non-"ok" body: units that treat only "ok" as success should retry on their next
+// 30 s timer (not a durable offline queue). Stage-tested in fixtures; not enabled in prod.
+$site = dirname(SESS_DIR);
+if (is_file($site . '/private/sess_writers_pause')) {
+	@file_put_contents(SESS_DIR . '/push.log', date('Y-m-d H:i:s') . " INFO writers paused; 503\n", FILE_APPEND | LOCK_EX);
+	http_response_code(503);
+	header('Retry-After: 60');
+	$res = 'maintenance';
+	header('Content-Length: ' . strlen($res));
+	header('Connection: close');
+	echo $res;
+	exit;
+}
 try {
 	require SESS_DIR . '/push_logic.php';
 	$res = push_receive($node, $key, $raw, $_SERVER['REMOTE_ADDR'], time());

@@ -24,3 +24,7 @@ never open the live DB as another account — even `sqlite3 -readonly` can creat
 `-wal`/`-shm` owned by the wrong user and stop logging.
 
 Cutover steps: `docs/sessions-db-data-folder.md`.
+
+## Writers pause (cutover)
+
+Create `private/sess_writers_pause` only during an approved window. See `docs/sessions-db-data-folder.md`.

@@ -70,6 +70,8 @@ chmod 700 "$SITE/private/key" "$SITE/loadbalancer/secrets"; chmod 750 "$SITE/pri
 chown -R 1883:1883 "$SITE/loadbalancer/mosquitto/data" "$SITE/loadbalancer/mosquitto/log"
 chown root:root "$SITE/private/jobs_root.sh" && chmod 755 "$SITE/private/jobs_root.sh"
 [ -f "$SITE/private/sess_sqlite.sh" ] && chown root:root "$SITE/private/sess_sqlite.sh" && chmod 755 "$SITE/private/sess_sqlite.sh"
+[ -f "$SITE/private/sess_consistent_copy.sh" ] && chown root:root "$SITE/private/sess_consistent_copy.sh" && chmod 755 "$SITE/private/sess_consistent_copy.sh"
+[ -f "$SITE/private/stage_data_migration_demo.sh" ] && chown root:root "$SITE/private/stage_data_migration_demo.sh" && chmod 755 "$SITE/private/stage_data_migration_demo.sh"
 [ "$(stat -c %h "$SITE/private/jobs_root.sh")" = 1 ] || warn "private/jobs_root.sh has more than one hard link: copy it (cp) instead, or the jobs task will refuse it"
 ok "private/ (root), key/ status/ firmware/ backups/ run/ secrets/ ($WU), mosquitto data/log (uid 1883)"
 

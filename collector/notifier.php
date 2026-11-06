@@ -19,6 +19,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 define('SESS_DIR', __DIR__);
 define('OEV_SITE', dirname(__DIR__));
 chdir(OEV_SITE);
+if (is_file(OEV_SITE . '/private/sess_writers_pause')) { @file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . " INFO writers paused; notifier skipped\n", FILE_APPEND | LOCK_EX); exit(0); }
 require OEV_SITE . '/include_v5.php';
 require OEV_SITE . '/include_lb.php';
 require OEV_SITE . '/sessions_lib.php';
