@@ -31,6 +31,7 @@ svg text{font-family:Arial,sans-serif}
 .chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
 /* phone keeps the 30/30-margin SVG; desktop shows the tighter-margin twin */
 .sgd{display:none}
+.sec svg.sessgraph{box-sizing:border-box}
 @media screen and (min-width:700px){
 .sgp{display:none}.sgd{display:block}
 /* session amp/pilot/temp graph (.sessgraph): full card width, independent 340px height.
@@ -39,7 +40,6 @@ svg text{font-family:Arial,sans-serif}
    scaleY=340/190≈1.79 so CSS font-size is in user units under the CTM: 5.5→~10px physical.
    scaleX≈3.23 at the 1200px card; scaleX(0.55) on labels counters the non-uniform stretch. */
 body.pgw .sec .sgd>svg.sessgraph{width:100%;height:340px;display:block}
-.sec svg.sessgraph{box-sizing:border-box}
 body.pgw .sec .sgd>svg.sessgraph text{font-size:5.5px;transform:scaleX(.55);transform-box:fill-box;transform-origin:center}
 body.pgw .sec .sgd>svg.sessgraph text[text-anchor="end"]{transform-origin:right center}
 body.pgw .sec .sgd>svg.sessgraph text[text-anchor="start"]{transform-origin:left center}
