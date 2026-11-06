@@ -74,7 +74,9 @@ relative, and the cookies and the home-screen app use the folder the site is in.
 <site>/                   the web site (index.php, unit.php, settings.php, help.php, ...)
   setup.sh                checks the requirements and does setup steps 2 to 5 (run as root)
   openevse.db             units, load groups, users, settings (SQLite, made by setup)
-  sessions.db             readings and charging sessions (SQLite, made by setup)
+  sessions.db             legacy path for readings (until moved to data/)
+  data/                   protected session DB folder (sessions.db after cutover; deny-all .htaccess)
+  sess_path.php           resolves SESS_DB_PATH (override → data/ → root)
   emoncms/receiver.php    where units send their 30-second readings ("Internal logging")
   collector/              scheduled scripts: collector.php, jobs.php, notifier.php, setup_auth.php
   loadbalancer/           docker-compose.yml, env.example, coordinator/ (load balancer code), mosquitto/,
@@ -85,7 +87,7 @@ relative, and the cookies and the home-screen app use the folder the site is in.
   PHPMailer/              email library
 ```
 
-`collector/`, `loadbalancer/`, `private/` and `backups/` each have an `.htaccess` that denies all web
+`collector/`, `loadbalancer/`, `private/`, `data/` and `backups/` each have an `.htaccess` that denies all web
 access. The site's own `.htaccess` also hides the databases, logs, keys, scripts and dot files.
 
 ## Setup, step by step
@@ -111,10 +113,11 @@ the steps are also written out so you can do them by hand.
    ```sh
    cd /var/www/html/openevse
    sudo chown www-data:www-data . collector emoncms
-   sudo mkdir -p private/key private/status private/firmware backups loadbalancer/run loadbalancer/secrets \
+   sudo mkdir -p private/key private/status private/firmware backups data loadbalancer/run loadbalancer/secrets \
         loadbalancer/mosquitto/data loadbalancer/mosquitto/log
    sudo chown root:root private private/jobs_root.sh && sudo chmod 755 private private/jobs_root.sh
-   sudo chown www-data:www-data private/key private/status private/firmware backups loadbalancer/run loadbalancer/secrets
+   sudo chown www-data:www-data private/key private/status private/firmware backups data loadbalancer/run loadbalancer/secrets
+   sudo chmod 750 data
    sudo chmod 700 private/key loadbalancer/secrets
    sudo chown -R 1883:1883 loadbalancer/mosquitto/data loadbalancer/mosquitto/log
    sudo -u www-data sh -c 'umask 077; openssl rand -hex 32 > private/key/secret.key; chmod 400 private/key/secret.key'
@@ -220,6 +223,6 @@ Your databases, key, `.env`, logins and logs are not part of the files, so they 
 `include_v5.php` (and `include.php`, `util_lib.php`) when it starts, so after changing those, restart it
 when convenient: `sudo docker compose restart coordinator`.
 
-Shared code: `util_lib.php` (h(), ago(), the read-only sessions.db connection), `live.js` (the 5-second
+Shared code: `util_lib.php` / `sess_path.php` (h(), ago(), sessions.db path + read-only connection), `live.js` (the 5-second
 live update and its coloured dot on the home, unit and load balancer pages), `include_v5.php`
 evse_post_2x() (saving a form on a WiFi 2.x unit) and `loadbalancer/tools/users_lib.php` (the MQTT login file).

@@ -49,7 +49,10 @@ else warn "docker not found: the load balancer and MQTT broker need it (the rest
 [ -n "$WU" ] && [ -n "$PHP" ] && { sudo -u "$WU" test -w "$SITE/collector" 2>/dev/null && ok "collector/ writable by $WU" || { [ $CHECK = 1 ] && warn "collector/ not writable by $WU (setup fixes this)"; }; }
 
 if [ $CHECK = 1 ]; then
-	for f in private/key/secret.key openevse.db sessions.db loadbalancer/.env loadbalancer/secrets/coordinator.env; do [ -e "$SITE/$f" ] && ok "$f exists" || warn "$f not made yet"; done
+	for f in private/key/secret.key openevse.db loadbalancer/.env loadbalancer/secrets/coordinator.env; do [ -e "$SITE/$f" ] && ok "$f exists" || warn "$f not made yet"; done
+	if [ -e "$SITE/data/sessions.db" ]; then ok "data/sessions.db exists"
+	elif [ -e "$SITE/sessions.db" ]; then ok "sessions.db exists (legacy root; move to data/ when ready)"
+	else warn "sessions.db not made yet"; fi
 	echo "$FAIL failed, $WARN warnings."; [ $FAIL = 0 ]; exit $?
 fi
 [ $FAIL = 0 ] || { echo "Fix the failed items above, then run this again."; exit 1; }
@@ -58,13 +61,15 @@ W(){ sudo -u "$WU" "$@"; }
 
 echo "Folders and owners"
 chown "$U:$G" "$SITE" "$SITE/collector" "$SITE/emoncms" 2>/dev/null
-mkdir -p "$SITE/private" "$SITE/backups" "$SITE/loadbalancer/run" "$SITE/loadbalancer/secrets" "$SITE/loadbalancer/mosquitto/data" "$SITE/loadbalancer/mosquitto/log"
+mkdir -p "$SITE/private" "$SITE/backups" "$SITE/data" "$SITE/loadbalancer/run" "$SITE/loadbalancer/secrets" "$SITE/loadbalancer/mosquitto/data" "$SITE/loadbalancer/mosquitto/log"
 chown root:root "$SITE/private" && chmod 755 "$SITE/private"
 for d in key status firmware; do mkdir -p "$SITE/private/$d"; done
-chown "$U:$G" "$SITE/private/key" "$SITE/private/status" "$SITE/private/firmware" "$SITE/backups" "$SITE/loadbalancer/run" "$SITE/loadbalancer/secrets"
+chown "$U:$G" "$SITE/private/key" "$SITE/private/status" "$SITE/private/firmware" "$SITE/backups" "$SITE/data" "$SITE/loadbalancer/run" "$SITE/loadbalancer/secrets"
+chmod 750 "$SITE/data"
 chmod 700 "$SITE/private/key" "$SITE/loadbalancer/secrets"; chmod 750 "$SITE/private/firmware"
 chown -R 1883:1883 "$SITE/loadbalancer/mosquitto/data" "$SITE/loadbalancer/mosquitto/log"
 chown root:root "$SITE/private/jobs_root.sh" && chmod 755 "$SITE/private/jobs_root.sh"
+[ -f "$SITE/private/sess_sqlite.sh" ] && chown root:root "$SITE/private/sess_sqlite.sh" && chmod 755 "$SITE/private/sess_sqlite.sh"
 [ "$(stat -c %h "$SITE/private/jobs_root.sh")" = 1 ] || warn "private/jobs_root.sh has more than one hard link: copy it (cp) instead, or the jobs task will refuse it"
 ok "private/ (root), key/ status/ firmware/ backups/ run/ secrets/ ($WU), mosquitto data/log (uid 1883)"
 

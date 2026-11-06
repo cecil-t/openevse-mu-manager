@@ -10,12 +10,13 @@
  *    (switching it to WAL would change how the existing code uses it).
  *  - sessions.db runs in WAL mode (readers never block the writer), and can be
  *    pruned, vacuumed, backed up or deleted on its own.
- *  - it sits next to openevse.db, so the site's *.db download block
- *    (.htaccess) covers it and its -wal/-shm files too.
+ *  - preferred location is data/sessions.db (denied by data/.htaccess); the
+ *    legacy file next to the pages is still the default until that file exists.
+ *    Path resolution: sess_path.php (override file, then data/, then root).
  * A future load coordinator can open both files (ATTACH) if it needs to.
  ******************************************************************************/
 
-if (!defined('SESS_DB_PATH')) define('SESS_DB_PATH', __DIR__ . '/sessions.db');
+require_once __DIR__ . '/sess_path.php';   // SESS_DB_PATH
 require_once __DIR__ . '/volts_lib.php';
 define('SESS_SCHEMA_VERSION', 7);
 

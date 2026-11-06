@@ -1,0 +1,5 @@
+# Keep folder + .htaccess + README in git; never commit the live DB or sidecars.
+*
+!.gitignore
+!.htaccess
+!README.md
