@@ -30,17 +30,22 @@ form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
 svg text{font-family:Arial,sans-serif}
 .chd{display:none}@media screen and (min-width:700px){.chp{display:none}.chd{display:flex}}   /* kWh chart: phone keeps the scaled SVG, desktop the fixed-font one */
 @media screen and (min-width:700px){
-/* session amp/pilot/temp graph: full card width on desktop at a compact ~340px height (viewBox 360x190 alone would scale to ~625px tall under body.pgw); pin label/stroke physical size */
-body.pgw .sec>svg{width:100%;height:340px;display:block}
-body.pgw .sec>svg text{font-size:11px}
-body.pgw .sec>svg text[font-size="8"]{font-size:9px}
-body.pgw .sec>svg text[font-size="9"]{font-size:10px}
-body.pgw .sec>svg path,body.pgw .sec>svg line{vector-effect:non-scaling-stroke}
-body.pgw .sec>svg path[stroke="#07d"]{stroke-width:1.8px}
-body.pgw .sec>svg path[stroke-dasharray]{stroke-width:1.2px;stroke-dasharray:4px 3px}
-body.pgw .sec>svg path:not([stroke="#07d"]):not([stroke-dasharray]){stroke-width:1.1px}
-body.pgw .sec>svg line{stroke-width:1px}
-body.pgw .sec>svg line[stroke-dasharray]{stroke-dasharray:2px 3px}
+/* session amp/pilot/temp graph (.sessgraph): full card width, independent 340px height.
+   preserveAspectRatio=none fills the 1164×340 box (default meet letterboxed to ~645px wide).
+   scaleY=340/190≈1.79 so CSS font-size is in user units under the CTM: 5.5→~10px physical.
+   scaleX≈3.23 at the 1200px card; scaleX(0.55) on labels counters the non-uniform stretch. */
+body.pgw .sec>svg.sessgraph{width:100%;height:340px;display:block}
+body.pgw .sec>svg.sessgraph text{font-size:5.5px;transform:scaleX(.55);transform-box:fill-box;transform-origin:center}
+body.pgw .sec>svg.sessgraph text[text-anchor="end"]{transform-origin:right center}
+body.pgw .sec>svg.sessgraph text[text-anchor="start"]{transform-origin:left center}
+body.pgw .sec>svg.sessgraph text[font-size="8"]{font-size:4.5px}
+body.pgw .sec>svg.sessgraph text[font-size="9"]{font-size:5px}
+body.pgw .sec>svg.sessgraph path,body.pgw .sec>svg.sessgraph line{vector-effect:non-scaling-stroke}
+body.pgw .sec>svg.sessgraph path[stroke="#07d"]{stroke-width:1.8px}
+body.pgw .sec>svg.sessgraph path[stroke-dasharray]{stroke-width:1.2px;stroke-dasharray:4px 3px}
+body.pgw .sec>svg.sessgraph path:not([stroke="#07d"]):not([stroke-dasharray]){stroke-width:1.1px}
+body.pgw .sec>svg.sessgraph line{stroke-width:1px}
+body.pgw .sec>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px}
 }
 .sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
 .sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
@@ -187,7 +192,7 @@ function svg_session($samples, $segments, $t0, $t1, $volts){
 	$X = function($ts) use ($t0, $t1, $W, $pl, $pr){ return round($pl + ($W - $pl - $pr) * ($ts - $t0) / ($t1 - $t0), 1); };
 	$YA = function($a) use ($amax, $H, $pt, $pb){ return round($H - $pb - ($H - $pt - $pb) * $a / $amax, 1); };
 	$YT = function($c) use ($tmin, $tmax, $H, $pt, $pb){ return round($H - $pb - ($H - $pt - $pb) * ($c - $tmin) / ($tmax - $tmin), 1); };
-	$o = "<svg viewBox='0 0 $W $H' width='100%' role='img' style='background:#fff;border:1px solid #ccc;border-radius:6px'>";
+	$o = "<svg class='sessgraph' viewBox='0 0 $W $H' width='100%' preserveAspectRatio='none' role='img' style='background:#fff;border:1px solid #ccc;border-radius:6px'>";
 	foreach ($segments as $g) { $x1 = $X(max($t0, $g['start_at'])); $x2 = $X(min($t1, $g['stop_at'] ?: $t1)); $o .= "<rect x='$x1' y='$pt' width='" . max(1, $x2 - $x1) . "' height='" . ($H - $pt - $pb) . "' fill='#e6f3ff'/>"; }
 	for ($g = 0; $g <= 4; $g++) {
 		$a = $amax * $g / 4; $y = $YA($a);
