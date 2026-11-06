@@ -80,7 +80,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 	#wide .bar{gap:6px}#wide .bar input{flex:1 1 180px;max-width:none;min-width:0;padding:5px 7px}#wide .chip{padding:4px 9px;font-size:12px}
 	#wt tr.u td:first-child{font-size:14px}#wt tr.u td:first-child img.plug{height:1em;margin-top:2px}#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
 	#wt{table-layout:fixed}#wt col.cu{width:49% !important}#wt col.cs{width:29% !important}#wt col.cd{width:22% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
-	#wt img.plug{margin-left:3px}
+	#wt img.plug{margin-left:2px}
 	#unit.slidebox{width:auto;max-width:none;margin:0 5px;padding:8px}}
 </style>
 <div id="wide">
