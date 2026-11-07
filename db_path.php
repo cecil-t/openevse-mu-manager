@@ -63,6 +63,7 @@ if (!function_exists('oev_cfg_db_path')) {
 	function oev_cfg_db_open(array $opts = array(), $create = false, $site = null){
 		$ro = isset($opts[PDO::SQLITE_ATTR_OPEN_FLAGS]) && ($opts[PDO::SQLITE_ATTR_OPEN_FLAGS] & PDO::SQLITE_OPEN_READONLY);
 		if ($create && oev_cfg_maint($site)) throw new RuntimeException('config database maintenance in progress');
+		if ($create) { $sd = (($site !== null && $site !== '') ? rtrim(str_replace('\\', '/', (string)$site), '/') : str_replace('\\', '/', __DIR__)) . '/data'; if (!is_dir($sd)) @mkdir($sd, 0750, true); }   // new install: data/ (holds the lock file too)
 		if (!$ro && !oev_cfg_maint($site)) oev_cfg_lock_sh($site);   // lock BEFORE resolving the path
 		$maint = oev_cfg_maint($site);                                // re-check after a possible wait
 		if ($create && $maint) throw new RuntimeException('config database maintenance in progress');

@@ -9,7 +9,8 @@ Pre-creating empty `data/` + `data/.htaccess` (no DB file) is safe and preferred
 
 1. `private/sess_db_path` — optional one-line override (absolute or site-relative)
 2. `data/sessions.db` — if the file exists
-3. `sessions.db` at the site root — legacy default
+3. `sessions.db` at the site root — legacy install, if that file exists (never moved automatically)
+4. `data/sessions.db` — nothing exists yet: a new install makes it here (Nov 7, 2026)
 
 Safe CLI (as web user only): `private/sess_sqlite.sh …`  
 Consistent copy (requires pause flag): `private/sess_consistent_copy.sh /abs/dest.db`

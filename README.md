@@ -75,7 +75,8 @@ relative, and the cookies and the home-screen app use the folder the site is in.
   setup.sh                checks the requirements and does setup steps 2 to 5 (run as root)
   data/                   protected DBs, deny-all .htaccess: openevse.db (units, load groups, users,
                           settings; made by setup) and sessions.db (+ sidecars). An older install may
-                          still have openevse.db in the site folder; db_path.php finds either
+                          still have openevse.db / sessions.db in the site folder; db_path.php and
+                          sess_path.php find either; a new install makes both in data/
                           (docs/config-db-data-folder.md).
   sess_path.php           resolves SESS_DB_PATH (override → data/ → legacy root if present)
   emoncms/receiver.php    where units send their 30-second readings ("Internal logging")

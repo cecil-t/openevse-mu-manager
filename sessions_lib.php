@@ -21,6 +21,7 @@ require_once __DIR__ . '/volts_lib.php';
 define('SESS_SCHEMA_VERSION', 7);
 
 function sess_db($readonly = false){
+	if (!$readonly && !is_file(SESS_DB_PATH) && !is_dir(dirname(SESS_DB_PATH))) @mkdir(dirname(SESS_DB_PATH), 0750, true);   // new install: data/
 	$db = new PDO('sqlite:' . SESS_DB_PATH, null, null, array(
 		PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 		PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

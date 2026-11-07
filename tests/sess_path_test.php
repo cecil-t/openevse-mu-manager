@@ -30,7 +30,8 @@ function load_path($site){
 
 // 1) Legacy default when neither override nor data file exists
 $p = load_path($site);
-ck('legacy root default', $p === $site . '/sessions.db');
+ck('nothing yet -> data/ (new install)', $p === $site . '/data/sessions.db');
+file_put_contents($site . '/sessions.db', ''); ck('legacy root kept when only root exists', oev_sess_db_path($site) === $site . '/sessions.db'); unlink($site . '/sessions.db');
 
 // 2) Prefer data/sessions.db when that file exists
 file_put_contents($site . '/data/sessions.db', '');
@@ -61,7 +62,7 @@ $cmd = escapeshellarg($php) . ' -r ' . escapeshellarg(
 	'require $argv[1]; echo SESS_DB_PATH;'
 ) . ' ' . escapeshellarg($site . '/sess_path.php');
 $out = trim((string)shell_exec($cmd));
-ck('subprocess SESS_DB_PATH legacy', $out === $site . '/sessions.db');
+ck('subprocess SESS_DB_PATH nothing yet -> data/', $out === $site . '/data/sessions.db');
 
 file_put_contents($site . '/data/sessions.db', '');
 $out = trim((string)shell_exec($cmd));

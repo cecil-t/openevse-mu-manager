@@ -5,8 +5,9 @@
  * Resolution (first match wins), relative to the site folder:
  *  1. private/sess_db_path  — optional one-line override (absolute, or relative
  *     to the site folder). No secrets; deploy-time switch only.
- *  2. data/sessions.db      — preferred protected location, if the file exists
- *  3. sessions.db           — legacy default next to the PHP pages
+ *  2. data/sessions.db      — protected location, if the file exists
+ *  3. sessions.db           — legacy location next to the PHP pages, if it exists
+ *  4. data/sessions.db      — nothing exists yet: a new install makes it here
  *
  * Pages and collectors include this (or get it via sessions_lib / util_lib).
  * After a cutover that creates data/sessions.db, every caller follows without
@@ -26,7 +27,8 @@ if (!function_exists('oev_sess_db_path')) {
 		}
 		$data = $site . '/data/sessions.db';
 		if (is_file($data)) return $data;
-		return $site . '/sessions.db';
+		if (is_file($site . '/sessions.db')) return $site . '/sessions.db';   // legacy install: keep using it (never moved automatically)
+		return $data;   // nothing yet: a new install makes it in data/
 	}
 }
 if (!defined('SESS_DB_PATH')) define('SESS_DB_PATH', oev_sess_db_path());
