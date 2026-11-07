@@ -599,7 +599,14 @@ if ($sec === 'system') {
 	}
 	echo '</div>';
 	echo '<div class="note">These checks run on their own every minute. When one turns into a problem for 2 minutes in a row, users who get Errors are emailed (if notifications are on), and again when it is OK. The jobs and notifications task sends those emails, so if that task itself stops, no email can go out: the red dot on your initials still shows it.</div>';
-	echo '<p><a href="settings.php?s=system">Check again</a></p>';
+	echo '<h3>Software versions</h3><div class="card">';
+	foreach (oev_sys_versions() as $v) echo '<div class="sys"><div><b>' . h($v['name']) . ':</b> ' . ($v['value'] === null ? 'Not reported' : oev_v($v['value'])) . ($v['note'] !== '' ? ' <span class="note">(' . h($v['note']) . ')</span>' : '') . '</div></div>';
+	echo '</div><h3>Database size</h3><div class="card">';
+	foreach (oev_sys_dbsizes() as $d) {
+		$x = array(); foreach ($d['side'] as $k => $b) $x[] = h($k) . ' ' . oev_v(oev_sys_bytes($b));
+		echo '<div class="sys"><div><b>' . h($d['name']) . ':</b> ' . ($d['size'] === null ? 'Not found' : oev_v(oev_sys_bytes($d['size']))) . ' <span class="note">' . h($d['file']) . ($x ? '; plus ' . implode(', ', $x) . ' (temporary)' : '') . '</span></div></div>';
+	}
+	echo '</div>';
 }
 ?>
 <p><a href="./">&larr; Home</a></p>

@@ -91,3 +91,49 @@ function oev_sys_v($x){ return '<span class="v">' . htmlspecialchars((string)$x,
 function oev_sys_ago($s, $ago = true){ $s = max(0, (int)$s); $t = $s < 120 ? $s . ($s == 1 ? ' second' : ' seconds') : ($s < 7200 ? round($s / 60) . ' minutes' : ($s < 172800 ? round($s / 3600) . ' hours' : round($s / 86400) . ' days')); return oev_sys_v($t) . ($ago ? ' ago' : ''); }
 // problems only (for the avatar dot): cheap, no network
 function oev_sys_problems(){ $p = array(); foreach (oev_sys_checks(false) as $k => $c) if ($c['ok'] === false) $p[$k] = $c; return $p; }
+
+/* Software versions + database sizes (Settings > System status). Read-only, cheap, from this web
+ * request's own runtime and plain files; no shell calls, no phpinfo(). A value that can't be read
+ * is null (shown as "Not reported"), never guessed. $src overrides the sources (tests only). */
+function oev_sys_tok($s){   // "Apache/2.4.62 (Unix)" -> "Apache/2.4.62"; product/version tokens only
+	$t = array(); foreach (preg_split('/\s+/', trim((string)$s)) as $w) if (preg_match('~^[A-Za-z][A-Za-z0-9_.-]{0,30}(/[0-9][A-Za-z0-9_.-]{0,20})?$~', $w)) { $t[] = $w; if (count($t) >= 3) break; }
+	return $t ? implode(' ', $t) : null;
+}
+function oev_sys_ini($f){ $o = array(); foreach (@file($f, FILE_IGNORE_NEW_LINES) ?: array() as $l) if (preg_match('/^(\w+)\s*=\s*"?([^"]*)"?\s*$/', $l, $m)) $o[$m[1]] = $m[2]; return $o; }
+function oev_sys_versions($site = null, $src = array()){
+	$site = $site ?: __DIR__; $r = array();
+	$add = function($n, $v, $note = '') use (&$r){ $r[] = array('name' => $n, 'value' => ($v === '' ? null : $v), 'note' => $note); };
+	$ss = array_key_exists('server_software', $src) ? $src['server_software'] : ($_SERVER['SERVER_SOFTWARE'] ?? null);
+	$add('Web server', oev_sys_tok($ss), 'as reported to PHP for this request');
+	$add('PHP', array_key_exists('php', $src) ? $src['php'] : PHP_VERSION . ' (' . PHP_SAPI . ')');
+	$sq = array_key_exists('sqlite', $src) ? $src['sqlite'] : null;
+	if (!array_key_exists('sqlite', $src)) { try { $m = new PDO('sqlite::memory:'); $sq = (string)$m->query('SELECT sqlite_version()')->fetchColumn(); $m = null; } catch (Exception $e) { $sq = null; } }
+	$add('SQLite', $sq, 'library used by PHP (PDO)');
+	$dv = oev_sys_ini(array_key_exists('dsm_file', $src) ? $src['dsm_file'] : '/etc.defaults/VERSION');
+	$add('Synology DSM', !empty($dv['productversion']) ? $dv['productversion'] . (!empty($dv['buildnumber']) ? '-' . $dv['buildnumber'] : '') . (!empty($dv['smallfixnumber']) ? ' Update ' . $dv['smallfixnumber'] : '') : null);
+	$add('Linux kernel', array_key_exists('kernel', $src) ? $src['kernel'] : (oev_sys_tok(php_uname('r')) ?: null));
+	// containers: the image tags they are built from (docker-compose.yml / Dockerfile) + state from the jobs task
+	$st = @json_decode((string)@file_get_contents(array_key_exists('status_file', $src) ? $src['status_file'] : OEV_SYS_STATUS_FILE), true);
+	$c = is_array($st) ? (array)($st['containers'] ?? array()) : array();
+	$dc = (string)@file_get_contents(array_key_exists('compose_file', $src) ? $src['compose_file'] : $site . '/loadbalancer/docker-compose.yml');
+	$df = (string)@file_get_contents(array_key_exists('dockerfile', $src) ? $src['dockerfile'] : $site . '/loadbalancer/coordinator/Dockerfile');
+	$state = function($k) use ($c){ return isset($c[$k]) && $c[$k] !== '' ? 'container ' . $c[$k] : 'container state not reported'; };
+	$add('Mosquitto (MQTT broker)', preg_match('~image:\s*(eclipse-mosquitto:\S+)~', $dc, $m) ? $m[1] : null, 'image tag; ' . $state('openevse-mosquitto'));
+	$add('Load balancer runtime', preg_match('~^FROM\s+(\S+)~m', $df, $m) ? $m[1] : null, 'coordinator image base; ' . $state('openevse-lb-coordinator'));
+	return $r;
+}
+function oev_sys_bytes($b){ $b = (int)$b; if ($b < 1024) return $b . ' B'; foreach (array('KiB', 'MiB', 'GiB') as $i => $u) { $v = $b / pow(1024, $i + 1); if ($v < 1024 || $u === 'GiB') return round($v, $v < 10 ? 2 : 1) . ' ' . $u; } }
+// sizes of the database files (stat only: never opens them), main file and its -wal/-shm separately
+function oev_sys_dbsizes($site = null, $sess = null){
+	$site = $site ?: __DIR__;
+	if ($sess === null) { require_once __DIR__ . '/sess_path.php'; $sess = defined('SESS_DB_PATH') ? SESS_DB_PATH : ''; }
+	$o = array();
+	foreach (array('Sessions (readings)' => $sess, 'Config (units, users, settings)' => $site . '/openevse.db') as $n => $f) {
+		if ($f === '') continue; clearstatcache(true, $f);
+		$rel = strpos($f, $site . '/') === 0 ? substr($f, strlen($site) + 1) : basename($f);
+		$row = array('name' => $n, 'file' => $rel, 'size' => is_file($f) ? (int)@filesize($f) : null, 'side' => array());
+		foreach (array('-wal', '-shm') as $x) if (is_file($f . $x)) $row['side'][$x] = (int)@filesize($f . $x);
+		$o[] = $row;
+	}
+	return $o;
+}
