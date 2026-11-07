@@ -29,11 +29,14 @@ file_put_contents("$d/data/sessions.db", str_repeat('x', 4096)); file_put_conten
 $s = oev_sys_dbsizes($d, "$d/data/sessions.db");
 ck('sessions main size only', $s[0]['size'] === 4096 && $s[0]['file'] === 'data/sessions.db');
 ck('wal/shm separate', $s[0]['side'] === array('-wal' => 2048, '-shm' => 32768));
-ck('openevse.db missing -> null', $s[1]['size'] === null && $s[1]['side'] === array() && $s[1]['file'] === 'openevse.db');
+ck('openevse.db missing -> null (new-install path data/)', $s[1]['size'] === null && $s[1]['side'] === array() && $s[1]['file'] === 'data/openevse.db');
 file_put_contents("$d/openevse.db", str_repeat('x', 3 * 1048576));
 $s = oev_sys_dbsizes($d, "$d/data/sessions.db");
-ck('openevse.db present', $s[1]['size'] === 3 * 1048576);
+ck('legacy root openevse.db present', $s[1]['size'] === 3 * 1048576 && $s[1]['file'] === 'openevse.db');
+mkdir("$d/data", 0777, true); rename("$d/openevse.db", "$d/data/openevse.db"); file_put_contents("$d/data/openevse.db-wal", 'xx');
+$s = oev_sys_dbsizes($d, "$d/data/sessions.db");
+ck('moved data/openevse.db + wal shown', $s[1]['file'] === 'data/openevse.db' && $s[1]['size'] === 3 * 1048576 && $s[1]['side'] === array('-wal' => 2) && $s[0]['size'] === 4096);
 ck('outside path shows basename only', oev_sys_dbsizes($d, '/tmp/zz/elsewhere.db')[0]['file'] === 'elsewhere.db');
 ck('bytes format', oev_sys_bytes(512) === '512 B' && oev_sys_bytes(2048) === '2 KiB' && oev_sys_bytes(3 * 1048576) === '3 MiB');
-foreach (array("data/sessions.db","data/sessions.db-wal","data/sessions.db-shm","openevse.db","VERSION","system.json","loadbalancer/docker-compose.yml","loadbalancer/coordinator/Dockerfile") as $x) @unlink("$d/$x");
+foreach (array("data/sessions.db","data/sessions.db-wal","data/sessions.db-shm","openevse.db","data/openevse.db","data/openevse.db-wal","VERSION","system.json","loadbalancer/docker-compose.yml","loadbalancer/coordinator/Dockerfile") as $x) @unlink("$d/$x");
 echo $f ? "$f FAILED\n" : "ALL PASS\n"; exit($f ? 1 : 0);

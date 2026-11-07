@@ -21,7 +21,7 @@ define('OEV_COOKIE_DAYS', 3650);
 
 function oev_db(){
 	static $db = null;
-	if ($db === null) $db = new PDO('sqlite:' . OEV_DB_FILE, null, null, array(PDO::ATTR_TIMEOUT => 5, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
+	if ($db === null) $db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 5, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
 	return $db;
 }
 function oev_https(){ return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') || (($_SERVER['SERVER_PORT'] ?? '') == 443); }

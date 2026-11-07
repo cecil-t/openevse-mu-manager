@@ -37,7 +37,7 @@ function evse_group_volts($gid){
 	if (!$gid) return null;
 	if ($m === null || time() - $at > 60) {
 		$m = array(); $at = time();
-		try { $db = new PDO('sqlite:' . OEV_DB_FILE, null, null, array(PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
+		try { $db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 3, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
 			foreach ($db->query('SELECT id, volts_override FROM load_groups') as $g) $m[(int)$g['id']] = evse_volts_v($g['volts_override']); } catch (Exception $e) {}   // no column yet: none
 	}
 	return $m[(int)$gid] ?? null;

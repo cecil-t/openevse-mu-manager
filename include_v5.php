@@ -20,7 +20,8 @@ require_once __DIR__ . '/evse_prefs.php';   // TEMP_UNIT (display only)
 require_once __DIR__ . '/util_lib.php';     // h(), oev_sess_ro()
 chdir($__v5_cwd);
 
-define('EVSE_DB', 'sqlite:' . __DIR__ . '/openevse.db');
+require_once __DIR__ . '/db_path.php';     // OEV_DB_FILE
+define('EVSE_DB', 'sqlite:' . OEV_DB_FILE);
 // Our client id for claims (load balancing). Must stay below 2^31: the WiFi
 // firmware parses the id with String::toInt(), which saturates bigger values.
 define('EVSE_CLAIM_CLIENT', 0x48530001);   // "HS" + 1 = 1213399041
@@ -37,7 +38,7 @@ function evse_units($with_ids = array()){
 	$units = is_array($evses) ? $evses : array();
 	$with_ids = array_filter(array_map('intval', (array)$with_ids));
 	if ($with_ids) {
-		$dbh = new PDO(EVSE_DB);
+		$dbh = oev_cfg_db_open();
 		$st  = $dbh->prepare('SELECT * FROM evses WHERE id = ?');
 		foreach ($with_ids as $id) {
 			if (isset($units[$id])) continue;

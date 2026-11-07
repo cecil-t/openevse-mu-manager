@@ -6,7 +6,7 @@
  * encrypted (secret_lib.php) and never shown.
  ******************************************************************************/
 require_once __DIR__ . '/secret_lib.php';
-if (!defined('OEV_DB_FILE')) define('OEV_DB_FILE', __DIR__ . '/openevse.db');
+require_once __DIR__ . '/db_path.php';   // OEV_DB_FILE, oev_cfg_db_open()
 if (!defined('OEV_SERVER_TZ')) define('OEV_SERVER_TZ', date_default_timezone_get());   // before any override
 
 if (!defined('OEV_SITE_NAME_DEFAULT')) define('OEV_SITE_NAME_DEFAULT', 'OpenEVSE MU Manager');
@@ -29,7 +29,7 @@ function oev_settings($reload = false){
 	if ($s === null || $reload) {
 		$s = oev_settings_defaults();
 		try {
-			$db = new PDO('sqlite:' . OEV_DB_FILE, null, null, array(PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
+			$db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 3, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
 			foreach ($db->query('SELECT k, v FROM settings') as $r) $s[$r['k']] = $r['v'];
 			$db = null;
 		} catch (Exception $e) { /* no settings table yet: defaults */ }
@@ -39,7 +39,7 @@ function oev_settings($reload = false){
 function oev_setting($k, $default = null){ $s = oev_settings(); return array_key_exists($k, $s) ? $s[$k] : $default; }
 function oev_setting_int($k, $default, $min, $max){ $v = oev_setting($k); return (is_numeric($v) && (int)$v >= $min && (int)$v <= $max) ? (int)$v : $default; }
 function oev_settings_save($kv){
-	$db = new PDO('sqlite:' . OEV_DB_FILE, null, null, array(PDO::ATTR_TIMEOUT => 5, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+	$db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 5));
 	$st = $db->prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)');
 	foreach ($kv as $k => $v) $st->execute(array($k, (string)$v));
 	$db = null;

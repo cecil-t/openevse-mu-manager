@@ -15,6 +15,7 @@
  *    units' 30-second readings last arrived.
  *  - with $full: a quick TCP connect to the broker (MQTT_BIND:MQTT_PORT from loadbalancer/.env, 1 s).
  ******************************************************************************/
+require_once __DIR__ . '/db_path.php';     // oev_cfg_db_path()
 require_once __DIR__ . '/util_lib.php';   // oev_sess_ro()
 define('OEV_SYS_STATUS_FILE', __DIR__ . '/private/status/system.json');
 
@@ -28,7 +29,7 @@ function oev_sys_checks($full = false){
 	$hbage = $hb ? $now - (int)$hb['time'] : null; $hbok = $hb && $hbage <= 90;
 	$grouped = 0; $units = array();
 	try {
-		$db = new PDO('sqlite:' . $site . '/openevse.db', null, null, array(PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
+		$db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 3, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY), false, $site);
 		foreach ($db->query('SELECT id, enabled, loadgroupid, emon_mode FROM evses', PDO::FETCH_ASSOC) as $r) { $units[(int)$r['id']] = $r; if ($r['enabled'] && $r['loadgroupid']) $grouped++; }
 		$stuck = (int)$db->query("SELECT count(*) FROM jobs WHERE status = 'queued' AND created_at < " . ($now - 300))->fetchColumn();
 		$db = null;
@@ -128,7 +129,7 @@ function oev_sys_dbsizes($site = null, $sess = null){
 	$site = $site ?: __DIR__;
 	if ($sess === null) { require_once __DIR__ . '/sess_path.php'; $sess = defined('SESS_DB_PATH') ? SESS_DB_PATH : ''; }
 	$o = array();
-	foreach (array('Sessions (readings)' => $sess, 'Config (units, users, settings)' => $site . '/openevse.db') as $n => $f) {
+	foreach (array('Sessions (readings)' => $sess, 'Config (units, users, settings)' => oev_cfg_db_path($site)) as $n => $f) {
 		if ($f === '') continue; clearstatcache(true, $f);
 		$rel = strpos($f, $site . '/') === 0 ? substr($f, strlen($site) + 1) : basename($f);
 		$row = array('name' => $n, 'file' => $rel, 'size' => is_file($f) ? (int)@filesize($f) : null, 'side' => array());

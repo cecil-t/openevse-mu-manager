@@ -40,7 +40,7 @@ if ($ONCE) $DRY = true;   // --once never writes
 
 require __DIR__ . '/lb_core.php';
 require __DIR__ . '/mqtt.php';
-$cwd = getcwd(); chdir($SITE); require $SITE . '/include_v5.php'; chdir($cwd);
+$cwd = getcwd(); chdir($SITE); require $SITE . '/include_v5.php'; chdir($cwd);   // brings db_path.php (oev_cfg_db_path)
 
 function lb_log($msg){
 	global $RUN, $ONCE;
@@ -61,7 +61,7 @@ function lb_write_json($name, $data){ global $RUN; $t = "$RUN/$name.tmp"; file_p
 // Groups and their units from the site's database (read-only); unit secrets stay in memory.
 function lb_load_config(){
 	global $SITE;
-	$db = new PDO('sqlite:' . $SITE . '/openevse.db', null, null, [PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+	$db = new PDO('sqlite:' . oev_cfg_db_path($SITE), null, null, [PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 	$groups = [];
 	foreach ($db->query('SELECT id, name, max_load FROM load_groups') as $g) $groups[(int)$g['id']] = ['id'=>(int)$g['id'], 'name'=>$g['name'], 'limit'=>(int)$g['max_load'], 'units'=>[]];
 	$cols = array_column($db->query('PRAGMA table_info(evses)')->fetchAll(PDO::FETCH_ASSOC), 'name');

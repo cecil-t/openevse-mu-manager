@@ -49,7 +49,10 @@ else warn "docker not found: the load balancer and MQTT broker need it (the rest
 [ -n "$WU" ] && [ -n "$PHP" ] && { sudo -u "$WU" test -w "$SITE/collector" 2>/dev/null && ok "collector/ writable by $WU" || { [ $CHECK = 1 ] && warn "collector/ not writable by $WU (setup fixes this)"; }; }
 
 if [ $CHECK = 1 ]; then
-	for f in private/key/secret.key openevse.db loadbalancer/.env loadbalancer/secrets/coordinator.env; do [ -e "$SITE/$f" ] && ok "$f exists" || warn "$f not made yet"; done
+	for f in private/key/secret.key loadbalancer/.env loadbalancer/secrets/coordinator.env; do [ -e "$SITE/$f" ] && ok "$f exists" || warn "$f not made yet"; done
+	if [ -e "$SITE/data/openevse.db" ]; then ok "data/openevse.db exists"
+	elif [ -e "$SITE/openevse.db" ]; then ok "openevse.db exists (legacy root; move to data/ when ready)"
+	else warn "openevse.db not made yet"; fi
 	if [ -e "$SITE/data/sessions.db" ]; then ok "data/sessions.db exists"
 	elif [ -e "$SITE/sessions.db" ]; then ok "sessions.db exists (legacy root; move to data/ when ready)"
 	else warn "sessions.db not made yet"; fi
@@ -110,7 +113,7 @@ else
 fi
 
 echo "Databases"
-if [ -n "$ADMIN" ] && ! W "$PHP" -r '$d = new PDO("sqlite:" . $argv[1] . "/openevse.db"); try { exit((int)$d->query("SELECT count(*) FROM users")->fetchColumn() ? 0 : 1); } catch (Exception $e) { exit(1); }' "$SITE" 2>/dev/null; then
+if [ -n "$ADMIN" ] && ! W "$PHP" -r 'require $argv[1] . "/db_path.php"; try { $d = oev_cfg_db_open(array(), false, $argv[1]); exit((int)$d->query("SELECT count(*) FROM users")->fetchColumn() ? 0 : 1); } catch (Exception $e) { exit(1); }' "$SITE" 2>/dev/null; then
 	printf 'Password for %s (8+ characters, not shown): ' "$ADMIN"; stty -echo 2>/dev/null; read -r PW; stty echo 2>/dev/null; echo
 	printf '%s\n' "$PW" | W env OEV_ADMIN_EMAIL="$ADMIN" "$PHP" "$SITE/collector/setup_auth.php"; R=$?; PW=""
 else

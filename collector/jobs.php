@@ -25,7 +25,7 @@ require_once OEV_LB . '/tools/users_lib.php';           // lb_users_load(), lb_u
 function emon_server($v5){ $u = oev_site_url(); if ($u === '') return ''; $u .= 'emoncms'; return $v5 ? $u : preg_replace('#^https?://#', '', $u); }
 
 function jlog($m){ @file_put_contents(SESS_DIR . '/jobs.log', date('Y-m-d H:i:s') . ' ' . $m . "\n", FILE_APPEND | LOCK_EX); }
-function jdb(){ static $d = null; if (!$d) $d = new PDO('sqlite:' . OEV_SITE . '/openevse.db', null, null, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC)); return $d; }
+function jdb(){ static $d = null; if (!$d) $d = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC)); return $d; }
 function broker_port(){ foreach (@file(OEV_LB . '/.env', FILE_IGNORE_NEW_LINES) ?: array() as $l) if (preg_match('/^MQTT_PORT=(\d+)/', $l, $m)) return (int)$m[1]; return 1883; }   // MQTT_PORT in .env, default 1883
 function broker_ip(){ foreach (@file(OEV_LB . '/.env', FILE_IGNORE_NEW_LINES) ?: array() as $l) if (preg_match('/^MQTT_BIND=(\S+)/', $l, $m)) return $m[1]; return ''; }
 function finish($id, $ok, $msg){ jdb()->prepare("UPDATE jobs SET status = ?, msg = ?, done_at = ? WHERE id = ?")->execute(array($ok ? 'done' : 'failed', $msg, time(), $id)); jlog("job $id " . ($ok ? 'done' : 'FAILED') . ": $msg"); }

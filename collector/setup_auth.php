@@ -15,7 +15,7 @@
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 $site = dirname(__DIR__);
 require $site . '/settings_lib.php';
-$db = new PDO('sqlite:' . $site . '/openevse.db', null, null, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
+$db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC), true);   // setup may create it (data/openevse.db on a new install)
 if (!oev_key()) { fwrite(STDERR, "key file missing: " . OEV_KEY_FILE . "\n"); exit(1); }
 // units and load groups (a new install starts with none; add them in Settings)
 $db->exec("CREATE TABLE IF NOT EXISTS load_groups (id INTEGER PRIMARY KEY NOT NULL, name TEXT, max_load INTEGER DEFAULT 50);

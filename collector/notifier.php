@@ -31,7 +31,7 @@ $S = oev_settings();
 $stf = SESS_DIR . '/notify_state.json';
 $st = @json_decode((string)@file_get_contents($stf), true); if (!is_array($st)) $st = array();
 $now = time();
-$odb = new PDO('sqlite:' . OEV_SITE . '/openevse.db', null, null, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
+$odb = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
 $sdb = sess_db();
 $units = array(); foreach ($odb->query('SELECT id, name, enabled, loadgroupid FROM evses') as $u) $units[(int)$u['id']] = $u;
 $users = $odb->query('SELECT * FROM users')->fetchAll();
