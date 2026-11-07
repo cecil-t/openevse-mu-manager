@@ -38,7 +38,7 @@ function evse_units($with_ids = array()){
 	$units = is_array($evses) ? $evses : array();
 	$with_ids = array_filter(array_map('intval', (array)$with_ids));
 	if ($with_ids) {
-		$dbh = oev_cfg_db_open();
+		$dbh = oev_cfg_db_open(array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));   // reads only
 		$st  = $dbh->prepare('SELECT * FROM evses WHERE id = ?');
 		foreach ($with_ids as $id) {
 			if (isset($units[$id])) continue;

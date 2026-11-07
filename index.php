@@ -122,7 +122,7 @@ function idx_session($e, $s){
 // then units not in a group. Load balancer state from its heartbeat file (no unit calls).
 $lgroups = array();
 try {
-	$gdb = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 1));
+	$gdb = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 1, PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));
 	foreach ($gdb->query('SELECT id, name, max_load FROM load_groups ORDER BY id') as $g) $lgroups[(int)$g['id']] = array('name'=>$g['name'], 'limit'=>(int)$g['max_load'], 'keys'=>array());
 	$gdb = null;
 } catch (Exception $ex) { $lgroups = array(); }

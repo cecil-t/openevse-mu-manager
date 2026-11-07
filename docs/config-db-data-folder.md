@@ -31,42 +31,43 @@ coordinator (re-resolves on every 60-s config reload).
 - Coordinator container (uid 1023): READ-ONLY, reopens on every 60-s reload and re-resolves the path
   (needs the new coordinator.php, i.e. one restart; its heartbeat then carries cfg_resolver=1).
 
-## Maintenance contract (private/cfg_db_maint, created/removed only by cfg_db_move.php)
-- Every new config connection opens read-only: a write FAILS with an error instead of being lost.
-- Sign-in shows "paused for a minute"; token touches and logout deletes are skipped (pages still work).
-- jobs.php, notifier.php, setup_auth.php exit at start (logged).
-- Opens never create the file (SQLITE_OPEN_READWRITE without CREATE; PHP 8.1+; NAS PHP 8.4, image 8.3).
+## Writer exclusion (what the code enforces)
+- Every write-capable config connection made through oev_cfg_db_open() takes a SHARED flock on
+  data/cfg_db.lock BEFORE resolving the path and holds it until its process ends (a web request,
+  one jobs/notifier run). Read-only opens (coordinator, report pages, connection.php) take none.
+- private/cfg_db_maint (made only by cfg_db_move.php): new connections open read-only; sign-in
+  pauses, token/public-link touches and logout deletes are skipped; jobs.php, notifier.php and
+  setup_auth.php exit at start. Saves during the window fail with an error (not lost).
+- cfg_db_move.php takes the lock EXCLUSIVE before copying and keeps it until publication, so it
+  WAITS for any open write-capable connection, including one holding an uncommitted transaction
+  (test R1, move and rollback), or aborts after --lock-wait with nothing published and the write
+  kept (R2). New writers arriving meanwhile wait (bounded; web 503) and then open the new path (R4, R5).
+- With the lock held it also asks SQLite for BEGIN IMMEDIATE and checks for -journal/-wal/-shm:
+  a writer outside the contract caught in a transaction aborts the move with its write kept (R3).
+- The first drafts used timers (drain/settle) and were unsafe: a transaction opened before the flag
+  and committed after the settle wrote into the archived old file. Removed; no timers remain.
 
-## Why the first draft (8719604) was unsafe (proved in scratch tests, Nov 7)
-- It took SQLite's lock, then copy()/hash_file() opened and closed the DB file in the same process:
-  POSIX locks are per process, so closing ANY descriptor drops SQLite's lock. A writer got through
-  in 0.00 s instead of waiting (control: 1.5 s wait without the copy).
-- A writer waiting on the old file wrote into it after the rename (the write was in the premove copy,
-  not the live DB), and the script only reported it afterwards (exit 3).
-- It left a permanent openevse.db symlink in the site folder.
+## Honest limits (not enforced by code)
+- Anything that writes openevse.db without oev_cfg_db_open() (an old PHP request still running code
+  from before the deploy, a hand-run sqlite3, another tool) is not excluded. The script refuses until
+  the lock-contract code is --min-code-age (900 s) old and no jobs/notifier/setup process predates it;
+  web requests are bounded by PHP's max_execution_time, which must be below that.
+- A non-contract writer that starts writing after the BEGIN IMMEDIATE check is not caught by it.
+  SQLite refuses writes from a handle whose file was renamed (SQLITE_READONLY_DBMOVED) only for
+  transactions that start after the rename.
+- So the plan relies on: no human edits during the window (Greg agreed: no Settings changes), and the
+  known background writers being drained/paused by the flag and lock.
 
-## How the new script stays safe (tests/cfg_db_path_test.php, real concurrent processes)
-1. Preflight: regular file, no -wal/-shm/-journal, journal_mode asked from SQLite (WAL refused even
-   with no sidecars on disk), run as owner, no flag already, coordinator heartbeat has cfg_resolver.
-2. Flag on; wait for jobs/notifier/setup processes to end; then --drain seconds (default 30) for web
-   requests that opened before the flag. A write in this time lands in the old file BEFORE the copy (test A).
-3. sha256, VACUUM INTO (no descriptor of the DB is closed while SQLite holds a lock), sha256 again:
-   any write during the copy aborts with nothing published (test C). quick_check + per-table row counts; fsync.
-4. Publish: rename copy -> data/openevse.db, then rename old -> data/openevse.db.premove-<ts>.
-   The resolved path existed on every one of ~7 million checks during the move (test E).
-5. An old handle that writes after the rename gets "attempt to write a readonly database" from SQLite
-   itself (SQLITE_READONLY_DBMOVED, SQLite 3.8.3+; NAS 3.40.0): it fails loudly (test B).
-   Belt and braces: if the old file changes during --settle (default 10 s) the script puts it back,
-   moves the copy aside as .failed-<ts>, exits 3; nothing lost (test B2).
-6. Flag off. --verify re-checks the old file's saved sha256 any time later.
-Residual: none found for writes; a page that hit the window shows an error and the user retries.
-
-## Phases (each needs Greg's approval)
-1. Deploy code (backup, owner 1023:1023). No behaviour change: everything still uses ./openevse.db.
-2. Restart the coordinator once so it runs the new coordinator.php (heartbeat shows cfg_resolver=1).
-   Mosquitto is not restarted. Control pauses only for the container restart itself.
-3. Window: `sudo -n -u http php private/cfg_db_move.php --check`, then `--move` (about 30-45 s with
-   defaults; sign-in and saves fail during it, pages and charging continue). Then System status shows
-   data/openevse.db; GET /openevse/openevse.db -> 404, /openevse/data/ -> 403.
-4. Later: `--verify`; delete data/openevse.db.premove-* when happy. No symlink to remove.
-Rollback: `--rollback` (same procedure, copies the CURRENT data/openevse.db back; keeps later writes).
+## Minimal plan (each step needs Greg's approval)
+1. Deploy the code (backups, owner 1023:1023). Behaviour unchanged: still ./openevse.db.
+   sessions.db is not touched by any of this.
+2. Restart the coordinator container once (Mosquitto untouched). Needed: the running coordinator reads
+   ./openevse.db by a fixed path and would fail its reloads after the move; the new one re-resolves.
+   Load balancing pauses only while the container restarts. Do it when no test charge needs it.
+3. Wait >= 15 min after step 1 (script enforces). Greg makes no Settings changes.
+4. `sudo -n -u http php private/cfg_db_move.php --check`, then `--move`. Usually a few seconds; longer
+   only if a page/job is mid-write (bounded by --lock-wait=120, then aborts safely).
+5. Check System status shows data/openevse.db; /openevse/openevse.db -> 404; /openevse/data/ -> 403.
+   Later `--verify`, then delete data/openevse.db.premove-* when happy. No symlink exists.
+Rollback: `--rollback` (same procedure; copies the CURRENT data/openevse.db back).
+Tests: `php tests/cfg_db_path_test.php` (synthetic fixtures, real concurrent processes).

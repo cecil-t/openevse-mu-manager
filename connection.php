@@ -6,7 +6,7 @@
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { http_response_code(404); exit; }
 require_once __DIR__ . '/settings_lib.php';
 
-$dbh = oev_cfg_db_open();
+$dbh = oev_cfg_db_open(array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY));   // reads only
 $rs = $dbh->query('SELECT * FROM evses WHERE enabled ORDER BY name');
 while ($row = $rs->fetch(PDO::FETCH_ASSOC)) {
 	if (PHP_SAPI !== 'cli' && function_exists('oev_unit_visible') && !oev_unit_visible($row)) continue;
