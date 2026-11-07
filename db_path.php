@@ -19,7 +19,7 @@
  * open write-capable connection (including uncommitted transactions) to be gone,
  * and new ones wait (bounded) until the move is published, then open the new path.
  * Read-only opens (coordinator, report pages) take no lock and need no write access.
- * Maintenance (private/cfg_db_maint, made only by cfg_db_move.php): new connections
+ * Maintenance (data/cfg_db_maint, made only by cfg_db_move.php): new connections
  * open read-only (a write fails loudly) so the site keeps serving pages meanwhile.
  * Code that opens openevse.db without this function is NOT covered (see docs).
  ******************************************************************************/
@@ -37,7 +37,7 @@ if (!function_exists('oev_cfg_db_path')) {
 	}
 	function oev_cfg_maint($site = null){
 		$site = ($site !== null && $site !== '') ? rtrim(str_replace('\\', '/', (string)$site), '/') : str_replace('\\', '/', __DIR__);
-		return is_file($site . '/private/cfg_db_maint');
+		return is_file($site . '/data/cfg_db_maint');
 	}
 	// Shared writer lock, held for the rest of the process. Bounded wait; web: 503 on timeout.
 	function oev_cfg_lock_sh($site = null, $wait = null){

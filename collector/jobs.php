@@ -15,7 +15,7 @@ define('SESS_DIR', __DIR__);
 define('OEV_SITE', dirname(__DIR__));
 define('OEV_LB', OEV_SITE . '/loadbalancer');
 chdir(OEV_SITE);
-if (is_file(OEV_SITE . '/private/cfg_db_maint')) { @file_put_contents(SESS_DIR . '/jobs.log', date('Y-m-d H:i:s') . " INFO config DB maintenance; jobs skipped\n", FILE_APPEND | LOCK_EX); exit(0); }
+if (is_file(OEV_SITE . '/data/cfg_db_maint')) { @file_put_contents(SESS_DIR . '/jobs.log', date('Y-m-d H:i:s') . " INFO config DB maintenance; jobs skipped\n", FILE_APPEND | LOCK_EX); exit(0); }
 if (is_file(OEV_SITE . '/private/sess_writers_pause')) { @file_put_contents(SESS_DIR . '/jobs.log', date('Y-m-d H:i:s') . " INFO writers paused; jobs skipped\n", FILE_APPEND | LOCK_EX); exit(0); }
 require OEV_SITE . '/include_v5.php';
 require OEV_SITE . '/sessions_lib.php';

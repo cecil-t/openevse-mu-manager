@@ -3,7 +3,7 @@
  * private/cfg_db_move.php - move the config DB (openevse.db) into data/, or back.
  * MAINTENANCE ONLY. Run as the web user (the file's owner), never from the web:
  *   sudo -n -u http php private/cfg_db_move.php --check | --move | --rollback | --verify
- *   options: --lock-wait=SEC (default 120)  --min-code-age=SEC (default 900)  --site=DIR (tests)
+ *   options: --lock-wait=SEC (default 120)  --min-code-age=SEC (default 0)  --site=DIR (tests)
  *            --no-coordinator-check (only for a site with no load balancer)
  *
  * Writer exclusion (db_path.php): every write-capable connection holds a SHARED
@@ -11,7 +11,7 @@
  * This script holds it EXCLUSIVE from before the copy until after publication, so no
  * cooperating writer can have the old file open for writing (not even inside an
  * uncommitted transaction) while it is copied and replaced. Not a timer.
- * While private/cfg_db_maint exists new connections open read-only (pages keep
+ * While data/cfg_db_maint exists new connections open read-only (pages keep
  * serving; saves fail loudly); writers that started earlier are waited for.
  *
  * Enforced preconditions (refuses otherwise):
@@ -19,9 +19,11 @@
  *    no -wal/-shm/-journal file
  *  - run as the file owner; no maintenance flag already present
  *  - coordinator heartbeat is fresh and has cfg_resolver=1 (it re-resolves the path)
- *  - the lock-contract code (db_path.php and its callers) has been on disk for
- *    --min-code-age seconds (default 900) and no jobs/notifier/setup process started
- *    before it (so no pre-contract CLI process can still be writing)
+ *  - no jobs/notifier/setup process started before the current code was written
+ *    (so no pre-contract CLI process can still be writing); optional --min-code-age
+ *  - with the lock held: no other process has the database file open (checked in
+ *    /proc as the web user, retried until --lock-wait). Every later opener runs the
+ *    new code (PHP opcache revalidates changed files within seconds).
  *  - EXCLUSIVE lock obtained within --lock-wait seconds (default 120), else abort
  *  - with the lock held, SQLite grants BEGIN IMMEDIATE at once (no hidden writer
  *    outside the contract holds a write transaction right now)
@@ -36,7 +38,7 @@
  * No symlink is left behind: after --move the site folder has no openevse.db.
  ******************************************************************************/
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
-$o = array('lock-wait' => 120, 'min-code-age' => 900, 'site' => dirname(__DIR__), 'coord' => true); $mode = null;
+$o = array('lock-wait' => 120, 'min-code-age' => 0, 'site' => dirname(__DIR__), 'coord' => true); $mode = null;
 foreach (array_slice($argv, 1) as $a) {
 	if (preg_match('/^--(lock-wait|min-code-age)=(\d+(\.\d+)?)$/', $a, $m)) $o[$m[1]] = (float)$m[2];
 	elseif (preg_match('/^--site=(.+)$/', $a, $m)) $o['site'] = rtrim($m[1], '/');
@@ -45,12 +47,17 @@ foreach (array_slice($argv, 1) as $a) {
 	else { fwrite(STDERR, "unknown option $a\n"); exit(2); }
 }
 $mode = $mode ?: '--check';
-$site = $o['site']; $root = "$site/openevse.db"; $data = "$site/data/openevse.db"; $flag = "$site/private/cfg_db_maint"; $ts = date('Ymd-His');
+$site = $o['site']; $root = "$site/openevse.db"; $data = "$site/data/openevse.db"; $flag = "$site/data/cfg_db_maint"; $ts = date('Ymd-His');
 function out($m){ echo $m, "\n"; }
 function fail($m, $c = 1){ fwrite(STDERR, "cfg_db_move: $m\n"); exit($c); }
 function sha($f){ clearstatcache(true, $f); return is_file($f) ? hash_file('sha256', $f) : null; }
 function ro($f){ return new PDO('sqlite:' . $f, null, null, array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 10)); }
 function counts($f){ $d = ro($f); $r = array(); foreach ($d->query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN) as $t) $r[$t] = (int)$d->query('SELECT count(*) FROM "' . str_replace('"', '""', $t) . '"')->fetchColumn(); $d = null; return $r; }
+function holders($f){   // other processes with $f open (same user's /proc fds; root-owned ones are not visible)
+	$rp = realpath($f); $me = getmypid(); $n = array();
+	foreach (glob('/proc/[0-9]*/fd/*') ?: array() as $l) { $pid = (int)explode('/', $l)[2]; if ($pid === $me) continue; if (@readlink($l) === $rp) $n[$pid] = 1; }
+	return array_keys($n);
+}
 function old_writers($site, $since){   // jobs/notifier/setup processes for this site started before $since (Linux /proc)
 	$n = 0; foreach (glob('/proc/[0-9]*/cmdline') ?: array() as $c) { $s = str_replace("\0", ' ', (string)@file_get_contents($c));
 		if (strpos($s, $site . '/collector/') !== false && preg_match('~/collector/(jobs|notifier|setup_auth)\.php~', $s) && (int)@filemtime(dirname($c)) < $since) $n++; }
@@ -68,7 +75,7 @@ if (!is_dir("$site/data")) fail('data/ folder missing');
 if (!is_file($src) || is_link($src)) fail('source is not a regular file: ' . substr($src, strlen($site) + 1));
 if (file_exists($dst) || is_link($dst)) fail('target already exists: ' . substr($dst, strlen($site) + 1));
 if (function_exists('posix_geteuid') && posix_geteuid() !== fileowner($src)) fail('run as the file owner (the web user)');
-if (file_exists($flag)) fail('maintenance flag already present (another run?): private/cfg_db_maint');
+if (file_exists($flag)) fail('maintenance flag already present (another run?): data/cfg_db_maint');
 $d = ro($src); $jm = strtolower((string)$d->query('PRAGMA journal_mode')->fetchColumn()); $d = null;
 if ($jm === 'wal') fail('journal_mode is WAL; not supported');
 $st = stat($src);
@@ -85,13 +92,14 @@ if ($mode !== '--check') {
 if ($mode === '--check') exit(0);
 
 // 2. maintenance flag (new connections read-only), then the EXCLUSIVE writer lock
-if (!@touch($flag)) fail('cannot create private/cfg_db_maint');
+if (!@touch($flag)) fail('cannot create data/cfg_db_maint');
 $tmp = dirname($dst) . '/.openevse.db.tmp-' . getmypid();
 $lk = @fopen("$site/data/cfg_db.lock", 'c');
 $abort = function($m, $c = 1) use ($flag, $tmp, &$lk){ @unlink($tmp); @unlink($flag); if ($lk) { flock($lk, LOCK_UN); fclose($lk); } fail($m . ' (aborted; nothing moved; maintenance flag removed)', $c); };
 if (!$lk) $abort('cannot open data/cfg_db.lock');
 $until = microtime(true) + $o['lock-wait'];
 while (!flock($lk, LOCK_EX | LOCK_NB)) { if (microtime(true) > $until) $abort('writers still hold the config DB after ' . $o['lock-wait'] . ' s', 5); usleep(100000); }
+while ($hp = holders($src)) { if (microtime(true) > $until) $abort('processes still have the database open: pids ' . implode(',', $hp), 5); usleep(100000); }
 // 3. copy under the lock
 foreach (array('-wal', '-shm', '-journal') as $x) if (file_exists($src . $x)) $abort("source has a $x file with all contract writers gone (WAL mode or a writer outside the contract)", 3);
 try {

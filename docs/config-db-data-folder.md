@@ -35,7 +35,7 @@ coordinator (re-resolves on every 60-s config reload).
 - Every write-capable config connection made through oev_cfg_db_open() takes a SHARED flock on
   data/cfg_db.lock BEFORE resolving the path and holds it until its process ends (a web request,
   one jobs/notifier run). Read-only opens (coordinator, report pages, connection.php) take none.
-- private/cfg_db_maint (made only by cfg_db_move.php): new connections open read-only; sign-in
+- data/cfg_db_maint (made only by cfg_db_move.php): new connections open read-only; sign-in
   pauses, token/public-link touches and logout deletes are skipped; jobs.php, notifier.php and
   setup_auth.php exit at start. Saves during the window fail with an error (not lost).
 - cfg_db_move.php takes the lock EXCLUSIVE before copying and keeps it until publication, so it
@@ -64,7 +64,7 @@ coordinator (re-resolves on every 60-s config reload).
 2. Restart the coordinator container once (Mosquitto untouched). Needed: the running coordinator reads
    ./openevse.db by a fixed path and would fail its reloads after the move; the new one re-resolves.
    Load balancing pauses only while the container restarts. Do it when no test charge needs it.
-3. Wait >= 15 min after step 1 (script enforces). Greg makes no Settings changes.
+3. Greg makes no Settings changes. (No fixed wait; the script checks open handles instead.)
 4. `sudo -n -u http php private/cfg_db_move.php --check`, then `--move`. Usually a few seconds; longer
    only if a page/job is mid-write (bounded by --lock-wait=120, then aborts safely).
 5. Check System status shows data/openevse.db; /openevse/openevse.db -> 404; /openevse/data/ -> 403.
