@@ -217,8 +217,8 @@ foreach ($sec[1] as $k) {
 </tr>
 </table>
 <script>
-	var difference = (new Date() - new Date(<?=date('U')*1000;?>)) / 1000;
-	if (Math.abs(difference) >= 300) { document.getElementById('td_time').style.backgroundColor='#ffa'; }
+	// yellow when the shown data (the "as of" time) is 5+ min old, not when the page is (a phone tab resumed from cache)
+	var asOf = OEVLive.asOf(document.getElementById('td_time'), <?=(int)date('U')?>);
 	// a load balancer note that doesn't fit next to the session is dropped (narrow phones)
 	function fitNotes(){ document.querySelectorAll('dl.units dd').forEach(function(d){ var n = d.querySelector('.nt'), s = d.querySelector('.ss'); if (!n || n.textContent === '') return; n.style.display = ''; if (d.scrollWidth > d.clientWidth + 1 || (s && s.scrollWidth > s.clientWidth + 1)) n.style.display = 'none'; }); }
 	fitNotes();
@@ -258,6 +258,7 @@ foreach ($sec[1] as $k) {
 		}
 		OEVLive.poll('lbstate.php', function(j){
 			apply(j);
+			asOf.update(j);
 			if (!j.ok) OEVLive.dot('x', 'No load balancer');
 			else OEVLive.light(j, 'Live: load balancer data ' + j.age + ' s old, updated every 5 s');
 		});
