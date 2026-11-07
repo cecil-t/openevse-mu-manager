@@ -134,13 +134,19 @@ ck('F: re-resolving reader opens data/ after the move', oev_cfg_db_path($s) === 
 
 // R8: a process outside the contract holding the file open (no transaction) -> move waits for it, aborts if it stays
 $s = $site(); $mk("$s/openevse.db", 'orig');
-$code = '$h=fopen($argv[1],"r"); sleep(3); fclose($h); echo "closed";';
+$code = '$h=fopen($argv[1],"r+"); sleep(3); fclose($h); echo "closed";';
 exec(escapeshellarg($php) . ' -r ' . escapeshellarg($code) . ' ' . escapeshellarg("$s/openevse.db") . " > $s/wR8 2>&1 &"); usleep(300000);
 list($rc) = $run($s, '--move --no-coordinator-check --lock-wait=1'); sleep(3);
-ck('R8: open file handle elsewhere -> exit 5, nothing published', $rc === 5 && !file_exists("$s/data/openevse.db") && !file_exists("$s/data/cfg_db_maint"));
+ck('R8: writable file handle elsewhere -> exit 5, nothing published', $rc === 5 && !file_exists("$s/data/openevse.db") && !file_exists("$s/data/cfg_db_maint"));
 exec(escapeshellarg($php) . ' -r ' . escapeshellarg($code) . ' ' . escapeshellarg("$s/openevse.db") . " > $s/wR8 2>&1 &"); usleep(300000);
 list($rc) = $run($s, '--move --no-coordinator-check --lock-wait=10');
 ck('R8: ... and proceeds once it closed', $rc === 0 && trim(file_get_contents("$s/wR8")) === 'closed' && $val("$s/data/openevse.db") === 'orig');
+// R9: a read-only handle elsewhere (like the coordinator's) does not block; it cannot write
+$s = $site(); $mk("$s/openevse.db", 'orig');
+$code = '$d=new PDO("sqlite:".$argv[1],null,null,[PDO::SQLITE_ATTR_OPEN_FLAGS=>PDO::SQLITE_OPEN_READONLY]); $d->query("select 1")->fetchAll(); $h=fopen($argv[1],"r"); sleep(3); echo "done";';
+exec(escapeshellarg($php) . ' -r ' . escapeshellarg($code) . ' ' . escapeshellarg("$s/openevse.db") . " > $s/wR9 2>&1 &"); usleep(300000);
+list($rc) = $run($s, '--move --no-coordinator-check --lock-wait=1');
+ck('R9: read-only holder does not block the move', $rc === 0 && $val("$s/data/openevse.db") === 'orig'); sleep(3);
 echo "-- fault injection\n";
 $s = $site(); $mk("$s/openevse.db", 'orig'); chmod("$s/private", 0555);   // as on the NAS: private/ not writable by the web user
 list($rc, $o) = $run($s, '--move --no-coordinator-check'); chmod("$s/private", 0755);

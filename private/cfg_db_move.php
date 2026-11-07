@@ -21,7 +21,7 @@
  *  - coordinator heartbeat is fresh and has cfg_resolver=1 (it re-resolves the path)
  *  - no jobs/notifier/setup process started before the current code was written
  *    (so no pre-contract CLI process can still be writing); optional --min-code-age
- *  - with the lock held: no other process has the database file open (checked in
+ *  - with the lock held: no other process has the database file open for writing (in
  *    /proc as the web user, retried until --lock-wait). Every later opener runs the
  *    new code (PHP opcache revalidates changed files within seconds).
  *  - EXCLUSIVE lock obtained within --lock-wait seconds (default 120), else abort
@@ -53,9 +53,11 @@ function fail($m, $c = 1){ fwrite(STDERR, "cfg_db_move: $m\n"); exit($c); }
 function sha($f){ clearstatcache(true, $f); return is_file($f) ? hash_file('sha256', $f) : null; }
 function ro($f){ return new PDO('sqlite:' . $f, null, null, array(PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READONLY, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 10)); }
 function counts($f){ $d = ro($f); $r = array(); foreach ($d->query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN) as $t) $r[$t] = (int)$d->query('SELECT count(*) FROM "' . str_replace('"', '""', $t) . '"')->fetchColumn(); $d = null; return $r; }
-function holders($f){   // other processes with $f open (same user's /proc fds; root-owned ones are not visible)
+function holders($f){   // other processes with $f open for writing (same user's /proc fds; root-owned ones are not visible)
 	$rp = realpath($f); $me = getmypid(); $n = array();
-	foreach (glob('/proc/[0-9]*/fd/*') ?: array() as $l) { $pid = (int)explode('/', $l)[2]; if ($pid === $me) continue; if (@readlink($l) === $rp) $n[$pid] = 1; }
+	foreach (glob('/proc/[0-9]*/fd/*') ?: array() as $l) { $pid = (int)explode('/', $l)[2]; if ($pid === $me) continue; if (@readlink($l) !== $rp) continue;
+		$fi = (string)@file_get_contents(str_replace('/fd/', '/fdinfo/', $l)); $fl = preg_match('/^flags:\s*([0-7]+)/m', $fi, $m) ? octdec($m[1]) : 2;
+		if (($fl & 3) !== 0) $n[$pid] = 1; }   // only handles that can write (O_WRONLY/O_RDWR) block; read-only ones cannot write
 	return array_keys($n);
 }
 function old_writers($site, $since){   // jobs/notifier/setup processes for this site started before $since (Linux /proc)
