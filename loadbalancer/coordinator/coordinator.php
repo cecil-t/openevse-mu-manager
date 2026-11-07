@@ -520,6 +520,7 @@ function lb_heartbeat(){
 			'charging'=>$r['charging'] ?? false, 'monitor'=>true];
 	}
 	$out['actions'] = array_slice($state['actions'] ?? [], -10);
+	$out['cfg_resolver'] = 1;   // this coordinator finds openevse.db via db_path.php on every reload (private/cfg_db_move.php checks it)
 	lb_write_json('heartbeat.json', $out);
 	if ($mq && $mq->connected) { static $lp = 0; if (time() - $lp >= 60) { $mq->publish($cfg['mqtt_prefix'] . '/lb/status', $out['mode'], true); $lp = time(); } }
 }

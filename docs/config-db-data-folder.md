@@ -21,32 +21,52 @@ Switched: settings_lib, auth_lib, volts_lib, connection, include_v5 (EVSE_DB), i
 (System status size), collector/jobs, collector/notifier, collector/setup_auth, setup.sh, and the
 coordinator (re-resolves on every 60-s config reload).
 
-## Who has openevse.db open
-- Web pages (Apache/PHP as http): open per request; follow the move on the next request.
-- Task Scheduler (root -> runs as http): "OpenEVSE session collector" (collector/collector.php) and
-  "OpenEVSE jobs and notifications" (private/jobs_root.sh -> jobs.php, notifier.php), every minute;
-  each run re-resolves.
-- Coordinator container (uid 1023, site mounted read-only at the same path): reloads config every
-  60 s. Until it is restarted with the new coordinator.php it keeps the old path, which the move
-  turns into a symlink `openevse.db -> data/openevse.db`, so it keeps reading the right file.
-  Restart is NOT needed for the move; do it later in any normal window to drop the symlink use.
-  Its in-memory config keeps control running between reloads.
+## Who writes openevse.db (all go through oev_cfg_db_open)
+- Web (PHP as http): sign-in (login_fails, auth_tokens, users.last_login_at, rehash), token / public-link
+  `last_used_at` touches on page views, logout, Settings saves (settings, units, groups, users,
+  public links, jobs queue, reminders), account.php.
+- Task Scheduler as http, every minute: collector/jobs.php and collector/notifier.php
+  ("OpenEVSE jobs and notifications" -> private/jobs_root.sh). collector/collector.php only reads it.
+- collector/setup_auth.php (setup / upgrades; the only code allowed to create the file).
+- Coordinator container (uid 1023): READ-ONLY, reopens on every 60-s reload and re-resolves the path
+  (needs the new coordinator.php, i.e. one restart; its heartbeat then carries cfg_resolver=1).
 
-## Window (approval needed)
-1. Deploy the code above (backup in backups/, owner 1023:1023 kept). No behaviour change yet.
-2. `sudo -n -u http php private/cfg_db_move.php --check`
-3. `sudo -n -u http php private/cfg_db_move.php --move` - holds SQLite's write lock while it copies,
-   checks (quick_check + sha256), renames into data/, keeps the old file as
-   data/openevse.db.premove-<ts>, and swaps the root name for the compat symlink. Takes about
-   2 seconds; readers keep working; a Settings save/login in that moment waits on the lock.
-   Exit 3 = a waiting writer wrote to the old file after the copy: re-apply by hand from the
-   premove file or roll back.
-4. Check: System status shows data/openevse.db; `/openevse/openevse.db` and `/openevse/data/` deny.
-Charging does not depend on the web app: the coordinator keeps its loaded config and the units
-keep their own limits. No unit commands, no restarts, no recording pause needed.
+## Maintenance contract (private/cfg_db_maint, created/removed only by cfg_db_move.php)
+- Every new config connection opens read-only: a write FAILS with an error instead of being lost.
+- Sign-in shows "paused for a minute"; token touches and logout deletes are skipped (pages still work).
+- jobs.php, notifier.php, setup_auth.php exit at start (logged).
+- Opens never create the file (SQLITE_OPEN_READWRITE without CREATE; PHP 8.1+; NAS PHP 8.4, image 8.3).
 
-## Rollback (keeps writes made after the move)
-`sudo -n -u http php private/cfg_db_move.php --rollback` copies the CURRENT data/openevse.db back
-under the same lock, replaces the symlink with the file, and renames data/openevse.db aside.
+## Why the first draft (8719604) was unsafe (proved in scratch tests, Nov 7)
+- It took SQLite's lock, then copy()/hash_file() opened and closed the DB file in the same process:
+  POSIX locks are per process, so closing ANY descriptor drops SQLite's lock. A writer got through
+  in 0.00 s instead of waiting (control: 1.5 s wait without the copy).
+- A writer waiting on the old file wrote into it after the rename (the write was in the premove copy,
+  not the live DB), and the script only reported it afterwards (exit 3).
+- It left a permanent openevse.db symlink in the site folder.
 
-Tests: `php tests/cfg_db_path_test.php` (synthetic fixtures only).
+## How the new script stays safe (tests/cfg_db_path_test.php, real concurrent processes)
+1. Preflight: regular file, no -wal/-shm/-journal, journal_mode asked from SQLite (WAL refused even
+   with no sidecars on disk), run as owner, no flag already, coordinator heartbeat has cfg_resolver.
+2. Flag on; wait for jobs/notifier/setup processes to end; then --drain seconds (default 30) for web
+   requests that opened before the flag. A write in this time lands in the old file BEFORE the copy (test A).
+3. sha256, VACUUM INTO (no descriptor of the DB is closed while SQLite holds a lock), sha256 again:
+   any write during the copy aborts with nothing published (test C). quick_check + per-table row counts; fsync.
+4. Publish: rename copy -> data/openevse.db, then rename old -> data/openevse.db.premove-<ts>.
+   The resolved path existed on every one of ~7 million checks during the move (test E).
+5. An old handle that writes after the rename gets "attempt to write a readonly database" from SQLite
+   itself (SQLITE_READONLY_DBMOVED, SQLite 3.8.3+; NAS 3.40.0): it fails loudly (test B).
+   Belt and braces: if the old file changes during --settle (default 10 s) the script puts it back,
+   moves the copy aside as .failed-<ts>, exits 3; nothing lost (test B2).
+6. Flag off. --verify re-checks the old file's saved sha256 any time later.
+Residual: none found for writes; a page that hit the window shows an error and the user retries.
+
+## Phases (each needs Greg's approval)
+1. Deploy code (backup, owner 1023:1023). No behaviour change: everything still uses ./openevse.db.
+2. Restart the coordinator once so it runs the new coordinator.php (heartbeat shows cfg_resolver=1).
+   Mosquitto is not restarted. Control pauses only for the container restart itself.
+3. Window: `sudo -n -u http php private/cfg_db_move.php --check`, then `--move` (about 30-45 s with
+   defaults; sign-in and saves fail during it, pages and charging continue). Then System status shows
+   data/openevse.db; GET /openevse/openevse.db -> 404, /openevse/data/ -> 403.
+4. Later: `--verify`; delete data/openevse.db.premove-* when happy. No symlink to remove.
+Rollback: `--rollback` (same procedure, copies the CURRENT data/openevse.db back; keeps later writes).

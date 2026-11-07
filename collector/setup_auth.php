@@ -14,6 +14,7 @@
  ******************************************************************************/
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 $site = dirname(__DIR__);
+if (is_file($site . '/private/cfg_db_maint')) { fwrite(STDERR, "config DB maintenance in progress\n"); exit(1); }
 require $site . '/settings_lib.php';
 $db = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC), true);   // setup may create it (data/openevse.db on a new install)
 if (!oev_key()) { fwrite(STDERR, "key file missing: " . OEV_KEY_FILE . "\n"); exit(1); }

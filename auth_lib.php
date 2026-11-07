@@ -45,7 +45,7 @@ function oev_user(){
 			$st = oev_db()->prepare('SELECT t.id tid, t.token_hash, t.last_used_at, u.* FROM auth_tokens t JOIN users u ON u.id = t.user_id WHERE t.selector = ?');
 			$st->execute(array($t[0])); $r = $st->fetch();
 			if ($r && hash_equals($r['token_hash'], hash('sha256', $t[1]))) {
-				if (time() - (int)$r['last_used_at'] > 3600) oev_db()->prepare('UPDATE auth_tokens SET last_used_at = ? WHERE id = ?')->execute(array(time(), $r['tid']));
+				if (time() - (int)$r['last_used_at'] > 3600 && !oev_cfg_maint()) oev_db()->prepare('UPDATE auth_tokens SET last_used_at = ? WHERE id = ?')->execute(array(time(), $r['tid']));
 				unset($r['token_hash'], $r['pass_hash']);
 				$r['groups'] = oev_user_groups((int)$r['id']);
 				$r['token_id'] = (int)$r['tid'];
@@ -138,6 +138,7 @@ function oev_csrf_check(){ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !oev_csr
 
 /* ---------- log in / out ---------- */
 function oev_login($email, $pass){
+	if (oev_cfg_maint()) return 'Sign-in is paused for a minute of maintenance. Try again shortly.';
 	$db = oev_db(); $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 	$db->prepare('DELETE FROM login_fails WHERE ts < ?')->execute(array(time() - 900));
 	$st = $db->prepare('SELECT count(*) FROM login_fails WHERE ip = ? OR email = ?'); $st->execute(array($ip, strtolower($email)));
@@ -160,7 +161,7 @@ function oev_login($email, $pass){
 }
 function oev_logout($everywhere = false){
 	$u = oev_user();
-	if ($u && $u['role'] !== 'public') {
+	if ($u && $u['role'] !== 'public' && !oev_cfg_maint()) {
 		if ($everywhere) oev_db()->prepare('DELETE FROM auth_tokens WHERE user_id = ?')->execute(array($u['id']));
 		else oev_db()->prepare('DELETE FROM auth_tokens WHERE id = ?')->execute(array($u['token_id']));
 	}
@@ -178,7 +179,7 @@ function oev_public_check($v){
 	$t = oev_split_token($v); if (!$t) return null;
 	$st = oev_db()->prepare('SELECT * FROM public_links WHERE selector = ? AND revoked_at IS NULL'); $st->execute(array($t[0])); $r = $st->fetch();
 	if (!$r || !hash_equals($r['token_hash'], hash('sha256', $t[1]))) return null;
-	if (time() - (int)$r['last_used_at'] > 3600) oev_db()->prepare('UPDATE public_links SET last_used_at = ? WHERE id = ?')->execute(array(time(), $r['id']));
+	if (time() - (int)$r['last_used_at'] > 3600 && !oev_cfg_maint()) oev_db()->prepare('UPDATE public_links SET last_used_at = ? WHERE id = ?')->execute(array(time(), $r['id']));
 	return $r;
 }
 // oev_site_url(): settings_lib.php (Settings > Preferences > Site web address, or detected)
