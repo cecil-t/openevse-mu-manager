@@ -337,7 +337,7 @@ $c = new PDO('sqlite::memory:'); $c->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMOD
 $c->exec("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, role TEXT, scope_all INTEGER, n_errors INTEGER DEFAULT 0, n_reboots INTEGER DEFAULT 0, n_sessions INTEGER DEFAULT 0, n_reminders INTEGER DEFAULT 0)");
 $c->exec("INSERT INTO users (email, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders) VALUES ('a@x.test', 'admin', 1, 1, 1, 1, 1)");
 ck('migration: column missing before', !oev_users_have_stops($c));
-ck('migration adds n_stops and n_stops_since', oev_users_stop_cols($c) === array('n_stops', 'n_stops_since'));
+ck('migration adds n_stops, n_stops_since and n_sessions_since', oev_users_stop_cols($c) === array('n_stops', 'n_stops_since', 'n_sessions_since'));
 ck('migration again: nothing to do', oev_users_stop_cols($c) === array());
 $r = $c->query('SELECT * FROM users')->fetch(PDO::FETCH_ASSOC);
 ck('existing user: Charging stopped off, other prefs kept', (int)$r['n_stops'] === 0 && $r['n_stops_since'] === null && (int)$r['n_sessions'] === 1 && (int)$r['n_errors'] === 1 && (int)$r['n_reboots'] === 1 && (int)$r['n_reminders'] === 1);

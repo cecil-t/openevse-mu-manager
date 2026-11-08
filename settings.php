@@ -188,6 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$db->prepare('DELETE FROM evses WHERE id = ?')->execute(array($id));
 		$db->prepare("UPDATE jobs SET status = 'replaced', done_at = ? WHERE status = 'queued' AND unit_id = ?")->execute(array(time(), $id));
 		$db->prepare('DELETE FROM reminders WHERE unit_id = ?')->execute(array($id));
+		oev_unit_notify_forget($db, null, $id);   // everyone's per-unit notification choices for it
 		back('units', 'Unit removed. Its session history stays in the reports. Nothing was changed on the unit itself.');
 	}
 	/* ---- groups ---- */
@@ -247,6 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$id = (int)$P('id'); $email = strtolower($P('email')); $role = $P('role') === 'admin' ? 'admin' : 'viewer'; $all = ($role === 'admin' || $P('scope') === 'all') ? 1 : 0;   // admins always see everything
 		$gs = array_values(array_intersect(array_map('intval', (array)($_POST['groups'] ?? array())), array_keys($gname)));
 		$n = array(); foreach (array('errors', 'reboots', 'sessions') as $k) $n[$k] = isset($_POST['n_' . $k]) ? 1 : 0;
+		$hss = oev_users_have_col($db, 'n_sessions_since');   // added by setup_auth.php
 		$hs = oev_users_have_stops($db); $nst = isset($_POST['n_stops']) ? 1 : 0;   // Charging stopped (column added by setup_auth.php)
 		$fn = substr($P('first_name'), 0, 60); $ln = substr($P('last_name'), 0, 60);
 		if (!filter_var($email, FILTER_VALIDATE_EMAIL)) back('users', 'Enter a valid email address.', $id ? "p$id" : 'addu');
@@ -255,14 +257,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($a === 'user_add' || $pw !== '') { $pp = oev_password_problem($pw); if ($pp) back('users', $pp, $id ? "p$id" : 'addu'); }
 		try {
 			if ($a === 'user_add') {
-				$db->prepare('INSERT INTO users (email, first_name, last_name, pass_hash, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders, created_at) VALUES (?,?,?,?,?,?,?,?,?,0,?)')
-					->execute(array($email, $fn, $ln, password_hash($pw, PASSWORD_DEFAULT), $role, $all, $n['errors'], $n['reboots'], $n['sessions'], time()));
+				// Session summary and its start time in ONE statement (a reader never sees it on without its time)
+				$db->prepare('INSERT INTO users (email, first_name, last_name, pass_hash, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders, created_at' . ($hss ? ', n_sessions_since' : '') . ') VALUES (?,?,?,?,?,?,?,?,?,0,?' . ($hss ? ',?' : '') . ')')
+					->execute(array_merge(array($email, $fn, $ln, password_hash($pw, PASSWORD_DEFAULT), $role, $all, $n['errors'], $n['reboots'], $n['sessions'], time()), $hss ? array($n['sessions'] ? time() : null) : array()));
 				$id = (int)$db->lastInsertId();
 				if ($hs && $nst) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
 			} else {
 				if ($id === (int)$me['id'] && $role !== 'admin') back('users', 'You can\'t take admin away from your own login.', "p$id");
-				$db->prepare('UPDATE users SET email = ?, first_name = ?, last_name = ?, role = ?, scope_all = ?, n_errors = ?, n_reboots = ?, n_sessions = ? WHERE id = ?')
-					->execute(array($email, $fn, $ln, $role, $all, $n['errors'], $n['reboots'], $n['sessions'], $id));
+				// Session summary and its start time in ONE statement (CASE reads the row as it was): off -> on stamps now,
+				// on -> off clears it, unchanged keeps it (an old "on" with no time stays as it is)
+				$db->prepare('UPDATE users SET email = ?, first_name = ?, last_name = ?, role = ?, scope_all = ?, n_errors = ?, n_reboots = ?, n_sessions = ?'
+					. ($hss ? ', n_sessions_since = CASE WHEN CAST(? AS INTEGER) = 0 THEN NULL WHEN coalesce(n_sessions, 0) = 0 THEN CAST(? AS INTEGER) ELSE n_sessions_since END' : '') . ' WHERE id = ?')
+					->execute(array_merge(array($email, $fn, $ln, $role, $all, $n['errors'], $n['reboots'], $n['sessions']), $hss ? array($n['sessions'], time()) : array(), array($id)));
 				if ($hs) {   // Charging stopped: remember when it was turned on (nothing older is sent)
 					$was = (int)$db->query('SELECT n_stops FROM users WHERE id = ' . $id)->fetchColumn();
 					if ($nst && !$was) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
@@ -279,6 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$id = (int)$P('id');
 		if ($id === (int)$me['id']) back('users', 'You can\'t remove your own login.');
 		foreach (array('DELETE FROM auth_tokens WHERE user_id = ?', 'DELETE FROM user_groups WHERE user_id = ?', 'DELETE FROM users WHERE id = ?') as $q) $db->prepare($q)->execute(array($id));
+		oev_unit_notify_forget($db, $id, null);   // their per-unit notification choices
 		back('users', 'Login removed.');
 	}
 	/* ---- view-only links ---- */
@@ -405,6 +412,8 @@ if ($sec === 'units') {
 		$id = (int)$u['id'];
 		echo '<details class="card" id="u' . $id . '"' . ((isset($_GET['msg']) && strpos($_SERVER['REQUEST_URI'], "#u$id") !== false) ? ' open' : '') . '><summary>' . h($u['name']) . ' <span>&middot; ' . ($u['enabled'] ? '' : 'disabled &middot; ') . ($u['loadgroupid'] ? oev_v($gname[(int)$u['loadgroupid']] ?? 'group ' . $u['loadgroupid']) : 'no group') . '</span></summary>';
 		echo unit_form($u, $groups, $CS, $emon_names);
+		// your own emails for this unit: a link (outside the unit's Save form), the same box every login has on the unit page
+		echo '<div class="note" style="margin:6px 0"><a href="unit.php?unitid=' . $id . '#yn" style="color:#035a5a;font-weight:bold">Your notifications for ' . h($u['name']) . '</a> (just your own emails; <a href="notifications.php">all units</a>)</div>';
 		foreach ($jobs[$id] ?? array() as $j) {
 			$w = $j['status'] === 'queued' || $j['status'] === 'running' ? 'waiting to run (within a minute)' : h($j['msg']);
 			echo '<div class="job ' . h($j['status']) . '"><b>' . h($jk[$j['kind']] ?? $j['kind']) . ($j['kind'] === 'emon' ? ' (' . h($emon_names[$j['arg']] ?? $j['arg']) . ')' : '') . ', ' . oev_v(ago($j['done_at'] ?: $j['created_at'])) . ':</b> ' . $w . '</div>';
@@ -562,6 +571,7 @@ if ($sec === 'users') {
 		<?php foreach (array('errors' => 'Errors', 'reboots' => 'Reboots') as $k => $t) echo '<label class="in"><input type="checkbox" name="n_' . $k . '"' . chk(!empty($u['n_' . $k])) . '>' . $t . '</label>'; ?>
 		<label class="in"><input type="checkbox" name="n_sessions"<?=chk(!empty($u['n_sessions']))?>>Session summary</label><div class="note nsub">Email when unplugged: total energy and charging time.</div>
 		<?php if ($hstops) { ?><label class="in"><input type="checkbox" name="n_stops"<?=chk(!empty($u['n_stops']))?>>Charging stopped</label><div class="note nsub">Email when charging stops while still plugged in (limit, schedule, manual stop, fault, or the vehicle stopped drawing power), once per plug-in. Load-balancer pauses are not included.</div><?php } ?>
+		<div class="note">Session summary and Charging stopped are defaults: each login can set any unit On or Off for themselves on the unit page (Your notifications; overview at <a href="notifications.php">notifications.php</a>, their own only).</div>
 		<div class="note">Plug-in reminders are set on each reminder (Preferences), not here.</div>
 		<button type="submit" class="go"><?=$id ? 'Save' : 'Add login'?></button></form>
 		<?php return ob_get_clean();

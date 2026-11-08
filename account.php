@@ -66,6 +66,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <label>New password</label><input type="password" name="new" autocomplete="new-password" required>
 <label>New password again</label><input type="password" name="new2" autocomplete="new-password" required>
 <button type="submit" class="go">Change password</button></form></div></div>
+<div class="card"><b>Notifications</b><br><a href="notifications.php">Your notifications</a>: your email choices for every charger you can see, in one place.</div>
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
 <p><a href="./">&larr; Home</a><?=oev_is_admin() ? ' &middot; <a href="settings.php">Settings</a>' : ''?> &middot; <a href="help.php">Help</a></p>

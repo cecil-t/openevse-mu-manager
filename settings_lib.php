@@ -105,6 +105,99 @@ function oev_users_stop_cols($db){
 	$add = array();
 	if (!in_array('n_stops', $cols, true)) { $db->exec('ALTER TABLE users ADD COLUMN n_stops INTEGER DEFAULT 0'); $add[] = 'n_stops'; }
 	if (!in_array('n_stops_since', $cols, true)) { $db->exec('ALTER TABLE users ADD COLUMN n_stops_since INTEGER'); $add[] = 'n_stops_since'; }
+	// Session summary: when it was last turned on (NULL while on = turned on before this column existed: no limit)
+	if (!in_array('n_sessions_since', $cols, true)) { $db->exec('ALTER TABLE users ADD COLUMN n_sessions_since INTEGER'); $add[] = 'n_sessions_since'; }
 	return $add;
 }
+function oev_users_have_col($db, $c){ return in_array($c, array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC), 'name'), true); }
 function oev_users_have_stops($db){ return in_array('n_stops', array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC), 'name'), true); }
+
+/* ---- per-unit "Your notifications" (each login's own choice per unit; no row = use the account default) ----
+ * user_unit_notify: one row per (login, unit, kind). kind 'sessions' (Session summary) or 'stops' (Charging stopped).
+ * mode 'on' / 'off' = override; 'inherit' = use the account default (kept only to remember continuity).
+ * since: when this unit's email last became effectively ON for this login (null when not on): nothing that
+ * happened before it is mailed. updated_at: when the row was saved. */
+function oev_unit_notify_table($db){
+	if (oev_unit_notify_have($db)) return false;
+	$db->exec("CREATE TABLE IF NOT EXISTS user_unit_notify (user_id INTEGER NOT NULL, unit_id INTEGER NOT NULL,
+		kind TEXT NOT NULL CHECK (kind IN ('sessions','stops')), mode TEXT NOT NULL CHECK (mode IN ('inherit','on','off')),
+		since INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, unit_id, kind))");
+	return true;
+}
+function oev_unit_notify_have($db){ return (bool)$db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify'")->fetchColumn(); }
+function oev_unit_notify_kinds(){ return array('sessions' => 'Session summary', 'stops' => 'Charging stopped'); }
+// rows for one login: [unit_id][kind] => row
+function oev_unit_notify_rows($db, $user_id){
+	$o = array(); if (!oev_unit_notify_have($db)) return $o;
+	$st = $db->prepare('SELECT * FROM user_unit_notify WHERE user_id = ?'); $st->execute(array((int)$user_id));
+	foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $o[(int)$r['unit_id']][$r['kind']] = $r;
+	return $o;
+}
+// The account default for a kind: on?, and since when. stops: users.n_stops_since (null = not proven, nothing sent).
+// sessions: users.n_sessions_since; null while on = on since before that column existed (0: no limit, as before)
+function oev_notify_account($u, $kind){
+	$on = !empty($u['n_' . $kind]);
+	if (!$on) return array('on' => false, 'since' => null);
+	if ($kind === 'stops') return array('on' => true, 'since' => empty($u['n_stops_since']) ? null : (int)$u['n_stops_since']);
+	return array('on' => true, 'since' => empty($u['n_sessions_since']) ? 0 : (int)$u['n_sessions_since']);
+}
+// What applies for this login + unit + kind: the unit override first, then the account default.
+// on, since (events before it are not mailed; null with on = never proven, nothing is mailed), src 'unit' / 'account', mode
+function oev_notify_effective($u, $row, $kind){
+	$m = ($row && in_array($row['mode'] ?? '', array('on', 'off'), true)) ? $row['mode'] : 'inherit';
+	if ($m === 'on') return array('on' => true, 'since' => ($row['since'] === null || $row['since'] === '') ? null : (int)$row['since'], 'src' => 'unit', 'mode' => 'on');
+	if ($m === 'off') return array('on' => false, 'since' => null, 'src' => 'unit', 'mode' => 'off');
+	$a = oev_notify_account($u, $kind);
+	$since = $a['since'];
+	// switched to "account default" while on: keep that earlier start, but only with proof the account was already on
+	// BEFORE the switch (strictly earlier second; the same second is ambiguous, so the account's own start is used)
+	if ($a['on'] && $row && $row['since'] !== null && $row['since'] !== '' && $since !== null && $since < (int)$row['updated_at']) $since = (int)$row['since'];
+	return array('on' => $a['on'], 'since' => $since, 'src' => 'account', 'mode' => 'inherit');
+}
+// Save one login's choice for one unit. $modes: kind => 'inherit'|'on'|'off' (checked by the caller AND here).
+// Reads the login's account default fresh, in one write transaction. An unchanged choice changes nothing
+// (its start time is kept); turning on again later starts from now (nothing older is mailed).
+function oev_unit_notify_save($db, $user_id, $unit_id, $modes, $now = null){
+	$now = $now ?? time(); $kinds = oev_unit_notify_kinds();
+	foreach ($modes as $k => $m) if (!isset($kinds[$k]) || !in_array($m, array('inherit', 'on', 'off'), true)) throw new InvalidArgumentException('bad choice');
+	$own = !$db->inTransaction(); if ($own) $db->exec('BEGIN IMMEDIATE');
+	try {
+		$st = $db->prepare('SELECT * FROM users WHERE id = ?'); $st->execute(array((int)$user_id)); $u = $st->fetch(PDO::FETCH_ASSOC);
+		if (!$u) throw new RuntimeException('login removed');
+		$rows = oev_unit_notify_rows($db, $user_id); $rows = $rows[(int)$unit_id] ?? array();
+		$changed = 0;
+		foreach ($modes as $k => $m) {
+			$row = $rows[$k] ?? null;
+			$cur = $row ? $row['mode'] : 'inherit';
+			if ($cur === $m) continue;   // same choice: keep it as it is
+			$prev = oev_notify_effective($u, $row, $k);
+			$keep = ($prev['on'] && $prev['since'] !== null) ? $prev['since'] : $now;   // still on: no new start, no backlog either
+			if ($m === 'inherit' && !$row) continue;
+			// account default chosen while the account is off: nothing to carry (it starts with the account)
+			$since = ($m === 'off' || ($m === 'inherit' && !oev_notify_account($u, $k)['on'])) ? null : $keep;
+			$db->prepare('INSERT INTO user_unit_notify (user_id, unit_id, kind, mode, since, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT (user_id, unit_id, kind) DO UPDATE SET mode = excluded.mode, since = excluded.since, updated_at = excluded.updated_at')
+				->execute(array((int)$user_id, (int)$unit_id, $k, $m, $since, $now));
+			$changed++;
+		}
+		if ($own) $db->exec('COMMIT');
+		return $changed;
+	} catch (Throwable $x) { if ($own && $db->inTransaction()) $db->exec('ROLLBACK'); throw $x; }
+}
+// One login's choices for the units they can see, resolved exactly as the notifier does (oev_notify_effective).
+// $units: id => row (with loadgroupid), already limited to what this login may see. Returns unit id => kind =>
+// array(mode, on, src, account_on). $master: the site-wide switch (Settings > Preferences); off = nothing is sent at all.
+function oev_unit_notify_view($db, $u, $units){
+	$rows = oev_unit_notify_rows($db, (int)$u['id']); $o = array();
+	foreach ($units as $id => $x) foreach (oev_unit_notify_kinds() as $k => $t) {
+		$ef = oev_notify_effective($u, $rows[(int)$id][$k] ?? null, $k); $a = oev_notify_account($u, $k);
+		$o[(int)$id][$k] = array('mode' => $ef['mode'], 'on' => $ef['on'], 'src' => $ef['src'], 'account_on' => $a['on']);
+	}
+	return $o;
+}
+// a login or a unit removed: its rows go too (settings.php)
+function oev_unit_notify_forget($db, $user_id = null, $unit_id = null){
+	if (!oev_unit_notify_have($db)) return;
+	if ($user_id !== null) $db->prepare('DELETE FROM user_unit_notify WHERE user_id = ?')->execute(array((int)$user_id));
+	if ($unit_id !== null) $db->prepare('DELETE FROM user_unit_notify WHERE unit_id = ?')->execute(array((int)$unit_id));
+}

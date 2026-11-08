@@ -18,8 +18,10 @@
  *       sent{uid:ts}  drop{uid:why}  tries{uid:n}  next{uid:ts}  att{uid:ts}
  *       fin: 1 = nothing left to do;  skip: why nothing is sent
  *       stop entries also: seg, at, reason, line, kwh, sec (the first event, kept until done)
+ * Who: each login's own choice for the unit (user_unit_notify: On / Off) first, else
+ * their account default (oev_notify_effective(), settings_lib.php).
  * Delivery: at least once. Each recipient is re-checked at every attempt (master
- * switch, their own setting, current address, access to the unit). A failed send is
+ * switch, their own setting for the unit, current address, access to the unit). A failed send is
  * retried with backoff (1, 2, 4 ... 60 min) and never dropped; turning the email
  * off (master switch or the user's setting) cancels what is still queued. If the
  * process dies after the mail server accepted a message but before "sent" is saved,
@@ -60,12 +62,17 @@ function ns_known_reason($r){ return in_array($r, array('limit reached', 'schedu
 function ns_name($units, $uid){ return isset($units[$uid]) ? $units[$uid]['name'] : "unit $uid"; }
 function ns_users_by_id($users){ $o = array(); foreach ($users as $u) $o[(int)$u['id']] = $u; return $o; }
 
-// may this user get $col about unit $uid now (and, for stops, an event at $at)? '' = yes, else why not
+// may this user get $col about unit $uid now, for an event at $at (stop time / unplug time)? '' = yes, else why not
+// (oev_notify_effective() is in settings_lib.php, loaded first)
 function ns_why_not($u, $units, $col, $uid, $at = null){
 	if (!$u) return 'login removed';
-	if (empty($u[$col])) return 'turned off';
+	// this unit's own choice for this login first (user_unit_notify, $u['ovr'][unit][kind]), else the account default
+	$k = ($col === 'n_stops') ? 'stops' : 'sessions';
+	$ef = oev_notify_effective($u, $u['ovr'][$uid][$k] ?? null, $k);
+	if (!$ef['on']) return 'turned off';
 	if (empty($u['email']) || !filter_var($u['email'], FILTER_VALIDATE_EMAIL)) return 'no email address';
-	if ($col === 'n_stops' && (empty($u['n_stops_since']) || ($at !== null && (int)$u['n_stops_since'] > $at))) return 'turned on after the stop';
+	// strict: an event in the same second as turning on (or earlier) is not sent; 0 = on since before start times (no limit)
+	if ($ef['since'] === null || ($at !== null && $ef['since'] > 0 && $at <= $ef['since'])) return 'turned on after the ' . ($k === 'stops' ? 'stop' : 'unplug');
 	$all = ($u['role'] === 'admin') || !empty($u['scope_all']);
 	if (!$all) { $g = (int)($units[$uid]['loadgroupid'] ?? 0); if (!$g || !in_array($g, array_map('intval', (array)($u['groups'] ?? array())), true)) return 'no access to the unit'; }
 	return '';
@@ -124,14 +131,14 @@ function ns_summaries($sdb, $users, $units, &$st, $now, $on, $send, $save, $log 
 			if ($s['unplug_at'] === null) $st['sum'][$sid] = array('skip' => 'no unplug time', 'fin' => 1);
 			elseif (!$on) $st['sum'][$sid] = array('skip' => 'notifications off', 'fin' => 1);
 			elseif ((int)$s['unplug_at'] < (int)($st['ns_base_at'] ?? 0)) $st['sum'][$sid] = array('skip' => 'before baseline', 'fin' => 1);
-			else $st['sum'][$sid] = array('to' => ns_rcpt($users, $units, 'n_sessions', $uid), 'sent' => array());
+			else $st['sum'][$sid] = array('to' => ns_rcpt($users, $units, 'n_sessions', $uid, (int)$s['unplug_at']), 'sent' => array());
 			$save();
 		}
 		if (!empty($st['sum'][$sid]['fin'])) continue;
 		$k = ($s['kwh'] !== null) ? number_format((float)$s['kwh'], 1) . ' kWh' : 'unknown kWh';
 		$subj = ns_name($units, $uid) . ": session done, $k";
 		$body = ns_name($units, $uid) . "\nPlugged in: " . date('D g:i a', (int)$s['plug_in_at']) . "\nUnplugged: " . date('D g:i a', (int)$s['unplug_at']) . "\nEnergy: $k\nCharging time: " . sess_fmt_dur((int)$s['charge_seconds']);
-		ns_deliver($st['sum'][$sid], 'n_sessions', $byid, $units, $uid, null, $on, $subj, $body, $send, $save, $now, $log);
+		ns_deliver($st['sum'][$sid], 'n_sessions', $byid, $units, $uid, (int)$s['unplug_at'], $on, $subj, $body, $send, $save, $now, $log);
 	}
 	ns_advance($st, $rows); $save();
 	// the old notifier's cursor (only read if this update is rolled back: it then sends no backlog)
