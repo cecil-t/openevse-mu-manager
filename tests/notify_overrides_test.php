@@ -225,6 +225,9 @@ foreach (array('sessions' => 'n_sessions', 'stops' => 'n_stops') as $k => $col) 
 	ck("$k: a new event after that is sent", mails('b@example.test', $k === 'stops' ? '/charging stopped/' : '/session done/') >= 1);
 }
 
+$up = file_get_contents(__DIR__ . '/../unit.php');
+ck('unit page: the Your notifications box is capped to the screen (beats popFit inline width) and stacks select / Now', strpos($up, '#setyn .slidebox{box-sizing:border-box;width:calc(100vw - 24px)!important;max-width:340px!important') !== false && strpos($up, '.yn select{display:block;width:100%') !== false && strpos($up, '.ynnow{display:block') !== false && strpos($up, 'ynnow{font-size:85%;color:#666;white-space:nowrap}') === false);
+
 /* ===== cleanup ===== */
 $c = cfgdb(); oev_unit_notify_table($c); oev_unit_notify_save($c, 1, 4, array('stops'=>'on'), $T0); oev_unit_notify_save($c, 1, 5, array('stops'=>'on'), $T0); oev_unit_notify_save($c, 2, 4, array('stops'=>'off'), $T0);
 oev_unit_notify_forget($c, null, 5); ck('unit removed: its choices go, others stay', (int)$c->query('SELECT count(*) FROM user_unit_notify WHERE unit_id = 5')->fetchColumn() === 0 && (int)$c->query('SELECT count(*) FROM user_unit_notify')->fetchColumn() === 2);

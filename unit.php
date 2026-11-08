@@ -75,9 +75,12 @@ table.stats td:first-child form.inl button.chip{margin:-1px 0 -1px 8px}
 .slidecontainer:not(#setpilot) .slidebox{width:300px;max-width:calc(100vw - 24px);padding:10px 12px}
 .slidecontainer .slidebox input,.slidecontainer .slidebox select{max-width:100%;box-sizing:border-box;font-size:14px}
 .slidecontainer .slidebox form{margin:4px 0}
+/* Your notifications box: never wider than the screen (popFit's table width is overridden), each choice stacks
+   label / full-width select / "Now: ..." so nothing is cut off on 360-390px phones */
+#setyn .slidebox{box-sizing:border-box;width:calc(100vw - 24px)!important;max-width:340px!important;min-width:0}
 .slidecontainer .slidebox .yn{margin:4px 0 8px}
-.slidecontainer .slidebox .yn select{max-width:100%}
-.slidecontainer .slidebox .ynnow{font-size:85%;color:#666;white-space:nowrap}
+.slidecontainer .slidebox .yn select{display:block;width:100%;max-width:100%;min-width:0;margin:2px 0 0}
+.slidecontainer .slidebox .ynnow{display:block;font-size:85%;color:#666;margin-top:1px}
 .slidecontainer .slidebox .pf{display:inline-block;white-space:nowrap;margin:3px 2px}
 .slidecontainer .slidebox .pf input[type=time]{width:7.5em}
 .slidecontainer .slidebox .pf input[type=number]{width:4.5em}
@@ -438,7 +441,7 @@ document.getElementById('a_limits').onclick = function(){ pop('Limits', [<?=json
 document.getElementById('a_level').onclick = function(){ pop('Service level', [<?=json_encode('Level: ' . ($e['level'] === null ? '-' : 'L' . $e['level']))?>, <?=json_encode($vo)?>]); }
 <?php } ?>
 <?php if ($YN) { ?>document.getElementById('a_yn').onclick = function(){ openPop('setyn'); }
-if (location.hash === '#yn') openPop('setyn');   // from Your notifications (notifications.php)
+if (location.hash === '#yn') { if (document.readyState === 'complete') openPop('setyn'); else window.addEventListener('load', function(){ openPop('setyn'); }); }   // from Your notifications (notifications.php), after layout
 <?php } ?>document.getElementById('a_time').onclick = function(){ pop('Clock', <?=json_encode($clk)?>); }
 document.getElementById('a_checks').onclick = function(){ pop('Safety checks', <?=json_encode($ckl)?>); }
 document.getElementById('a_wifi').onclick = function(){ pop('WiFi', <?=json_encode(array_values(array_filter(array('SSID: ' . $e['ssid'], oev_is_admin() ? 'IP address: ' . $e['ipaddress'] : null, (oev_is_admin() && $e['hostname'] !== '') ? 'Hostname: ' . $e['hostname'] : null, $e['srssi'] !== null ? 'Signal: ' . $e['srssi'] . ' dBm' : null, 'API: ' . $e['api']))))?>); }
