@@ -10,10 +10,13 @@
  *               load balancer, collector, units' readings, stuck jobs) after 2 runs
  *               in a row. "OK again" is sent when it clears.
  *  - reboots:   a unit restarted (from the collector's reboot events)
- *  - sessions:  a charging session ended (car unplugged), with kWh and time
+ *  - sessions:  Session summary: once per plug-in, after unplug (kWh and time)
+ *  - stops:     Charging stopped: once per plug-in, the first real stop while still
+ *               plugged in (limit, schedule, manual, fault, vehicle stopped drawing);
+ *               not load-balancer pauses. Off for everyone until each user turns it on.
  *  - reminders: Plug-in reminders: a unit has no car plugged in by its set time.
  *               Sent only to the reminder's own "Send to" addresses (not to users).
- * At most one email per unit per kind per hour. State: collector/notify_state.json.
+ * Errors/reboots/reminders: at most one email per unit per kind per hour (sessions/stops: once per plug-in, see the lib). State: collector/notify_state.json.
  ******************************************************************************/
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 define('SESS_DIR', __DIR__);
@@ -26,11 +29,32 @@ require OEV_SITE . '/include_lb.php';
 require OEV_SITE . '/sessions_lib.php';
 require OEV_SITE . '/mail_lib.php';
 require OEV_SITE . '/sys_lib.php';
+require __DIR__ . '/notify_sessions_lib.php';
+// one notifier at a time (the every-minute task, a manual run, --dry): a second one exits at once
+$lockh = fopen(SESS_DIR . '/notifier.lock', 'c');
+if (!$lockh || !flock($lockh, LOCK_EX | LOCK_NB)) { @file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . " INFO another notifier run is busy; skipped\n", FILE_APPEND | LOCK_EX); exit(0); }
 $TEST = in_array('--dry', $argv);   // print what would be sent, send nothing, keep state
 
 $S = oev_settings();
 $stf = SESS_DIR . '/notify_state.json';
-$st = @json_decode((string)@file_get_contents($stf), true); if (!is_array($st)) $st = array();
+$raw = @file_get_contents($stf);
+$st = @json_decode((string)$raw, true);
+if (!is_array($st)) {
+	if ($raw !== false && trim((string)$raw) !== '') {   // damaged: keep it for a look, start over like a first run (records the present, mails nothing old)
+		$bad = $stf . '.bad-' . date('Ymd-His'); @rename($stf, $bad);
+		@file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . " ERROR notify_state.json unreadable; moved to " . basename($bad) . ", starting over (queued emails in it are lost)\n", FILE_APPEND | LOCK_EX);
+	}
+	$st = array();
+}
+// atomic save (notify_sessions_lib.php ns_write_atomic). A failed save throws: the run stops there (fail closed:
+// nothing more is sent this run, the previous state file stays intact) and the error is logged.
+function ns_save_state(){
+	global $st, $stf, $TEST;
+	if ($TEST) return;
+	$j = json_encode($st); if ($j === false) throw new RuntimeException('state not encodable: ' . json_last_error_msg());
+	ns_write_atomic($stf, $j);
+}
+set_exception_handler(function($x){ @file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . ' ERROR notifier stopped: ' . $x->getMessage() . "\n", FILE_APPEND | LOCK_EX); fwrite(STDERR, 'notifier stopped: ' . $x->getMessage() . "\n"); exit(1); });
 $now = time();
 $odb = oev_cfg_db_open(array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC));
 $sdb = sess_db();
@@ -113,16 +137,21 @@ if (!$first && $on) foreach ($sdb->query("SELECT * FROM events WHERE kind = 'reb
 	notify('reboots', (int)$e['unit_id'], 'reboot', nm((int)$e['unit_id']) . ' restarted', nm((int)$e['unit_id']) . ' restarted at about ' . date('g:i a', (int)$e['ts']) . '.' . ($e['detail'] ? "\n" . $e['detail'] : ''));
 $st['reboot_id'] = $maxid;
 
-/* ---- session completion (car unplugged) ---- */
-$last = (int)($st['session_id'] ?? 0);
-$rows = $sdb->query("SELECT * FROM sessions WHERE open = 0 AND unplug_at IS NOT NULL AND id > $last ORDER BY id")->fetchAll();
-if (!$first && $on) foreach ($rows as $s) {
-	$k = ($s['kwh'] !== null) ? number_format((float)$s['kwh'], 1) . ' kWh' : 'unknown kWh';
-	notify('sessions', (int)$s['unit_id'], 'session' . $s['id'], nm((int)$s['unit_id']) . ": session done, $k",
-		nm((int)$s['unit_id']) . "\nPlugged in: " . date('D g:i a', (int)$s['plug_in_at']) . "\nUnplugged: " . date('D g:i a', (int)$s['unplug_at']) . "\nEnergy: $k\nCharging time: " . sess_fmt_dur((int)$s['charge_seconds']));
-}
-$mx = (int)$sdb->query("SELECT coalesce(max(id), 0) FROM sessions WHERE open = 0")->fetchColumn();
-$st['session_id'] = max($last, $mx);
+/* ---- session summary (unplugged) and charging stopped (still plugged in): collector/notify_sessions_lib.php ---- */
+// once per plug-in each, per recipient, retried on a failed send; not subject to the one-per-hour rule below
+$nsend = function($kind){ return function($email, $subject, $body) use ($kind){
+	global $TEST, $odb, $sent;
+	$body .= "\n\n-- " . oev_site_name() . ", " . date('D M j, g:i a T') . "\n" . oev_site_url();
+	if ($TEST) { echo "WOULD SEND [$kind] to 1 recipient: $subject\n"; return true; }
+	$r = oev_mail(array($email), $subject, $body); $sent++;   // the queue entry is saved before and after this call
+	try { $odb->prepare('INSERT INTO notifications_sent (evse_id, type) VALUES (?, ?)')->execute(array(0, $kind . ': ' . $subject . ($r === true ? '' : ' (FAILED)'))); } catch (Exception $e) {}
+	@file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . " $kind: $subject -> 1 recipient" . ($r === true ? '' : ' FAILED: ' . $r) . "\n", FILE_APPEND | LOCK_EX);
+	return $r;
+}; };
+$nlog = function($m){ @file_put_contents(SESS_DIR . '/notify.log', date('Y-m-d H:i:s') . " INFO $m\n", FILE_APPEND | LOCK_EX); };
+if (ns_baseline($st, $sdb, $now, 'ns_save_state')) $nlog('session emails: baseline (nothing before now is mailed)');
+ns_stops($sdb, $users, $units, $st, $now, $on, $nsend('stops'), 'ns_save_state', $nlog);       // a closed session's stop is decided before its summary
+ns_summaries($sdb, $users, $units, $st, $now, $on, $nsend('sessions'), 'ns_save_state', $nlog);
 
 /* ---- plug-in reminders ---- */
 foreach ($odb->query('SELECT * FROM reminders WHERE enabled = 1')->fetchAll() as $rm) {
@@ -141,5 +170,5 @@ if (isset($st['rem'])) foreach (array_keys($st['rem']) as $k) if (substr($k, -8)
 if (isset($st['last'])) foreach ($st['last'] as $k => $t) if ($now - $t > 86400) unset($st['last'][$k]);
 
 $st['init'] = 1; $st['ran_at'] = $now;
-if (!$TEST) { file_put_contents("$stf.tmp", json_encode($st)); rename("$stf.tmp", $stf); }
-elseif ($first) echo "first run: would only record the current state\n";
+ns_save_state();
+if ($TEST && $first) echo "first run: would only record the current state\n";

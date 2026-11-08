@@ -39,6 +39,7 @@ $cols = array_column($db->query('PRAGMA table_info(load_groups)')->fetchAll(), '
 if (!in_array('volts_override', $cols)) { $db->exec('ALTER TABLE load_groups ADD COLUMN volts_override REAL'); echo "load_groups.volts_override added\n"; }
 $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(), 'name');
 foreach (array('first_name', 'last_name') as $c) if (!in_array($c, $cols)) { $db->exec("ALTER TABLE users ADD COLUMN $c TEXT DEFAULT ''"); echo "users.$c added\n"; }
+foreach (oev_users_stop_cols($db) as $c) echo "users.$c added\n";   // Charging stopped emails (off for everyone)
 // sessions.db (readings and sessions): made or brought up to date here (sessions_lib.php)
 require_once $site . '/sessions_lib.php';
 $sdb = sess_db();

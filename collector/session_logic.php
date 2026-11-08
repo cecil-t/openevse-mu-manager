@@ -260,9 +260,11 @@ function sess_stop_reason($r, $conn){
 	if ($st == 254 || $st == 255) {
 		if ($r['limit_sleep']) return 'limit reached';
 		if (!empty($r['our_claim']) && isset($r['our_claim']['state']) && $r['our_claim']['state'] == 'disabled') return 'load management';
-		if (!empty($r['override'])) return 'user sleep/override';
-		if ($r['sched_disabled'] || ($r['api'] == 'rapi' && $r['timer_active'])) return 'schedule';
-		return 'user sleep/override';
+		// manual stop only with positive evidence: a v5 override set to disabled (the load balancer never uses /override, only its own claim)
+		if (!empty($r['override']) && ($r['override']['state'] ?? null) === 'disabled') return 'user sleep/override';
+		// RAPI: the timer sleeps (254); 255 is also what the load balancer's $FD pause shows, so it is not counted as the schedule
+		if ($r['sched_disabled'] || ($r['api'] == 'rapi' && $r['timer_active'] && $st == 254)) return 'schedule';
+		return $st == 255 ? 'disabled (cause unknown)' : 'sleep (cause unknown)';   // no evidence: could be the load balancer, a button, ... (not reported as manual)
 	}
 	return 'unknown';
 }

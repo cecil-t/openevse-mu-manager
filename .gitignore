@@ -29,6 +29,9 @@ backups/
 *.log.*
 *.lock
 collector/notify_state.json
+collector/notify_state.json.tmp*
+collector/notify_state.json.bad-*
+collector/notifier.lock
 loadbalancer/run/
 loadbalancer/mosquitto/data/
 loadbalancer/mosquitto/log/

@@ -93,7 +93,7 @@ function sess_schema($db){
 		start_at INTEGER, stop_at INTEGER, seconds INTEGER DEFAULT 0,
 		lifetime_start_wh REAL, lifetime_end_wh REAL, kwh REAL,
 		amp_seconds REAL DEFAULT 0, avg_amps REAL, peak_amps REAL,
-		stop_reason TEXT,   -- car paused/full, schedule, limit reached, user sleep/override, fault, thermal, load management, unplugged, unknown
+		stop_reason TEXT,   -- car paused/full, schedule, limit reached, user sleep/override, fault, thermal, load management, sleep/disabled (cause unknown), unplugged, unknown
 		open INTEGER DEFAULT 1)");
 	$db->exec("CREATE INDEX IF NOT EXISTS segments_session ON segments(session_id, start_at)");
 	// timeline: current/pilot changes, faults, thermal, limits

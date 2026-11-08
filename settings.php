@@ -247,6 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$id = (int)$P('id'); $email = strtolower($P('email')); $role = $P('role') === 'admin' ? 'admin' : 'viewer'; $all = ($role === 'admin' || $P('scope') === 'all') ? 1 : 0;   // admins always see everything
 		$gs = array_values(array_intersect(array_map('intval', (array)($_POST['groups'] ?? array())), array_keys($gname)));
 		$n = array(); foreach (array('errors', 'reboots', 'sessions') as $k) $n[$k] = isset($_POST['n_' . $k]) ? 1 : 0;
+		$hs = oev_users_have_stops($db); $nst = isset($_POST['n_stops']) ? 1 : 0;   // Charging stopped (column added by setup_auth.php)
 		$fn = substr($P('first_name'), 0, 60); $ln = substr($P('last_name'), 0, 60);
 		if (!filter_var($email, FILTER_VALIDATE_EMAIL)) back('users', 'Enter a valid email address.', $id ? "p$id" : 'addu');
 		if (!$all && !$gs) back('users', 'Pick at least one load group, or All load groups.', $id ? "p$id" : 'addu');
@@ -257,10 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				$db->prepare('INSERT INTO users (email, first_name, last_name, pass_hash, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders, created_at) VALUES (?,?,?,?,?,?,?,?,?,0,?)')
 					->execute(array($email, $fn, $ln, password_hash($pw, PASSWORD_DEFAULT), $role, $all, $n['errors'], $n['reboots'], $n['sessions'], time()));
 				$id = (int)$db->lastInsertId();
+				if ($hs && $nst) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
 			} else {
 				if ($id === (int)$me['id'] && $role !== 'admin') back('users', 'You can\'t take admin away from your own login.', "p$id");
 				$db->prepare('UPDATE users SET email = ?, first_name = ?, last_name = ?, role = ?, scope_all = ?, n_errors = ?, n_reboots = ?, n_sessions = ? WHERE id = ?')
 					->execute(array($email, $fn, $ln, $role, $all, $n['errors'], $n['reboots'], $n['sessions'], $id));
+				if ($hs) {   // Charging stopped: remember when it was turned on (nothing older is sent)
+					$was = (int)$db->query('SELECT n_stops FROM users WHERE id = ' . $id)->fetchColumn();
+					if ($nst && !$was) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
+					elseif (!$nst && $was) $db->prepare('UPDATE users SET n_stops = 0, n_stops_since = NULL WHERE id = ?')->execute(array($id));
+				}
 				if ($pw !== '') { $db->prepare('UPDATE users SET pass_hash = ? WHERE id = ?')->execute(array(password_hash($pw, PASSWORD_DEFAULT), $id)); if ($id !== (int)$me['id']) $db->prepare('DELETE FROM auth_tokens WHERE user_id = ?')->execute(array($id)); }
 			}
 		} catch (PDOException $e) { back('users', 'That email address already has a login.', $id ? "p$id" : 'addu'); }
@@ -313,6 +320,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set input[type=checkbox],.set input[type=radio]{width:18px;height:18px;vertical-align:-3px;margin:0 5px 0 0}
 .set .row2{display:flex;gap:8px}.set .row2>div{flex:1 1 0;min-width:0}
 .set .note{color:#666;margin:4px 0}
+.set .note.nsub{margin:-2px 0 6px 24px;font-size:.92em}
 .set .warn{background:#fff4d6;border:1px solid #e9c46a;border-radius:6px;padding:5px 8px;margin:6px 0;color:#6b4b00}
 .set .msg{background:#e3f4e3;border:1px solid #9c9;border-radius:6px;padding:6px 9px;margin:0 0 8px 0;color:#245a24}
 .set button{font-size:16px;padding:5px 14px;margin:10px 8px 2px 0;border:1px solid #888;border-radius:5px;background:#f6f6f6;color:#000;cursor:pointer}
@@ -502,7 +510,7 @@ if ($sec === 'prefs') {
 	<div class="card" id="mail"><form method="post" action="settings.php?s=prefs"><?=$CS?>
 	<h2 style="margin-top:2px">Email notifications</h2>
 	<label class="in"><input type="checkbox" name="notify_on"<?=chk($S['notify_on'] === '1')?>>Send notifications</label>
-	<div class="note">Who gets errors, reboots and finished sessions is set for each user under Users. Plug-in reminders go only to the addresses on each reminder below.</div>
+	<div class="note">Who gets errors, reboots, session summaries and charging-stopped emails is set for each user under Users. Plug-in reminders go only to the addresses on each reminder below.</div>
 	<label>Error if a unit is not heard from for</label>
 	<div class="row2"><div><input type="number" name="heartbeat_val" min="1" max="10080" value="<?=h($hbv)?>"></div><div><select name="heartbeat_unit"><option value="m"<?=sel($hbu, 'm')?>>minutes</option><option value="h"<?=sel($hbu, 'h')?>>hours</option></select></div></div>
 	<h2>Mail server (SMTP)</h2>
@@ -538,6 +546,7 @@ if ($sec === 'prefs') {
 if ($sec === 'users') {
 	function user_form($u, $groups, $CS, $me){
 		$id = $u ? (int)$u['id'] : 0; $ug = $id ? oev_user_groups($id) : array(); $all = $u ? (int)$u['scope_all'] : 1;
+		static $hstops = null; if ($hstops === null) $hstops = oev_users_have_stops(oev_db());
 		ob_start(); ?>
 		<form method="post" action="settings.php?s=users"><?=$CS?><input type="hidden" name="a" value="<?=$id ? 'user_save' : 'user_add'?>"><input type="hidden" name="id" value="<?=$id?>">
 		<div class="row2"><div><label>First name</label><input type="text" name="first_name" value="<?=h($u['first_name'] ?? '')?>" maxlength="60"></div><div><label>Last name</label><input type="text" name="last_name" value="<?=h($u['last_name'] ?? '')?>" maxlength="60"></div></div>
@@ -550,7 +559,9 @@ if ($sec === 'users') {
 		<div class="gsx" style="margin-left:22px;<?=$all ? 'display:none' : ''?>"><?php foreach ($groups as $g) echo '<label class="in"><input type="checkbox" name="groups[]" value="' . (int)$g['id'] . '"' . chk(in_array((int)$g['id'], $ug, true)) . '>' . h($g['name']) . '</label>'; ?>
 		<div class="note">Units that are not in a load group are only shown to users who see all load groups.</div></div></div>
 		<label>Emails about</label>
-		<?php foreach (array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Finished sessions') as $k => $t) echo '<label class="in"><input type="checkbox" name="n_' . $k . '"' . chk(!empty($u['n_' . $k])) . '>' . $t . '</label>'; ?>
+		<?php foreach (array('errors' => 'Errors', 'reboots' => 'Reboots') as $k => $t) echo '<label class="in"><input type="checkbox" name="n_' . $k . '"' . chk(!empty($u['n_' . $k])) . '>' . $t . '</label>'; ?>
+		<label class="in"><input type="checkbox" name="n_sessions"<?=chk(!empty($u['n_sessions']))?>>Session summary</label><div class="note nsub">Email when unplugged: total energy and charging time.</div>
+		<?php if ($hstops) { ?><label class="in"><input type="checkbox" name="n_stops"<?=chk(!empty($u['n_stops']))?>>Charging stopped</label><div class="note nsub">Email when charging stops while still plugged in (limit, schedule, manual stop, fault, or the vehicle stopped drawing power), once per plug-in. Load-balancer pauses are not included.</div><?php } ?>
 		<div class="note">Plug-in reminders are set on each reminder (Preferences), not here.</div>
 		<button type="submit" class="go"><?=$id ? 'Save' : 'Add login'?></button></form>
 		<?php return ob_get_clean();

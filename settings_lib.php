@@ -97,3 +97,14 @@ function oev_host_suggest($units){
 function oev_timezone(){ $tz = (string)oev_setting('timezone', ''); return ($tz !== '' && in_array($tz, DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true)) ? $tz : OEV_SERVER_TZ; }
 // apply the override once, when the library is first loaded
 if (!defined('OEV_TZ_APPLIED')) { define('OEV_TZ_APPLIED', 1); if (oev_timezone() !== date_default_timezone_get()) date_default_timezone_set(oev_timezone()); }
+
+// users: "Charging stopped" emails (n_stops, off for everyone until they turn it on; n_stops_since = when they did,
+// so nothing from before that is sent). Safe to run again; setup_auth.php runs it.
+function oev_users_stop_cols($db){
+	$cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC), 'name');
+	$add = array();
+	if (!in_array('n_stops', $cols, true)) { $db->exec('ALTER TABLE users ADD COLUMN n_stops INTEGER DEFAULT 0'); $add[] = 'n_stops'; }
+	if (!in_array('n_stops_since', $cols, true)) { $db->exec('ALTER TABLE users ADD COLUMN n_stops_since INTEGER'); $add[] = 'n_stops_since'; }
+	return $add;
+}
+function oev_users_have_stops($db){ return in_array('n_stops', array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC), 'name'), true); }
