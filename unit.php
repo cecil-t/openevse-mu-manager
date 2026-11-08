@@ -109,6 +109,8 @@ table.stats tr.g2 td{background-color:#e3e7ec}
 .lbdot.g{background:#2a2}.lbdot.a{background:#e9a000}.lbdot.r{background:#d22}.lbdot.x{display:none}
 table.stats td.vfade{transition:background-color 1.2s ease-out}
 table.stats td.vfade.vchg{background-color:#fff8d1;transition:none}
+/* Connected (s2) header is light lime (style.css gradient #9C0->#CF6, unchanged): dark text for contrast; other states keep white */
+table.stats th.s2,table.stats th.s02{color:#222}
 </style>
 <?php
 $e = evse_status($unit);
