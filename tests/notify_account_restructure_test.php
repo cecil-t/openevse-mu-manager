@@ -100,7 +100,7 @@ ck('old View-only link tab redirects to Users#links', $code === 303 && strpos($l
 list($code, $b) = http('settings.php?s=users', 1);
 ck('Users has View-only link section and no Emails about checkboxes', $code === 200 && strpos($b, 'id="links"') !== false && strpos($b, 'Emails about') === false && strpos($b, 'name="n_sessions"') === false);
 list($code, $b) = http('account.php', 2);
-ck('Account & Prefs shows Email notifications + per-unit forms for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'name="n_errors"') !== false && strpos($b, 'name="n_reboots"') !== false && strpos($b, 'notify-u4') !== false && (strpos($b, 'Errors') !== false));
+ck('Account Preferences shows Email notifications + per-unit forms for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'name="n_errors"') !== false && strpos($b, 'name="n_reboots"') !== false && strpos($b, 'notify-u4') !== false && (strpos($b, 'Errors') !== false));
 ck('unit panels use details/summary with short Default labels', strpos($b, '<details class="ync" id="notify-u4"') !== false && strpos($b, 'ync-sum') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Default (') !== false && strpos($b, 'Use account default') === false && strpos($b, 'yn-rem') !== false);
 ck('shared per-charger legend once, hash-open script present', strpos($b, 'Per charger (tap to edit)') !== false && strpos($b, 'location.hash') !== false && strpos($b, 'DETAILS') !== false);
 ck('account CSS bounds unit selects (no full-bleed yn select)', strpos(file_get_contents("$app/account.php"), 'max-width:140px') !== false && strpos(file_get_contents("$app/account.php"), '.ac .yn select{display:block;width:100%}') === false);

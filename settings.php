@@ -257,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		} catch (PDOException $e) { back('users', 'That email address already has a login.', $id ? "p$id" : 'addu'); }
 		$db->prepare('DELETE FROM user_groups WHERE user_id = ?')->execute(array($id));
 		if (!$all) foreach ($gs as $g) $db->prepare('INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)')->execute(array($id, $g));
-		back('users', $a === 'user_add' ? 'Login added. Give them the password; they can change it under Account &amp; Prefs.' : 'Saved.', "p$id");
+		back('users', $a === 'user_add' ? 'Login added. Give them the password; they can change it under Account Preferences.' : 'Saved.', "p$id");
 	}
 	if ($a === 'user_delete') {
 		$id = (int)$P('id');
@@ -497,10 +497,10 @@ if ($sec === 'prefs') {
 	<div class="card" id="mail"><form method="post" action="settings.php?s=prefs"><?=$CS?>
 	<h2 style="margin-top:2px">Email notifications</h2>
 	<label class="in"><input type="checkbox" name="notify_on"<?=chk($S['notify_on'] === '1')?>>Enable outgoing email for this site</label>
-	<div class="note">This is the site-wide gate: when it is off, nothing is emailed to anyone. Each person chooses which emails they want under Account &amp; Prefs.</div>
+	<div class="note">This is the site-wide gate: when it is off, nothing is emailed to anyone. Each person chooses which emails they want under Account Preferences.</div>
 	<label>Consider a charger offline after</label>
 	<div class="row2 row2n"><div><input type="number" name="heartbeat_val" min="1" max="10080" value="<?=h($hbv)?>"></div><div><select name="heartbeat_unit"><option value="m"<?=sel($hbu, 'm')?>>minutes</option><option value="h"<?=sel($hbu, 'h')?>>hours</option></select></div></div>
-	<div class="note">Shared definition of offline for everyone. Who is emailed about it is each person's Errors choice under Account &amp; Prefs.</div>
+	<div class="note">Shared definition of offline for everyone. Who is emailed about it is each person's Errors choice under Account Preferences.</div>
 	<h2>Mail server (SMTP)</h2>
 	<div class="note">Use any mail service you have an account with. Mailjet works well and has a free plan (server in-v3.mailjet.com, port 587, TLS; the username and password are its API key and secret key).</div>
 	<div class="note">Port 587 goes with TLS, 465 with SSL.</div><label>Server</label><input type="text" name="smtp_host" value="<?=h($S['smtp_host'])?>" autocapitalize="off">
@@ -532,7 +532,7 @@ if ($sec === 'users') {
 		<label class="in"><input type="radio" name="scope" value="all"<?=chk($all)?> onchange="gsx(this)">All load groups</label><label class="in"><input type="radio" name="scope" value="some"<?=chk(!$all)?> onchange="gsx(this)">Only these load groups:</label>
 		<div class="gsx" style="margin-left:22px;<?=$all ? 'display:none' : ''?>"><?php foreach ($groups as $g) echo '<label class="in"><input type="checkbox" name="groups[]" value="' . (int)$g['id'] . '"' . chk(in_array((int)$g['id'], $ug, true)) . '>' . h($g['name']) . '</label>'; ?>
 		<div class="note">Units that are not in a load group are only shown to users who see all load groups.</div></div></div>
-		<div class="note">Email choices are each person's own under <a href="account.php#notify">Account &amp; Prefs</a>. Admins do not set them here.</div>
+		<div class="note">Email choices are each person's own under <a href="account.php#notify">Account Preferences</a>. Admins do not set them here.</div>
 		<button type="submit" class="go"><?=$id ? 'Save' : 'Add login'?></button></form>
 		<?php return ob_get_clean();
 	}

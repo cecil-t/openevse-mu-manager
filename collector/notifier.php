@@ -61,7 +61,7 @@ $sdb = sess_db();
 $units = array(); foreach ($odb->query('SELECT id, name, enabled, loadgroupid FROM evses') as $u) $units[(int)$u['id']] = $u;
 $users = $odb->query('SELECT * FROM users')->fetchAll();
 foreach ($users as &$u) $u['groups'] = array_map('intval', $odb->query('SELECT group_id FROM user_groups WHERE user_id = ' . (int)$u['id'])->fetchAll(PDO::FETCH_COLUMN)); unset($u);
-// each login's per-unit choices (Account & Prefs); none yet / no table = account defaults
+// each login's per-unit choices (Account Preferences); none yet / no table = account defaults
 foreach ($users as &$u) $u['ovr'] = oev_unit_notify_rows($odb, (int)$u['id']); unset($u);
 
 function nm($id){ global $units; return isset($units[$id]) ? $units[$id]['name'] : "unit $id"; }

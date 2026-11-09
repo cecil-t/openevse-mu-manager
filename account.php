@@ -97,7 +97,7 @@ $CS = oev_csrf_field();
 $rems = oev_reminders_for_user($db, (int)$me['id']);
 $unres = oev_is_admin() ? oev_reminders_unresolved($db) : array();
 
-$title = 'Account & Prefs'; $wq = '';
+$title = 'Account Preferences'; $wq = '';
 $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
@@ -163,7 +163,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <button type="submit" class="go">Change password</button></form></div></div>
 
 <div class="card" id="notify">
-<b>Email notifications</b> <span class="note">(Account &amp; Prefs)</span>
+<b>Email notifications</b> <span class="note">(Account Preferences)</span>
 <div class="note">These are your own choices (defaults, not a master switch). The site-wide gate and mail server are under Settings &gt; Site settings<?=oev_is_admin() ? '' : ' (an admin)'?>.<?=$master ? '' : ' Outgoing email is currently off for the whole site, so nothing is sent.'?></div>
 <form method="post" action="account.php"><?=$CS?><input type="hidden" name="a" value="notify_defaults">
 <label class="in"><input type="checkbox" name="n_errors"<?=!empty($me['n_errors']) ? ' checked' : ''?>>Errors</label>
