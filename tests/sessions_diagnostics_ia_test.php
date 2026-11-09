@@ -99,6 +99,8 @@ ck('diagnostics WiFi in Unit health (no per-event list; flag threshold 5/7d badg
 	&& strpos($diag, 'rb7') !== false
 	&& strpos($diag, 'gap7') !== false
 	&& strpos($diag, 'uh-hi') !== false
+	&& strpos($diag, 'uh-wnum') !== false
+	&& strpos($diag, 'title="WiFi restarts"') !== false
 	&& strpos($diag, 'foreach ($drops as') === false
 	&& strpos($diag, "kind IN ('reach', 'reboot') AND ts BETWEEN") === false);
 ck('diagnostics top intro+filters merged into one card',

@@ -33,16 +33,17 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 .diag-top .flt{background:#fff;margin:6px 0;padding:8px 10px}
 .diag-top .note{margin:2px 0 0 0}
 /* Unit health: compact grid (desktop) / stacked pills (mobile) */
-.uh{max-width:680px;padding:6px 8px}
-.uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.5fr) 2.6rem 3.6rem 2.8rem minmax(8.5rem,1.5fr);gap:4px 8px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
+.uh{max-width:760px;padding:6px 8px}
+.uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.4fr) 2.5rem 3.4rem 2.6rem 2.5rem 2.5rem 2.5rem 2.8rem 2.6rem;gap:4px 6px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
 .uh-h{font-size:11px;color:#888;border-bottom:1px solid #ccc;padding:2px 2px 5px;font-weight:600}
-.uh-h span:not(:first-child),.uh-c{text-align:center;font-variant-numeric:tabular-nums}
+.uh-h span:not(:first-child),.uh-c,.uh-hibox{display:block;width:100%;box-sizing:border-box;text-align:center;font-variant-numeric:tabular-nums}
 .uh-n{color:#333;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .uh-z{color:#aaa;font-weight:400}
 .uh-nz{color:#8a3030;font-weight:600}
-.uh-w{font-size:13px;color:#555;font-variant-numeric:tabular-nums;min-width:0}
-.uh-hi{display:inline-block;font-size:10px;line-height:1.3;padding:1px 6px;border-radius:8px;background:#f99;color:#600;font-weight:700;margin-left:4px;vertical-align:middle;letter-spacing:.02em}
-.uh-gap{color:#888;font-size:12px}
+.uh-wnum{color:#555;font-weight:400}
+.uh-gapc{color:#888;font-size:12px;font-weight:400}
+.uh-hi{display:inline-block;font-size:10px;line-height:1.3;padding:1px 6px;border-radius:8px;background:#f99;color:#600;font-weight:700;letter-spacing:.02em}
+.uh-hibox{min-height:1em}
 .uh-r:last-child{border-bottom:0}
 .mo-row{border-top:1px dotted #ddd;padding:6px 0;margin-top:4px;overflow:hidden}
 .mo-row .r{float:none;display:block;margin:2px 0 4px}
@@ -51,12 +52,14 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 	.uh-h{display:none}
 	.uh-r{display:block;padding:8px 2px}
 	.uh-n{display:block;white-space:normal;margin-bottom:5px;font-size:14px}
-	.uh-c{display:inline-block;margin:0 4px 4px 0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
+	.uh-c,.uh-hibox{display:inline-block;margin:0 4px 4px 0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
 	.uh-c::before{content:attr(data-l) " ";color:#777;font-weight:400}
 	.uh-nz{background:#fde8e8}
 	.uh-z{background:#f0f0f0;color:#999}
-	.uh-w{display:block;margin-top:2px;font-size:12px;line-height:1.45}
-	.uh-w::before{content:"WiFi ";color:#777}
+	.uh-wnum{background:#eee;color:#555}
+	.uh-gapc{background:#f0f0f0}
+	.uh-hibox{background:transparent;padding:0;vertical-align:middle}
+	.uh-hibox:empty{display:none}
 	.card .r{float:none;display:block;margin-top:3px}
 }
 </style>
@@ -141,20 +144,24 @@ usort($health, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); }
 <?php if (!$health) echo '<p class="sm">No units in scope.</p>';
 else {
 	$fc = function($v){ return ($v === null || $v === '') ? null : (int)$v; };
-	echo '<div class="uh-h"><span>Unit</span><span>GFCI</span><span>No ground</span><span>Stuck</span><span>WiFi 7d / 30d / all</span></div>';
+		echo '<div class="uh-h"><span>Unit</span><span>GFCI</span><span>No ground</span><span>Stuck</span><span title="WiFi restarts">7d</span><span title="WiFi restarts">30d</span><span title="WiFi restarts">All</span><span>Gaps</span><span></span></div>';
 	foreach ($health as $row) {
-		$cell = function($v, $lab) use ($fc) {
+		$cell = function($v, $lab, $extra = '') use ($fc) {
 			$n = $fc($v);
-			if ($n === null) return '<span class="uh-c uh-z" data-l="' . h($lab) . '">' . "\u{2014}" . '</span>';
+			if ($n === null) return '<span class="uh-c uh-z' . $extra . '" data-l="' . h($lab) . '">' . "\u{2014}" . '</span>';
 			$cls = $n > 0 ? 'uh-c uh-nz' : 'uh-c uh-z';
+			if ($extra) $cls .= $extra;
 			return '<span class="' . $cls . '" data-l="' . h($lab) . '">' . $n . '</span>';
 		};
-		$wtxt = (int)$row['rb7'] . ' / ' . (int)$row['rb30'] . ' / ' . (int)$row['rball'];
-		if ((int)$row['gap7'] > 0) $wtxt .= ' <span class="uh-gap">' . (int)$row['gap7'] . ' gap' . ($row['gap7'] == 1 ? '' : 's') . '</span>';
-		if ($row['flag']) $wtxt .= ' <span class="uh-hi">high</span>';
+		$gap = (int)$row['gap7'];
+		$gap_html = $gap > 0
+			? '<span class="uh-c uh-gapc" data-l="Gaps">' . $gap . '</span>'
+			: '<span class="uh-c uh-z uh-gapc" data-l="Gaps">0</span>';
+		$hi = $row['flag'] ? '<span class="uh-hibox"><span class="uh-hi">high</span></span>' : '<span class="uh-hibox"></span>';
 		echo '<div class="uh-r"><span class="uh-n" title="' . h($row['name']) . '">' . h($row['name']) . '</span>'
 			. $cell($row['gfci'], 'GFCI') . $cell($row['nognd'], 'No ground') . $cell($row['stuck'], 'Stuck')
-			. '<span class="uh-w">' . $wtxt . '</span></div>';
+			. $cell($row['rb7'], '7d', ' uh-wnum') . $cell($row['rb30'], '30d', ' uh-wnum') . $cell($row['rball'], 'All', ' uh-wnum')
+			. $gap_html . $hi . '</div>';
 	}
 } ?>
 </div>
