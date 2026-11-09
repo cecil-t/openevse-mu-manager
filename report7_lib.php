@@ -12,11 +12,8 @@ if (!defined('R7_DAYS')) define('R7_DAYS', 7);
 if (!defined('R7_STEP')) define('R7_STEP', 300);
 
 function r7_short_names($names){
-	// a "Place: " prefix that every unit's name shares is left out (as on sessions.php)
-	$pre = '';
-	$ns = array_values($names);
-	if (count($ns) > 1 && preg_match('/^([^:]{1,40}:\s*)\S/', (string)$ns[0], $m)) { $pre = $m[1]; foreach ($ns as $x) if (strpos((string)$x, $pre) !== 0) { $pre = ''; break; } }
-	$o = array(); foreach ($names as $id => $n) $o[$id] = ($pre !== '' && strpos((string)$n, $pre) === 0) ? substr((string)$n, strlen($pre)) : (string)$n;
+	// full unit names everywhere (no shared-prefix stripping)
+	$o = array(); foreach ($names as $id => $n) $o[$id] = (string)$n;
 	return $o;
 }
 

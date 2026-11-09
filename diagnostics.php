@@ -34,19 +34,6 @@ if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The co
 try { $db = sess_db(true); } catch (Throwable $e) { echo '<div class="sec">Session database unavailable.</div>'.oev_home_footer().'</div></body></html>'; exit; }
 
 function fdt($ts, $fmt = 'D m/d g:ia'){ return $ts ? date($fmt, (int)$ts) : '-'; }
-function unit_short($n){
-	static $pre = null;
-	if ($pre === null) {
-		$pre = '';
-		try {
-			$ns = oev_db()->query('SELECT name FROM evses')->fetchAll(PDO::FETCH_COLUMN);
-			if (count($ns) > 1 && preg_match('/^([^:]{1,40}:\s*)\S/', (string)$ns[0], $m)) { $pre = $m[1]; foreach ($ns as $x) if (strpos((string)$x, $pre) !== 0) { $pre = ''; break; } }
-		} catch (Exception $e) { $pre = ''; }
-	}
-	$n = (string)$n;
-	return ($pre !== '' && strpos($n, $pre) === 0) ? substr($n, strlen($pre)) : $n;
-}
-
 $units = $db->query("SELECT * FROM unit_state WHERE 1$SC ORDER BY unit_name")->fetchAll();
 define('SESS_THERMAL_C_PAGE', 65);
 
@@ -76,7 +63,7 @@ foreach ($db->query("SELECT $M m, unit_id,
 		sum(CASE WHEN kind = 'reboot' THEN 1 ELSE 0 END) reboots
 		FROM events WHERE 1$uw GROUP BY m, unit_id") as $x) $rows[$x['m']][$x['unit_id']] = array_merge(isset($rows[$x['m']][$x['unit_id']]) ? $rows[$x['m']][$x['unit_id']] : array(), $x);
 krsort($rows);
-$names = array(); foreach ($units as $u) $names[$u['unit_id']] = unit_short($u['unit_name']);
+$names = array(); foreach ($units as $u) $names[$u['unit_id']] = $u['unit_name'];
 $t1 = function($v){ return temp_num($v); };
 ?>
 <div class="sec"><h3 style="margin:4px 0 6px 0;color:#333">Diagnostics</h3>
@@ -84,7 +71,7 @@ $t1 = function($v){ return temp_num($v); };
 
 <form class="flt card" method="get" id="diagfilt">
 	<select name="unit"><option value="0">All units</option>
-	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h(unit_short($u['unit_name'])) . '</option>'; ?>
+	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h($u['unit_name']) . '</option>'; ?>
 	</select><br>
 	<input type="date" name="from" value="<?=h($from)?>"> to <input type="date" name="to" value="<?=h($to)?>">
 	<button type="submit">Show</button>
@@ -94,17 +81,17 @@ $t1 = function($v){ return temp_num($v); };
 <div class="sec"><h4>Faults &amp; thermal</h4>
 <?php if (!$faults) echo '<p class="sm">None logged in this range.</p>'; ?>
 <?php foreach ($faults as $e) { ?>
-	<div class="ev <?=h($e['kind'])?>"><b><?=fdt($e['ts'])?></b> <?=h(unit_short($e['unit_name']))?>: <?=h($e['detail'])?>
+	<div class="ev <?=h($e['kind'])?>"><b><?=fdt($e['ts'])?></b> <?=h($e['unit_name'])?>: <?=h($e['detail'])?>
 	<br><span class="sm"><?=$e['temp_c'] !== null ? temp_txt($e['temp_c']) : ''?><?=$e['session_id'] ? ' &middot; <a href="sessions.php?id=' . (int)$e['session_id'] . '">session</a>' : ' &middot; not in a session'?></span></div>
 <?php } ?></div>
 
 <div class="sec"><h4>WiFi drop-offs &amp; reboots</h4>
 <?php if (!$drops) echo '<p class="sm">None logged in this range.</p>'; ?>
 <?php foreach ($dropcount as $d) { ?>
-	<div class="kv"><span><?=h(unit_short($d['unit_name']))?></span><span><?=(int)$d['n']?> drop-off<?=$d['n'] == 1 ? '' : 's'?> &middot; <?=(int)$d['rb']?> reboot<?=$d['rb'] == 1 ? '' : 's'?><?=$d['rssi'] !== null ? ' &middot; WiFi avg ' . (int)$d['rssi'] . ' dBm' : ''?></span></div>
+	<div class="kv"><span><?=h($d['unit_name'])?></span><span><?=(int)$d['n']?> drop-off<?=$d['n'] == 1 ? '' : 's'?> &middot; <?=(int)$d['rb']?> reboot<?=$d['rb'] == 1 ? '' : 's'?><?=$d['rssi'] !== null ? ' &middot; WiFi avg ' . (int)$d['rssi'] . ' dBm' : ''?></span></div>
 <?php } ?>
 <?php foreach ($drops as $e) { ?>
-	<div class="ev reach"><b><?=fdt($e['ts'])?></b> <?=h(unit_short($e['unit_name']))?>: <?=h($e['detail'])?><?=$e['srssi'] !== null ? ' <span class="sm">(WiFi ' . (int)$e['srssi'] . ' dBm)</span>' : ''?></div>
+	<div class="ev reach"><b><?=fdt($e['ts'])?></b> <?=h($e['unit_name'])?>: <?=h($e['detail'])?><?=$e['srssi'] !== null ? ' <span class="sm">(WiFi ' . (int)$e['srssi'] . ' dBm)</span>' : ''?></div>
 <?php } ?></div>
 
 <div class="sec" id="monthly"><h4>Monthly temperatures &amp; thermal</h4>

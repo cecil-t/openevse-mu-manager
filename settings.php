@@ -597,20 +597,11 @@ if ($sec === 'system') {
 		if (!$ustates) {
 			echo '<div class="sys"><div>No unit state yet. The collector has not run.</div></div>';
 		} else {
-			$pre = '';
-			try {
-				$ns = $db->query('SELECT name FROM evses')->fetchAll(PDO::FETCH_COLUMN);
-				if (count($ns) > 1 && preg_match('/^([^:]{1,40}:\s*)\S/', (string)$ns[0], $m)) {
-					$pre = $m[1];
-					foreach ($ns as $x) if (strpos((string)$x, $pre) !== 0) { $pre = ''; break; }
-				}
-			} catch (Exception $e) { $pre = ''; }
 			foreach ($ustates as $u) {
 				$age = $u['last_ok_at'] ? time() - (int)$u['last_ok_at'] : null;
 				$pa = $u['last_push_at'] ? time() - (int)$u['last_push_at'] : null;
 				$stale = ($age === null || $age > 300);
 				$nm = (string)$u['unit_name'];
-				if ($pre !== '' && strpos($nm, $pre) === 0) $nm = substr($nm, strlen($pre));
 				$status = $age === null ? 'never' : ($age < 120 ? 'ok' : 'last ' . sess_fmt_dur($age) . ' ago');
 				$push = $pa !== null ? ('push ' . ($pa < 90 ? $pa . 's' : sess_fmt_dur($pa))) : 'polled';
 				$line = h($status) . ' &middot; ' . h($push);

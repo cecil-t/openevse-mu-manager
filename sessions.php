@@ -97,19 +97,6 @@ function fdd($ts, $ref){
 // so show the unit's session meter (display only, nothing is written)
 function sess_live(&$s){ if (!empty($s['open']) && (float)$s['kwh'] <= 0 && $s['kwh_meter'] !== null && (float)$s['kwh_meter'] > 0) { $s['kwh'] = (float)$s['kwh_meter']; $s['kwh_live'] = 1; } }
 function fkwh($v){ return $v === null ? '-' : number_format((float)$v, 2) . ' kWh'; }
-// shorter unit names in the reports: a "Place: " prefix that every unit's name shares is left out (none if the names differ)
-function unit_short($n){
-	static $pre = null;
-	if ($pre === null) {
-		$pre = '';
-		try {
-			$ns = oev_db()->query('SELECT name FROM evses')->fetchAll(PDO::FETCH_COLUMN);
-			if (count($ns) > 1 && preg_match('/^([^:]{1,40}:\s*)\S/', (string)$ns[0], $m)) { $pre = $m[1]; foreach ($ns as $x) if (strpos((string)$x, $pre) !== 0) { $pre = ''; break; } }
-		} catch (Exception $e) { $pre = ''; }
-	}
-	$n = (string)$n;
-	return ($pre !== '' && strpos($n, $pre) === 0) ? substr($n, strlen($pre)) : $n;
-}
 function limit_text($s){
 	if (!$s['limit_type']) return '';
 	$v = (float)$s['limit_value'];
@@ -283,7 +270,7 @@ if (isset($_GET['id'])) {
 	?>
 	<div class="sec"><a href="sessions.php">&larr; All sessions</a></div>
 	<div class="card">
-		<b><?=h(unit_short($s['unit_name']))?></b> <span class="r"><b><?=fkwh($s['kwh'])?></b></span><br>
+		<b><?=h($s['unit_name'])?></b> <span class="r"><b><?=fkwh($s['kwh'])?></b></span><br>
 		<span class="sm"><?=fdt($s['plug_in_at'], 'l, M j Y')?></span>
 		<?php if ($s['open']) echo ' <span class="tag o">in progress</span>'; ?>
 		<?php if ($s['partial']) echo ' <span class="tag">partial</span>'; ?>
@@ -368,7 +355,7 @@ echo r7_embed_html($R7);
 <p class="sm">Filter by unit and date. Totals and the list below follow these filters only — the Last 7 days chart above does not.</p>
 <form class="flt card" method="get">
 	<select name="unit"><option value="0">All units</option>
-	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h(unit_short($u['unit_name'])) . '</option>'; ?>
+	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h($u['unit_name']) . '</option>'; ?>
 	</select><br>
 	<input type="date" name="from" value="<?=h($from)?>"> to <input type="date" name="to" value="<?=h($to)?>">
 	<button type="submit">Show</button>
@@ -378,13 +365,13 @@ echo r7_embed_html($R7);
 <h4>By unit</h4>
 <?php if (!$byunit) echo '<p class="sm">No sessions in this range yet.</p>'; ?>
 <?php foreach ($byunit as $b) { ?>
-	<div class="kv"><span><?=h(unit_short($b['unit_name']))?></span><span><b><?=number_format($b['kwh'], 1)?></b> kWh &middot; <?=$b['n']?> &middot; <?=sess_fmt_dur($b['sec'])?></span></div>
+	<div class="kv"><span><?=h($b['unit_name'])?></span><span><b><?=number_format($b['kwh'], 1)?></b> kWh &middot; <?=$b['n']?> &middot; <?=sess_fmt_dur($b['sec'])?></span></div>
 <?php } ?>
 <h4>Sessions</h4>
 <?php if (!$sessions) echo '<p class="sm">None yet. Sessions show up after a car is plugged in.</p>'; ?>
 <?php foreach ($sessions as $s) { ?>
 	<div class="card"><a class="blk" href="sessions.php?id=<?=(int)$s['id']?>">
-		<b><?=h(unit_short($s['unit_name']))?></b> <span class="r"><b><?=fkwh($s['kwh'])?></b></span><br>
+		<b><?=h($s['unit_name'])?></b> <span class="r"><b><?=fkwh($s['kwh'])?></b></span><br>
 		<?=fdt($s['plug_in_at'])?> &ndash; <?=$s['open'] ? 'now' : fdt($s['unplug_at'], date('Ymd', (int)$s['unplug_at']) == date('Ymd', (int)$s['plug_in_at']) ? 'g:ia' : 'D g:ia')?><br>
 		<span class="sm"><?=sess_fmt_dur($s['charge_seconds'])?> charging<?php $skw = sess_session_kw($s); ?><?=$skw['avg'] !== null ? ' &middot; avg ' . number_format($skw['avg'], 1) . ' kW' : ''?><?=$skw['peak'] !== null ? ' &middot; peak ' . number_format($skw['peak'], 1) . ' kW' : ''?></span><br>
 		<?php if ($s['open']) echo '<span class="tag o">in progress</span>'; ?>
