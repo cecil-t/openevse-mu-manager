@@ -1,16 +1,25 @@
 <?php
 /******************************************************************************
  * sessions.php - charging session reports (reads sessions.db, written by the
- * collector and the push receiver). ?id=N shows one session (with graph);
- * ?view=months = monthly temperature / thermal / drop-off view per unit.
+ * collector and the push receiver). Top: rolling Last 7 days chart + per-unit
+ * summaries (independent of filters). Below: unit/date filtered session history.
+ * ?id=N shows one session (with graph). ?view=months redirects to diagnostics.php.
  * Filters: ?unit=ID&from=YYYY-MM-DD&to=YYYY-MM-DD
  ******************************************************************************/
 require_once __DIR__ . '/auth_lib.php'; oev_require('view');   // login gate (auth_lib.php)
+/* Months thermal/WiFi view lives on Diagnostics — redirect before any HTML/CSS output */
+if (isset($_GET['view']) && $_GET['view'] == 'months') {
+	$q = array();
+	if (isset($_GET['unit']) && ctype_digit((string)$_GET['unit']) && (int)$_GET['unit'] > 0) $q['unit'] = (int)$_GET['unit'];
+	header('Location: diagnostics.php' . ($q ? ('?' . http_build_query($q)) : '') . '#monthly', true, 302);
+	exit;
+}
 $__vis = oev_visible_unit_ids();   // null = all units; otherwise only these (user's load groups)
 $SC = ($__vis === null) ? '' : ' AND unit_id IN (' . ($__vis ? implode(',', $__vis) : '0') . ')';
 require __DIR__ . '/sessions_lib.php';
 require_once __DIR__ . '/evse_prefs.php';   // TEMP_UNIT (display only)
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
+require_once __DIR__ . '/report7_lib.php';   // Last 7 days overview embed
 $wq = '';
 $title = 'Sessions';
 $OEV_WIDE = 1; include __DIR__ . '/_head.php';
@@ -69,6 +78,8 @@ body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px
 .kvw .kv>span:first-child{padding-right:40px;color:#888}
 .kvw .kv>span:last-child{text-align:left;overflow:visible;text-overflow:clip;min-width:auto}
 }
+
+<?php echo r7_css(); ?>
 </style>
 <?php
 if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div>'.oev_home_footer().'</div></body></html>'; exit; }
@@ -257,8 +268,6 @@ function svg_session_pair($samples, $segments, $t0, $t1, $volts){
 function ftemp($c){ return temp_txt($c); }
 
 $units = $db->query("SELECT * FROM unit_state WHERE 1$SC ORDER BY unit_name")->fetchAll();
-define('SESS_THERMAL_C_PAGE', 65);
-
 /* =================== SESSION DETAIL =================== */
 if (isset($_GET['id'])) {
 	$id = (int)$_GET['id'];
@@ -338,51 +347,6 @@ if (isset($_GET['id'])) {
 	exit;
 }
 
-/* =================== MONTHLY TEMPERATURE / THERMAL =================== */
-if (isset($_GET['view']) && $_GET['view'] == 'months') {
-	$unit = isset($_GET['unit']) && ctype_digit((string)$_GET['unit']) ? (int)$_GET['unit'] : 0;
-	$uw = ($unit ? " AND unit_id = $unit" : '') . $SC;
-	$M = "strftime('%Y-%m', ts, 'unixepoch', 'localtime')";
-	$rows = array();
-	// idle = outside a session (15-min samples); charging = state 3 samples
-	foreach ($db->query("SELECT $M m, unit_id,
-			avg(CASE WHEN session_id IS NULL THEN temp_c END) idle_avg, max(CASE WHEN session_id IS NULL THEN temp_c END) idle_max,
-			avg(CASE WHEN state = 3 THEN temp_c END) chg_avg, max(CASE WHEN state = 3 THEN temp_c END) chg_max,
-			avg(srssi) rssi_avg, min(srssi) rssi_min
-			FROM samples WHERE (temp_c IS NOT NULL OR srssi IS NOT NULL)$uw GROUP BY m, unit_id") as $x) $rows[$x['m']][$x['unit_id']] = $x;
-	// thermal = derate / threshold crossings (not the "back below" restores); over-temp = fault state 10
-	foreach ($db->query("SELECT $M m, unit_id,
-			sum(CASE WHEN kind = 'thermal' AND reason = 'thermal' THEN 1 ELSE 0 END) thermal,
-			sum(CASE WHEN kind = 'fault' AND to_val = 10 THEN 1 ELSE 0 END) overtemp,
-			sum(CASE WHEN kind = 'reach' AND reason IN ('unreachable', 'push stopped') THEN 1 ELSE 0 END) drops,
-			sum(CASE WHEN kind = 'reboot' THEN 1 ELSE 0 END) reboots
-			FROM events WHERE 1$uw GROUP BY m, unit_id") as $x) $rows[$x['m']][$x['unit_id']] = array_merge(isset($rows[$x['m']][$x['unit_id']]) ? $rows[$x['m']][$x['unit_id']] : array(), $x);
-	krsort($rows);
-	$names = array(); foreach ($units as $u) $names[$u['unit_id']] = unit_short($u['unit_name']);
-	$t1 = function($v){ return temp_num($v); };
-	?>
-	<div class="sec"><a href="sessions.php">&larr; Sessions</a></div>
-	<form class="flt card" method="get"><input type="hidden" name="view" value="months">
-		<select name="unit"><option value="0">All units</option>
-		<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h(unit_short($u['unit_name'])) . '</option>'; ?>
-		</select> <button type="submit">Show</button></form>
-	<p class="sec sm">Per month: thermal throttling events, over-temperature faults, WiFi drop-offs, temperature (<?=temp_sym()?>, hottest sensor) avg / max while idle (ambient) and while charging, and WiFi signal where the unit reports it (v5 only).</p>
-	<?php if (!$rows) echo '<p class="sec sm">No data yet.</p>'; ?>
-	<?php foreach ($rows as $m => $us_) { ksort($us_); ?>
-		<div class="sec"><h4><?=h(date('F Y', strtotime($m . '-01')))?></h4>
-		<?php foreach ($us_ as $uid => $x) { $th = (int)($x['thermal'] ?? 0); $ot = (int)($x['overtemp'] ?? 0); $dr = (int)($x['drops'] ?? 0); ?>
-			<div class="card"><b><?=h($names[$uid] ?? "unit $uid")?></b>
-				<span class="r"><?=$th ? "<span class='tag f'>$th thermal</span>" : '<span class="tag">0 thermal</span>'?><?=$ot ? "<span class='tag f'>$ot over-temp</span>" : ''?><?=$dr ? "<span class='tag'>$dr drop-off" . ($dr == 1 ? '' : 's') . "</span>" : ''?><?=!empty($x['reboots']) ? "<span class='tag'>" . (int)$x['reboots'] . " reboot" . ($x['reboots'] == 1 ? '' : 's') . "</span>" : ''?></span><br>
-				<span class="sm">idle <?=$t1($x['idle_avg'] ?? null)?> / <?=$t1($x['idle_max'] ?? null)?> &middot; charging <?=$t1($x['chg_avg'] ?? null)?> / <?=$t1($x['chg_max'] ?? null)?><?=isset($x['rssi_avg']) && $x['rssi_avg'] !== null ? ' &middot; WiFi avg ' . round($x['rssi_avg']) . ' dBm (worst ' . (int)$x['rssi_min'] . ')' : ''?></span>
-			</div>
-		<?php } ?></div>
-	<?php } ?>
-	<p class="sec sm">avg / max <?=temp_sym()?>. Throttling starts at <?=temp_txt(SESS_THERMAL_C_PAGE)?> ambient.</p>
-	<?=oev_home_footer()?>
-	</div></body></html>
-	<?php
-	exit;
-}
 
 /* =================== LIST + TOTALS =================== */
 $unit = isset($_GET['unit']) && ctype_digit((string)$_GET['unit']) ? (int)$_GET['unit'] : 0;
@@ -393,28 +357,15 @@ $where = "plug_in_at BETWEEN $f AND $t$SC" . ($unit ? " AND unit_id = $unit" : '
 $sessions = $db->query("SELECT * FROM sessions WHERE $where ORDER BY plug_in_at DESC LIMIT 200")->fetchAll();
 foreach ($sessions as &$x) sess_live($x); unset($x);
 $byunit = $db->query("SELECT unit_name, count(*) n, sum(CASE WHEN open = 1 AND coalesce(kwh,0) <= 0 THEN coalesce(kwh_meter,0) ELSE coalesce(kwh,0) END) kwh, sum(charge_seconds) sec FROM sessions WHERE $where GROUP BY unit_id ORDER BY kwh DESC")->fetchAll();
-$bymonth = $db->query("SELECT strftime('%Y-%m', plug_in_at, 'unixepoch', 'localtime') m, count(*) n, sum(CASE WHEN open = 1 AND coalesce(kwh,0) <= 0 THEN coalesce(kwh_meter,0) ELSE coalesce(kwh,0) END) kwh, sum(charge_seconds) sec FROM sessions WHERE $where GROUP BY m ORDER BY m")->fetchAll();
-$days = ($t - $f) / 86400;
-if ($days <= 45) {
-	$byday = $db->query("SELECT strftime('%Y-%m-%d', plug_in_at, 'unixepoch', 'localtime') d, sum(CASE WHEN open = 1 AND coalesce(kwh,0) <= 0 THEN coalesce(kwh_meter,0) ELSE coalesce(kwh,0) END) kwh FROM sessions WHERE $where GROUP BY d")->fetchAll(PDO::FETCH_KEY_PAIR);
-	$labels = array(); $vals = array();
-	for ($d = $f; $d <= $t; $d = strtotime('+1 day', $d)) { $k = date('Y-m-d', $d); $labels[] = date('n/j', $d); $vals[] = isset($byday[$k]) ? (float)$byday[$k] : 0; }
-	$chart = svg_bars($labels, $vals, 'kWh per day');
-} else {
-	// every month in the range, including months with no sessions (0 kWh, no bar)
-	$mk = array(); foreach ($bymonth as $m) $mk[$m['m']] = (float)$m['kwh'];
-	$months = array(); for ($d = strtotime(date('Y-m-01', $f)); $d <= $t; $d = strtotime('+1 month', $d)) $months[] = $d;
-	$mfmt = count($months) <= 6 ? 'M Y' : "M 'y";
-	$labels = array(); $vals = array();
-	foreach ($months as $d) { $labels[] = date($mfmt, $d); $vals[] = $mk[date('Y-m', $d)] ?? 0; }
-	$chart = svg_bars($labels, $vals, 'kWh per month');
-}
 $tot = array('n'=>0, 'kwh'=>0, 'sec'=>0); foreach ($byunit as $b) { $tot['n'] += $b['n']; $tot['kwh'] += $b['kwh']; $tot['sec'] += $b['sec']; }
-$faults = $db->query("SELECT * FROM events WHERE kind IN ('fault','fault_count','thermal') AND ts BETWEEN $f AND $t$SC" . ($unit ? " AND unit_id = $unit" : '') . " ORDER BY ts DESC LIMIT 20")->fetchAll();
-$drops = $db->query("SELECT * FROM events WHERE kind IN ('reach', 'reboot') AND ts BETWEEN $f AND $t$SC" . ($unit ? " AND unit_id = $unit" : '') . " ORDER BY ts DESC LIMIT 30")->fetchAll();
-$dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 'reboot') rb,
-	(SELECT round(avg(srssi)) FROM samples x WHERE x.unit_id = events.unit_id AND x.ts BETWEEN $f AND $t) rssi FROM events WHERE ((kind = 'reach' AND reason IN ('unreachable', 'push stopped')) OR kind = 'reboot') AND ts BETWEEN $f AND $t$SC" . ($unit ? " AND unit_id = $unit" : '') . " GROUP BY unit_id ORDER BY unit_name")->fetchAll();
+
+/* Top overview: Last 7 days chart + per-unit summaries — independent of history filters */
+$R7 = r7_data();
+echo r7_embed_html($R7);
 ?>
+
+<div class="sec"><h4>Session history</h4>
+<p class="sm">Filter by unit and date. Totals and the list below follow these filters only — the Last 7 days chart above does not.</p></div>
 <form class="flt card" method="get">
 	<select name="unit"><option value="0">All units</option>
 	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h(unit_short($u['unit_name'])) . '</option>'; ?>
@@ -425,16 +376,11 @@ $dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 're
 
 <div class="card"><b><?=number_format($tot['kwh'], 1)?> kWh</b> in <?=$tot['n']?> session<?=$tot['n'] == 1 ? '' : 's'?> &middot; <?=sess_fmt_dur($tot['sec'])?> charging
 	<div class="sm"><?=h(date('M j, Y', $f))?> &ndash; <?=h(date('M j, Y', $t))?></div></div>
-<?=array_sum($vals) > 0 ? '<div class="sec">' . $chart . '</div>' : ''?>
 
 <div class="sec"><h4>By unit</h4>
 <?php if (!$byunit) echo '<p class="sm">No sessions in this range yet.</p>'; ?>
 <?php foreach ($byunit as $b) { ?>
 	<div class="kv"><span><?=h(unit_short($b['unit_name']))?></span><span><b><?=number_format($b['kwh'], 1)?></b> kWh &middot; <?=$b['n']?> &middot; <?=sess_fmt_dur($b['sec'])?></span></div>
-<?php } ?></div>
-<div class="sec"><h4>By month</h4>
-<?php foreach (array_reverse($bymonth) as $m) { ?>
-	<div class="kv"><span><?=h(date('M Y', strtotime($m['m'] . '-01')))?></span><span><b><?=number_format($m['kwh'], 1)?></b> kWh &middot; <?=$m['n']?> &middot; <?=sess_fmt_dur($m['sec'])?></span></div>
 <?php } ?></div>
 
 <div class="sec"><h4>Sessions</h4>
@@ -453,29 +399,7 @@ $dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 're
 		<?php if ($s['partial']) echo '<span class="tag">partial</span>'; ?>
 	</a></div>
 <?php } ?>
-<p class="sm"><a href="report7.php">Last 7 days, all units on one chart &rarr;</a><br><a href="sessions.php?view=months">Monthly temperatures &amp; thermal events &rarr;</a></p></div>
-<div class="sec"><h4>Faults &amp; thermal</h4>
-<?php if (!$faults) echo '<p class="sm">None logged in this range.</p>'; ?>
-<?php foreach ($faults as $e) { ?>
-	<div class="ev <?=h($e['kind'])?>"><b><?=fdt($e['ts'])?></b> <?=h(unit_short($e['unit_name']))?>: <?=h($e['detail'])?>
-	<br><span class="sm"><?=$e['temp_c'] !== null ? temp_txt($e['temp_c']) : ''?><?=$e['session_id'] ? ' &middot; <a href="sessions.php?id=' . (int)$e['session_id'] . '">session</a>' : ' &middot; not in a session'?></span></div>
-<?php } ?></div>
-
-<div class="sec"><h4>WiFi drop-offs &amp; reboots</h4>
-<?php if (!$drops) echo '<p class="sm">None logged in this range.</p>'; ?>
-<?php foreach ($dropcount as $d) { ?>
-	<div class="kv"><span><?=h(unit_short($d['unit_name']))?></span><span><?=(int)$d['n']?> drop-off<?=$d['n'] == 1 ? '' : 's'?> &middot; <?=(int)$d['rb']?> reboot<?=$d['rb'] == 1 ? '' : 's'?><?=$d['rssi'] !== null ? ' &middot; WiFi avg ' . (int)$d['rssi'] . ' dBm' : ''?></span></div>
-<?php } ?>
-<?php foreach ($drops as $e) { ?>
-	<div class="ev reach"><b><?=fdt($e['ts'])?></b> <?=h(unit_short($e['unit_name']))?>: <?=h($e['detail'])?><?=$e['srssi'] !== null ? ' <span class="sm">(WiFi ' . (int)$e['srssi'] . ' dBm)</span>' : ''?></div>
-<?php } ?></div>
-
-<div class="sec"><h4>Collector</h4>
-<?php foreach ($units as $u) { $age = $u['last_ok_at'] ? time() - $u['last_ok_at'] : null; $pa = $u['last_push_at'] ? time() - $u['last_push_at'] : null; ?>
-	<div class="kv"<?=$u['srssi'] !== null ? ' title="WiFi ' . (int)$u['srssi'] . ' dBm"' : ''?>><span><?=h(unit_short($u['unit_name']))?></span><span<?=($age === null || $age > 300) ? ' class="err"' : ''?>><?=$age === null ? 'never' : ($age < 120 ? 'ok' : 'last ' . sess_fmt_dur($age) . ' ago')?><?=$pa !== null ? ' &middot; push ' . ($pa < 90 ? $pa . 's' : sess_fmt_dur($pa)) : ' &middot; polled'?><?=$u['temp_c'] !== null ? ' &middot; ' . temp_txt($u['temp_c']) : ''?><?=$u['srssi'] !== null ? ' &middot; ' . (int)$u['srssi'] . 'dBm' : ''?><?=$u['charging'] ? ' &middot; charging' : ($u['connected'] ? ' &middot; plugged in' : '')?></span></div>
-<?php } ?>
-<p class="sm" style="margin-top:4px">push = seconds since the unit's last push; dBm = WiFi signal (v5 units only).</p></div>
-<div class="sec"><p class="sm"><a href="sessions.php?view=months">Monthly temperatures, thermal events &amp; drop-offs</a></p>
-<p class="sm">History starts <?php $hs = (int)$db->query('SELECT min(plug_in_at) FROM sessions')->fetchColumn(); echo $hs ? oev_v(date('M j, Y', $hs)) : 'with the first session'; ?>. kW = amps &times; <?=oev_v(EVSE_VOLTS_L2 . ' V')?> on L2, <?=oev_v(EVSE_VOLTS_L1 . ' V')?> on L1 (assumed), unless a unit has its own voltage sensor (Settings &gt; Units) or override.</p></div>
+<p class="sm">Faults, thermal, WiFi, and unit reporting: <a href="diagnostics.php">Diagnostics</a>.</p></div>
+<div class="sec"><p class="sm">History starts <?php $hs = (int)$db->query('SELECT min(plug_in_at) FROM sessions')->fetchColumn(); echo $hs ? oev_v(date('M j, Y', $hs)) : 'with the first session'; ?>. kW = amps &times; <?=oev_v(EVSE_VOLTS_L2 . ' V')?> on L2, <?=oev_v(EVSE_VOLTS_L1 . ' V')?> on L1 (assumed), unless a unit has its own voltage sensor (Settings &gt; Units) or override.</p></div>
 <?=oev_home_footer()?>
 </div></body></html>

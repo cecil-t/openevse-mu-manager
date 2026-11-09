@@ -25,9 +25,9 @@ ck('index has no page-end Home footer helper call', strpos($idx, 'oev_home_foote
 $lbs = file_get_contents("$app/lbstatus.php");
 ck('lbstatus foot says Home not Back to units', strpos($lbs, '>Home</a>') !== false && strpos($lbs, 'Back to units') === false);
 $r7 = file_get_contents("$app/report7.php");
-ck('report7 Home has no back-arrow; keeps Session reports task link', strpos($r7, '&larr; Home') === false && strpos($r7, 'href="./">Home</a>') !== false && strpos($r7, 'Session reports') !== false);
+ck('report7 HTML redirects to sessions overview; no standalone Home chrome', strpos($r7, 'Location: sessions.php') !== false && strpos($r7, '&larr; Home') === false);
 $sess = file_get_contents("$app/sessions.php");
-ck('sessions keeps in-flow All sessions / Sessions task links', strpos($sess, '&larr; All sessions') !== false && strpos($sess, '&larr; Sessions') !== false);
+ck('sessions detail keeps All sessions uplink; months redirects out', strpos($sess, '&larr; All sessions') !== false && strpos($sess, 'Location: diagnostics.php') !== false);
 ck('sessions dropped Back to units', strpos($sess, 'Back to units') === false);
 $login = file_get_contents("$app/login.php");
 ck('login logged-in shortcut says Home', strpos($login, 'Go to the home page') === false && strpos($login, 'href="./">Home</a>') !== false);
