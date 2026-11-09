@@ -88,13 +88,14 @@ list($code) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_errors'=>'in
 ck('notify_prefs: no CSRF token -> 400, nothing saved', $code === 400 && !$c->query('SELECT count(*) FROM user_unit_notify')->fetchColumn());
 list($code, , $loc) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'off','n_stops'=>'on', 'user_id' => '1', 'id' => '1'));
 $r = $c->query('SELECT user_id, unit_id, kind, mode FROM user_unit_notify ORDER BY kind')->fetchAll();
-ck('notify_prefs (view-only login): saved for that login only, back to Account', $code === 303 && strpos($loc, 'account.php') === 0 && count($r) === 2 && $r[0]['user_id'] == 2 && $r[1]['user_id'] == 2);
+ck('notify_prefs (view-only login): saved for that login only, back to Account unit anchor', $code === 303 && strpos($loc, 'account.php') === 0 && strpos($loc, '#notify-u4') !== false && count($r) === 2 && $r[0]['user_id'] == 2 && $r[1]['user_id'] == 2);
 list($code) = http('notify_prefs.php', 2, array('unitid' => '5', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'on','n_stops'=>'on'));
 ck('notify_prefs: a unit outside the login\'s groups is refused', (int)$c->query('SELECT count(*) FROM user_unit_notify WHERE unit_id = 5')->fetchColumn() === 0);
 list($code, , $loc) = http('notify_prefs.php', 0, array('unitid' => '4', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'on','n_stops'=>'on'));
 ck('notify_prefs: not logged in -> login page', $code === 303 && strpos($loc, 'login.php') === 0);
 list($code, $b) = http('account.php', 2);
 ck('Account & Prefs shows notify section for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'admin@example.invalid') === false);
+ck('Account unit panel: details + Default (On/Off) short labels + yn-row', strpos($b, 'details class="ync"') !== false && strpos($b, 'Default (') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Use account default') === false);
 ck('notifications.php deleted (app and fixture)', !is_file(__DIR__ . '/../notifications.php') && !is_file("$s/notifications.php"));
 list($code, $b) = http('settings.php?s=units', 2); ck('Settings stays admin-only for the view-only login', $code === 403);
 

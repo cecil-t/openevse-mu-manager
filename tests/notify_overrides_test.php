@@ -330,6 +330,20 @@ ck('settings.php removes choices with a login and with a unit', strpos($ss, 'oev
 
 
 ck('notifications.php is gone', !is_file(__DIR__ . '/../notifications.php'));
+
+/* ===== compact Account unit panel markup (unp_form_html) ===== */
+$view = array(
+	'errors' => array('mode'=>'inherit','on'=>true,'src'=>'account','account_on'=>true),
+	'reboots' => array('mode'=>'off','on'=>false,'src'=>'unit','account_on'=>true),
+	'sessions' => array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
+	'stops' => array('mode'=>'on','on'=>true,'src'=>'unit','account_on'=>false),
+);
+$html = unp_form_html(4, 'N Penn: 1F', $view, 'CSRF', true);
+ck('unp_form_html: details/summary + unit anchor id', strpos($html, '<details class="ync" id="notify-u4">') !== false && strpos($html, '<summary>') !== false && strpos($html, 'ync-name') !== false);
+ck('unp_form_html: collapsed effective summary', strpos($html, 'Errors On · Reboots Off · Summary Off · Stopped On') !== false);
+ck('unp_form_html: short Default labels, no long Use account default', strpos($html, 'Default (On)') !== false && strpos($html, 'Default (Off)') !== false && strpos($html, 'Use account default') === false);
+ck('unp_form_html: one-row editors + small Save, no Now: stack', strpos($html, 'yn-row') !== false && strpos($html, 'ynsave') !== false && strpos($html, '>Save<') !== false && strpos($html, 'Now:') === false);
+ck('account.php opens #notify-uN details after save', strpos(file_get_contents(__DIR__ . '/../account.php'), "location.hash") !== false && strpos(file_get_contents(__DIR__ . '/../account.php'), 'DETAILS') !== false);
 $up = file_get_contents(__DIR__ . '/../unit.php');
 ck('unit.php has no personal alerts/notifications UI', strpos($up, 'Your alerts') === false && strpos($up, 'Your notifications') === false && strpos($up, 'id="setyn"') === false && strpos($up, 'notify_prefs.php') === false && strpos($up, 'notifications.php') === false);
 

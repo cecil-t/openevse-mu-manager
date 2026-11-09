@@ -1,7 +1,7 @@
 <?php
 /******************************************************************************
  * notify_prefs.php - save one login's per-unit Session summary / Charging stopped
- * choice (Use account default / On / Off). Called from Account. Login from the
+ * choice (Default / On / Off). Called from Account. Login from the
  * session only; never a view-only link. Nothing else is changed.
  ******************************************************************************/
 require_once __DIR__ . '/auth_lib.php';
@@ -18,7 +18,7 @@ function unp_handle($db, $me, $post, $visible){
 	$modes = array();
 	foreach (oev_unit_notify_kinds() as $k => $t) {
 		$m = $post['n_' . $k] ?? null;
-		if (!is_string($m) || !in_array($m, array('inherit', 'on', 'off'), true)) return array(false, 'Choose Use account default, On or Off. Nothing was changed.');
+		if (!is_string($m) || !in_array($m, array('inherit', 'on', 'off'), true)) return array(false, 'Choose Default, On or Off. Nothing was changed.');
 		$modes[$k] = $m;
 	}
 	$n = oev_unit_notify_save($db, (int)$me['id'], (int)$unit['id'], $modes);
@@ -35,23 +35,34 @@ function unp_next($post, $unit_id = 0){
 	return 'account.php#notify';
 }
 
-// HTML for one unit's Your notifications form (Account). $view: one unit's oev_unit_notify_view row.
+// HTML for one unit's Your notifications panel (Account): collapsed summary + expandable editors.
+// $view: one unit's oev_unit_notify_view row. id=notify-uN stays the unit anchor after save.
 function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
 	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
-	$o = '<form method="post" action="notify_prefs.php" class="ynf" id="notify-u' . (int)$unit_id . '">' . $csrf_html
-		. '<input type="hidden" name="unitid" value="' . (int)$unit_id . '"><input type="hidden" name="next" value="account">'
-		. '<b>' . $e($unit_name) . '</b>';
+	$short = array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Summary', 'stops' => 'Stopped');
+	$bits = array();
+	foreach (oev_unit_notify_kinds() as $k => $t) $bits[] = $short[$k] . ' ' . (!empty($view[$k]['on']) ? 'On' : 'Off');
+	$sum = implode(' · ', $bits);
+	$uid = (int)$unit_id;
+	$o = '<details class="ync" id="notify-u' . $uid . '">'
+		. '<summary><span class="ync-name">' . $e($unit_name) . '</span>'
+		. '<span class="ync-sum">' . $e($sum) . '</span></summary>'
+		. '<form method="post" action="notify_prefs.php" class="ynf">' . $csrf_html
+		. '<input type="hidden" name="unitid" value="' . $uid . '"><input type="hidden" name="next" value="account">'
+		. '<div class="yn-row">';
 	foreach (oev_unit_notify_kinds() as $k => $t) {
-		$c = $view[$k]; $id = 'yn' . (int)$unit_id . '_' . $k;
+		$c = $view[$k]; $id = 'yn' . $uid . '_' . $k;
+		$def = 'Default (' . ($c['account_on'] ? 'On' : 'Off') . ')';
 		$o .= '<div class="yn"><label for="' . $id . '">' . $e($t) . '</label>'
 			. '<select id="' . $id . '" name="n_' . $k . '">'
-			. '<option value="inherit"' . ($c['mode'] === 'inherit' ? ' selected' : '') . '>Use account default (' . ($c['account_on'] ? 'On' : 'Off') . ')</option>'
+			. '<option value="inherit"' . ($c['mode'] === 'inherit' ? ' selected' : '') . '>' . $e($def) . '</option>'
 			. '<option value="on"' . ($c['mode'] === 'on' ? ' selected' : '') . '>On</option>'
 			. '<option value="off"' . ($c['mode'] === 'off' ? ' selected' : '') . '>Off</option>'
-			. '</select> <span class="ynnow">Now: ' . ($c['on'] ? 'On' : 'Off') . '</span></div>';
+			. '</select></div>';
 	}
-	$o .= '<button type="submit" class="go">Save</button></form>';
+	$o .= '<div class="ynsave"><button type="submit" class="go">Save</button></div></div></form>';
 	if (!$master_on) $o .= '<div class="note">Outgoing email is off for the whole site, so nothing is sent right now.</div>';
+	$o .= '</details>';
 	return $o;
 }
 

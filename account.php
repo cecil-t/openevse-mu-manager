@@ -109,11 +109,25 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .err{background:#fde3e3;border:1px solid #e99;border-radius:6px;padding:6px 9px;color:#a11;font-weight:normal}
 .ac .note{color:#666;font-size:14px;margin:4px 0}
 .ac .nsub{margin:-2px 0 6px 22px;font-size:13px}
-.ac .yn{margin:6px 0}
-.ac .yn select{display:block;width:100%}
-.ac .ynnow{font-size:85%;color:#666}
+.ac .ync{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 8px;margin:8px 0;box-sizing:border-box}
+.ac .ync>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;color:#333}
+.ac .ync>summary::-webkit-details-marker{display:none}
+.ac .ync>summary::before{content:"▸ ";color:#035a5a;font-weight:bold}
+.ac .ync[open]>summary::before{content:"▾ "}
+.ac .ync-name{font-weight:bold}
+.ac .ync-sum{font-size:13px;color:#666;font-weight:normal}
+.ac .yn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:flex-end}
+.ac .yn-row .yn{flex:1 1 110px;min-width:100px;max-width:140px;margin:0}
+.ac .yn-row .yn label{display:block;margin:0 0 2px 0;font-size:13px;color:#333}
+.ac .yn-row .yn select{display:block;width:100%;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
+.ac .yn-row .ynsave{flex:0 0 auto;margin:0 0 1px 0}
+.ac .yn-row .ynsave button{margin:0;padding:4px 12px;font-size:15px}
 .ac .st.on{color:#1d6b1d;font-weight:bold}.ac .st.off{color:#888;font-weight:bold}
 .ac .uh{font-weight:bold;margin-bottom:4px}
+@media screen and (max-width:420px){
+	.ac .yn-row .yn{flex:1 1 calc(50% - 8px);max-width:none;min-width:0}
+	.ac .yn-row .yn select{max-width:100%}
+}
 @media screen and (min-width:700px){.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
 </style>
 <div class="slidebox ac pgcard">
@@ -141,7 +155,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <div class="nsub note">Charger faults and when a charger is offline longer than the site threshold.</div>
 <label class="in"><input type="checkbox" name="n_reboots"<?=!empty($me['n_reboots']) ? ' checked' : ''?>>Reboots</label>
 <label class="in"><input type="checkbox" name="n_sessions"<?=!empty($me['n_sessions']) ? ' checked' : ''?>>Session summary</label>
-<div class="nsub note">Account default for every charger you can see. Per-charger overrides below (Use account default / On / Off).</div>
+<div class="nsub note">Account default for every charger you can see. Per-charger overrides below (Default / On / Off).</div>
 <?php if (oev_users_have_stops($db)) { ?>
 <label class="in"><input type="checkbox" name="n_stops"<?=!empty($me['n_stops']) ? ' checked' : ''?>>Charging stopped</label>
 <div class="nsub note">Default for every charger: email when charging stops while still plugged in (not load-balancer pauses), once per plug-in.</div>
@@ -151,9 +165,12 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <button type="submit" class="go">Save defaults</button></form>
 </div>
 
-<?php if ($have && $units) { foreach ($units as $id => $u) { ?>
-<div class="card"><?=unp_form_html($id, $u['name'], $view[$id], $CS, $master)?></div>
-<?php } } elseif ($have) { ?>
+<?php if ($have && $units) { ?>
+<div class="note" style="margin:4px 2px 0">Per charger (tap to edit): <b>Default</b> follows your checkboxes above.
+Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stop while still plugged in (not load-balancer pauses).</div>
+<?php foreach ($units as $id => $u) echo unp_form_html($id, $u['name'], $view[$id], $CS, $master); ?>
+<script>(function(){var h=location.hash;if(h&&h.indexOf('#notify-u')===0){var el=document.getElementById(h.slice(1));if(el&&el.tagName==='DETAILS'){el.open=true;try{el.scrollIntoView({block:'nearest'})}catch(e){el.scrollIntoView()}}}})();</script>
+<?php } elseif ($have) { ?>
 <div class="card"><div class="note">You have no chargers you can see, so there are no per-charger overrides.</div></div>
 <?php } ?>
 
