@@ -125,9 +125,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .yn-row .yn{flex:1 1 110px;min-width:100px;max-width:140px;margin:0}
 .ac .yn-row .yn label{display:block;margin:0 0 2px 0;font-size:13px;color:#333}
 .ac .yn-row .yn select{display:block;width:100%;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
-.ac .yn-row .yn.yn-def label{color:#888}
-.ac .yn-row .yn.yn-def select{color:#666;background:#f7f7f7}
-.ac .yn-row .yn:not(.yn-def) select{color:#222;background:#fff;font-weight:normal}
+.ac .yn-row .yn.yn-def select{color:#888}
 .ac .yn-row .ynsave{flex:0 0 auto;margin:0 0 1px 0}
 .ac .yn-row .ynsave button{margin:0;padding:4px 12px;font-size:15px}
 .ac .yn-rem{margin-top:8px;padding-top:8px;border-top:1px solid #eee}
