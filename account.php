@@ -200,5 +200,6 @@ Plug-in reminders live on each charger below (your account email only).</div>
 
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
+</div>
 <?=oev_home_footer()?>
-</div></div></body></html>
+</div></body></html>

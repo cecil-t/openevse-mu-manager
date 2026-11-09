@@ -71,8 +71,8 @@ body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px
 }
 </style>
 <?php
-if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div></div></body></html>'; exit; }
-try { $db = sess_db(true); } catch (Throwable $e) { echo '<div class="sec">Session database unavailable.</div></div></body></html>'; exit; }
+if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div>'.oev_home_footer().'</div></body></html>'; exit; }
+try { $db = sess_db(true); } catch (Throwable $e) { echo '<div class="sec">Session database unavailable.</div>'.oev_home_footer().'</div></body></html>'; exit; }
 
 function fdt($ts, $fmt = 'D m/d g:ia'){ return $ts ? date($fmt, (int)$ts) : '-'; }
 // a time within a session: just the time on the plug-in day, else with the weekday (and date if a week or more later)
@@ -264,7 +264,7 @@ if (isset($_GET['id'])) {
 	$id = (int)$_GET['id'];
 	$s = $db->query("SELECT * FROM sessions WHERE id = $id$SC")->fetch();
 	if ($s) sess_live($s);
-	if (!$s) { echo '<div class="sec">Session not found. <a href="sessions.php">Back</a></div></div></body></html>'; exit; }
+	if (!$s) { echo '<div class="sec">Session not found. <a href="sessions.php">Back</a></div>'.oev_home_footer().'</div></body></html>'; exit; }
 	$segs = $db->query("SELECT * FROM segments WHERE session_id = $id ORDER BY start_at")->fetchAll();
 	$evs = $db->query("SELECT * FROM events WHERE session_id = $id ORDER BY ts, id")->fetchAll();
 	$smp = $db->query("SELECT ts, amps, pilot, volts, temp_c, temp1_c, temp2_c, temp3_c, res FROM samples WHERE session_id = $id ORDER BY ts")->fetchAll();
@@ -332,6 +332,7 @@ if (isset($_GET['id'])) {
 		<div class="ev <?=h($e['kind'])?>"><b><?=fdd($e['ts'], $s['plug_in_at'])?></b> <?=h($e['detail'])?>
 		<br><span class="sm"><?=h($e['reason'])?><?=$e['temp_c'] !== null ? ' &middot; ' . temp_txt($e['temp_c']) : ''?><?=$e['srssi'] !== null ? ' &middot; WiFi ' . (int)$e['srssi'] . ' dBm' : ''?></span></div>
 	<?php } ?></div>
+	<?=oev_home_footer()?>
 	</div></body></html>
 	<?php
 	exit;
@@ -377,6 +378,7 @@ if (isset($_GET['view']) && $_GET['view'] == 'months') {
 		<?php } ?></div>
 	<?php } ?>
 	<p class="sec sm">avg / max <?=temp_sym()?>. Throttling starts at <?=temp_txt(SESS_THERMAL_C_PAGE)?> ambient.</p>
+	<?=oev_home_footer()?>
 	</div></body></html>
 	<?php
 	exit;

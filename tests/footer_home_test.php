@@ -8,7 +8,7 @@ $_SERVER['SCRIPT_NAME'] = '/openevse/index.php';
 ck('home page: footer empty (no redundant Home)', oev_home_footer() === '');
 $_SERVER['SCRIPT_NAME'] = '/openevse/account.php';
 $h = oev_home_footer();
-ck('account-like page: simple Home link, no arrow', $h === '<p class="oev-home"><a href="./">Home</a></p>' && strpos($h, '&larr;') === false && strpos($h, 'Settings') === false);
+ck('account-like page: oev-foot Home strip, no arrow', $h === '<div class="oev-foot"><a href="./">Home</a></div>' && strpos($h, '&larr;') === false && strpos($h, 'Settings') === false);
 
 $pages = array('account.php','settings.php','help.php','sessions.php','unit.php','unitlist.php');
 foreach ($pages as $p) {
@@ -33,5 +33,13 @@ $login = file_get_contents("$app/login.php");
 ck('login logged-in shortcut says Home', strpos($login, 'Go to the home page') === false && strpos($login, 'href="./">Home</a>') !== false);
 // public safety: helper never emits view= token
 ck('footer href is ./ only (public cookie path)', strpos($h, 'view=') === false && strpos($h, 'href="./"') !== false);
+
+foreach (array('account.php','settings.php','help.php','unitlist.php') as $pg) {
+	$src = file_get_contents("$app/$pg");
+	ck("$pg footer after content card, before container close", (bool)preg_match('#</div>\s*<\?=oev_home_footer\(\)\?>\s*</div>\s*</body>#', $src));
+}
+$hd = file_get_contents("$app/_head.php");
+ck('_head defines .oev-foot light strip', strpos($hd, '.oev-foot{') !== false && strpos($hd, 'background:rgba(246,246,246') !== false);
+
 echo $f ? "$f of $n FAILED\n" : "all $n passed\n";
 exit($f ? 1 : 0);

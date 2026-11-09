@@ -154,5 +154,6 @@ $NS = oev_host_suggest($NU); $NV = array_values(array_filter($NU, 'oev_unit_visi
 </ul>
 </div>
 <?php } ?>
+</div>
 <?=oev_home_footer()?>
-</div></div></body></html>
+</div></body></html>

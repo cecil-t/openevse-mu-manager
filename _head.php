@@ -30,6 +30,7 @@ if ($oev_sub === '') $oev_sub = $oev_site;
 .avm a:hover,.avm button:hover{background:#eef6f6}
 .avm form{margin:0;border-top:1px solid #ddd}
 .avm a span.avok,.avm a span.avbad{display:inline;border:0;padding:0;margin:0 0 0 6px;background:none;box-shadow:none;font:bold 17px Arial,sans-serif}.avm a span.avok{color:#2a7a2a}.avm a span.avbad{color:#b11}
+.oev-foot{box-sizing:border-box;background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:8px 12px;margin:10px 0;color:#444;font:15px Arial,sans-serif}.oev-foot a{color:#035a5a;text-decoration:none}body.pgw .oev-foot{margin-left:8px;margin-right:8px}
 .avlogin{display:inline-block;margin-top:6px;padding:6px 12px;border-radius:16px;background:#00807f;color:#fff !important;font:bold 16px Arial,sans-serif;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.35)}</style>
 </head>
 <body<?=!empty($GLOBALS['OEV_WIDE']) ? ' class="pgw"' : ''?>>

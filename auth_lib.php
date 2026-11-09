@@ -224,6 +224,7 @@ function oev_userbar(){
 function oev_home_footer(){
 	$script = basename(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')));
 	if ($script === '' || $script === 'index.php') return '';
-	return '<p class="oev-home"><a href="./">Home</a></p>';
+	/* Dedicated strip below the page card, inside .container — light band, not bare on the pattern. */
+	return '<div class="oev-foot"><a href="./">Home</a></div>';
 }
 
