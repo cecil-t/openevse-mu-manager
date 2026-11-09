@@ -72,14 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$st = $db->prepare('SELECT id, loadgroupid, name FROM evses WHERE id = ?'); $st->execute(array($uid)); $unit = $st->fetch(PDO::FETCH_ASSOC);
 		if (!$unit || !oev_unit_visible($unit)) $go('Pick a charger you can see.', $anchor($uid));
 		$t = (string)($_POST['at'] ?? '');
+		/* days[] present (even empty) → validate; omitted (old clients/tests) → every day. */
+		$days = array_key_exists('days', $_POST) ? $_POST['days'] : 127;
 		if ($a === 'rem_add') {
-			list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, 0);
+			list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, 0, $days);
 			if ($ok) $rmsg = 'Reminder added. It emails only ' . $me['email'] . '.';
 			$go($rmsg, $anchor((int)$au));
 		}
 		/* rem_save: keep the reminder on its unit (no charger move); ownership + dupe check under lock; existence=on */
 		$rid = (int)($_POST['id'] ?? 0);
-		list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, $rid);
+		list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, $rid, $days);
 		$go($rmsg, $anchor((int)$au));
 	}
 }
@@ -94,6 +96,7 @@ $have = oev_unit_notify_have($db);
 $view = $have ? oev_unit_notify_view($db, $me, $units) : array();
 $master = (bool)oev_setting('notify_on', '0');
 $CS = oev_csrf_field();
+if (oev_reminders_have_owner($db)) oev_reminders_days_col($db);
 $rems = oev_reminders_for_user($db, (int)$me['id']);
 $unres = oev_is_admin() ? oev_reminders_unresolved($db) : array();
 
@@ -147,6 +150,12 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .rem-row input[type=time]{width:auto;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
 .ac .rem-row label.in{display:inline-flex;align-items:center;gap:4px;margin:0 0 2px 0;white-space:nowrap}
 .ac .rem-row button{margin:0;padding:4px 10px;font-size:15px}
+.ac .rem-days{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;flex:1 1 auto;min-width:0;max-width:100%}
+.ac .rem-days .rd{display:inline-flex;align-items:center;gap:3px;margin:0;font-size:12px;color:#333;white-space:nowrap;cursor:pointer;font-weight:normal}
+.ac .rem-days .rd input{margin:0;flex:none}
+@media screen and (max-width:600px){
+	.ac .rem-days{flex:1 1 100%;gap:4px 8px}
+}
 .ac .st.on{color:#1d6b1d;font-weight:bold}.ac .st.off{color:#888;font-weight:bold}
 .ac .uh{font-weight:bold;margin-bottom:4px}
 @media screen and (max-width:420px){

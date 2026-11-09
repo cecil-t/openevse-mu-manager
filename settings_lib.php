@@ -278,6 +278,61 @@ function oev_reminders_own_cols($db){
 	$db->exec('ALTER TABLE reminders ADD COLUMN user_id INTEGER');
 	return true;
 }
+/* days: 7-bit mask, bit0=Sun … bit6=Sat (PHP date('w')). 127 = every day. Missing/NULL → 127. */
+define('OEV_REM_DAYS_ALL', 127);
+function oev_reminders_have_days($db){
+	return in_array('days', array_column($db->query('PRAGMA table_info(reminders)')->fetchAll(PDO::FETCH_ASSOC), 'name'), true);
+}
+function oev_reminders_days_col($db){
+	if (oev_reminders_have_days($db)) return false;
+	$db->exec('ALTER TABLE reminders ADD COLUMN days INTEGER NOT NULL DEFAULT 127');
+	return true;
+}
+function oev_rem_days_get($row){
+	if (!is_array($row) || !array_key_exists('days', $row) || $row['days'] === null || $row['days'] === '') return OEV_REM_DAYS_ALL;
+	$m = (int)$row['days'] & OEV_REM_DAYS_ALL;
+	return $m ? $m : OEV_REM_DAYS_ALL;   // 0/corrupt → every day (do not silently suppress legacy rows)
+}
+function oev_rem_days_active($mask, $w = null){
+	if ($w === null) $w = (int)date('w');
+	$w = (int)$w;
+	if ($w < 0 || $w > 6) return false;
+	$m = (int)$mask & OEV_REM_DAYS_ALL;
+	if ($m === 0) $m = OEV_REM_DAYS_ALL;
+	return (($m >> $w) & 1) === 1;
+}
+function oev_rem_days_norm($raw){
+	/* Accept mask int, or list of day indexes 0-6 (strings/ints). Null if none valid. Forged junk ignored. */
+	if (is_int($raw) || (is_string($raw) && preg_match('/^\d+$/', $raw))) {
+		$m = (int)$raw & OEV_REM_DAYS_ALL;
+		return $m > 0 ? $m : null;
+	}
+	if (!is_array($raw)) return null;
+	$m = 0;
+	foreach ($raw as $d) {
+		if (!(is_string($d) || is_int($d))) continue;
+		if (!preg_match('/^[0-6]$/', (string)$d)) continue;
+		$m |= (1 << (int)$d);
+	}
+	return $m > 0 ? $m : null;
+}
+function oev_rem_days_label($mask){
+	$mask = (int)$mask & OEV_REM_DAYS_ALL;
+	if ($mask === 0 || $mask === OEV_REM_DAYS_ALL) return 'Daily';
+	if ($mask === 62) return 'Weekdays';   // Mon-Fri
+	if ($mask === 65) return 'Weekends';  // Sun+Sat
+	$names = array('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+	$on = array();
+	for ($i = 0; $i < 7; $i++) if ($mask & (1 << $i)) $on[] = $i;
+	if (count($on) > 1) {
+		$contig = true;
+		for ($i = 1; $i < count($on); $i++) if ($on[$i] !== $on[$i - 1] + 1) { $contig = false; break; }
+		if ($contig) return $names[$on[0]] . '-' . $names[$on[count($on) - 1]];
+	}
+	$labs = array();
+	foreach ($on as $i) $labs[] = $names[$i];
+	return implode(',', $labs);
+}
 // Map legacy Send-to addresses onto real logins. Never invent an owner.
 // Returns array(assigned => n, unresolved => [ {id, reason, emails} ]).
 function oev_reminders_migrate_owners($db){
@@ -333,10 +388,13 @@ function oev_rem_norm_time($t){
 // BEGIN IMMEDIATE so concurrent posts cannot race past the check. Existing duplicate
 // rows are left alone — only blocks creating/changing into a duplicate.
 // Returns array(ok, msg, at_norm, anchor_unit_id).
-function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled = 1, $rid = 0){  // $enabled ignored; owned rows always enabled=1
+function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled = 1, $rid = 0, $days = 127){  // $enabled ignored; owned rows always enabled=1
 	$user_id = (int)$user_id; $unit_id = (int)$unit_id; $rid = (int)$rid;
 	$norm = oev_rem_norm_time($at);
 	if ($norm === null) return array(false, 'Pick a time for the reminder.', null, $unit_id);
+	$dmask = oev_rem_days_norm($days);
+	if ($dmask === null) return array(false, 'Pick at least one day for the reminder.', null, $unit_id);
+	oev_reminders_days_col($db);
 	$own = !$db->inTransaction();
 	if ($own) $db->exec('BEGIN IMMEDIATE');
 	try {
@@ -369,12 +427,12 @@ function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled = 1, $rid = 0
 		}
 		/* Existence = on for owned rows; always persist enabled=1 (ignore forged enabled=0). */
 		if ($rid > 0) {
-			$db->prepare('UPDATE reminders SET at_time = ?, enabled = 1, extra_to = ? WHERE id = ? AND user_id = ?')
-				->execute(array($norm, '', $rid, $user_id));
+			$db->prepare('UPDATE reminders SET at_time = ?, days = ?, enabled = 1, extra_to = ? WHERE id = ? AND user_id = ?')
+				->execute(array($norm, $dmask, '', $rid, $user_id));
 			$msg = 'Reminder saved.';
 		} else {
-			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')
-				->execute(array($unit_id, $norm, '', $user_id));
+			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id, days) VALUES (?, ?, ?, 1, ?, ?)')
+				->execute(array($unit_id, $norm, '', $user_id, $dmask));
 			$msg = 'Reminder added.';
 		}
 		if ($own) $db->exec('COMMIT');

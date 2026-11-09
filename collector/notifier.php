@@ -180,6 +180,8 @@ foreach ($odb->query($rem_sql)->fetchAll() as $rm) {
 	$t = mktime((int)$m[1], (int)$m[2], 0);
 	$dk = 'rem' . $rm['id'] . '|' . date('Ymd');
 	if ($now < $t || $now >= $t + 900 || !empty($st['rem'][$dk])) continue;   // 15-minute window, once a day
+	/* Weekday gate: app TZ (oev_timezone / America/New_York when configured). Missing days → every day. */
+	if (function_exists('oev_rem_days_active') && !oev_rem_days_active(oev_rem_days_get($rm), (int)date('w', $now))) continue;
 	$r = $usx[$id] ?? null;
 	if (!$r || $now - max((int)$r['last_ok_at'], (int)$r['last_push_at']) > 600) continue;   // no fresh reading: can't tell
 	$st['rem'][$dk] = 1;

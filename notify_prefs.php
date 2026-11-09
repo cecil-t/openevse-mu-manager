@@ -44,6 +44,24 @@ function unp_rem_time_label($at){
 	$h = (int)$m[1]; $min = $m[2]; $ap = $h >= 12 ? 'PM' : 'AM'; $h12 = $h % 12; if ($h12 === 0) $h12 = 12;
 	return $h12 . ':' . $min . ' ' . $ap;
 }
+function unp_rem_summary_label($r){
+	$t = unp_rem_time_label($r['at_time'] ?? '');
+	$d = function_exists('oev_rem_days_label') ? oev_rem_days_label(oev_rem_days_get($r)) : 'Daily';
+	return $t . ' ' . $d;
+}
+/* Compact Sun–Sat checkboxes; $mask bits match date('w'). */
+function unp_rem_days_html($mask, $name = 'days[]', $id_prefix = 'rd'){
+	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+	$mask = (int)$mask & 127; if ($mask === 0) $mask = 127;
+	$names = array('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+	$o = '<div class="rem-days" role="group" aria-label="Days">';
+	for ($i = 0; $i < 7; $i++) {
+		$id = $e($id_prefix . $i);
+		$ck = ($mask & (1 << $i)) ? ' checked' : '';
+		$o .= '<label class="rd" for="' . $id . '"><input type="checkbox" id="' . $id . '" name="' . $e($name) . '" value="' . $i . '"' . $ck . '>' . $names[$i] . '</label>';
+	}
+	return $o . '</div>';
+}
 function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rems = array(), $acct_rem_on = true){
 	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 	$short = array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Summary', 'stops' => 'Stopped');
@@ -55,9 +73,9 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		if (($c['mode'] ?? '') === 'on' || ($c['mode'] ?? '') === 'off') $bit = '<b>' . $bit . '</b>';
 		$bits[] = $bit;
 	}
-	// Reminder summary: existence = on; no per-row off. Account / site email gates annotate.
+	// Reminder summary: existence = on; include compact days label. Account / site email gates annotate.
 	$labs = array();
-	foreach ($rems as $r) $labs[] = unp_rem_time_label($r['at_time'] ?? '');
+	foreach ($rems as $r) $labs[] = unp_rem_summary_label($r);
 	if (!$labs) {
 		$rbit = $e('Reminder Off');
 	} else {
@@ -97,12 +115,14 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		. ($acct_rem_on ? '' : ' <b>(currently off — will not email)</b>') . '.</div>';
 	foreach ($rems as $r) {
 		$rid = (int)$r['id'];
+		$dmask = oev_rem_days_get($r);
 		$cfm = json_encode('Remove the ' . unp_rem_time_label($r['at_time'] ?? '') . ' reminder?', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 		$o .= '<form method="post" action="account.php" class="rem-row">' . $csrf_html
 			. '<input type="hidden" name="a" value="rem_save"><input type="hidden" name="id" value="' . $rid . '">'
 			. '<input type="hidden" name="unit" value="' . $uid . '">'
 			. '<div class="rem-f"><label for="remat' . $rid . '">Plug in by</label>'
 			. '<input type="time" id="remat' . $rid . '" name="at" value="' . $e($r['at_time']) . '"></div>'
+			. unp_rem_days_html($dmask, 'days[]', 'rd' . $rid . '_')
 			. '<button type="submit" class="go">Save</button>'
 			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(' . $cfm . ')">Remove</button>'
 			. '</form>';
@@ -111,6 +131,7 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		. '<input type="hidden" name="a" value="rem_add"><input type="hidden" name="unit" value="' . $uid . '">'
 		. '<div class="rem-f"><label for="remadd' . $uid . '">' . ($rems ? 'Add another' : 'Plug in by') . '</label>'
 		. '<input type="time" id="remadd' . $uid . '" name="at" value="21:00"></div>'
+		. unp_rem_days_html(127, 'days[]', 'rdadd' . $uid . '_')
 		. '<button type="submit" class="go">Add reminder</button></form>';
 	$o .= '</div></details>';
 	return $o;

@@ -392,20 +392,20 @@ $base = array(
 );
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1)), true);
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
-ck('reminder summary: enabled time bold', strpos($m[1], '<b>Reminder 9:00 PM</b>') !== false && strpos($h, 'yn-rem') !== false && strpos($h, '<select name="unit"') === false);
+ck('reminder summary: enabled time bold', strpos($m[1], '<b>Reminder 9:00 PM Daily</b>') !== false && strpos($h, 'yn-rem') !== false && strpos($h, 'rem-days') !== false && strpos($h, '<select name="unit"') === false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1)), false);
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
-ck('reminder summary: account gate annotated, not claiming mail', strpos($m[1], '<b>Reminder 9:00 PM (account off)</b>') !== false);
+ck('reminder summary: account gate annotated, not claiming mail', strpos($m[1], '<b>Reminder 9:00 PM Daily (account off)</b>') !== false);
 $h = unp_form_html(4, 'U4', $base, 'X', false, array(array('id'=>1,'at_time'=>'09:30','enabled'=>1)), true);
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
-ck('reminder summary: site email off annotated', strpos($m[1], '<b>Reminder 9:30 AM (email off)</b>') !== false);
+ck('reminder summary: site email off annotated', strpos($m[1], '<b>Reminder 9:30 AM Daily (email off)</b>') !== false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>0)), true);
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
-ck('reminder summary: owned row active by existence (no per-entry off)', strpos($m[1], '<b>Reminder 9:00 PM</b>') !== false && strpos($m[1], '(off)') === false);
+ck('reminder summary: owned row active by existence (no per-entry off)', strpos($m[1], '<b>Reminder 9:00 PM Daily</b>') !== false && strpos($m[1], '(off)') === false);
 ck('reminder UI has no per-row On checkbox', strpos($h, 'name="enabled"') === false && strpos($h, '>On</label>') === false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1), array('id'=>2,'at_time'=>'07:15','enabled'=>1)), true);
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
-ck('reminder summary: multiple enabled times listed', strpos($m[1], '<b>Reminders 9:00 PM, 7:15 AM</b>') !== false);
+ck('reminder summary: multiple enabled times listed', strpos($m[1], '<b>Reminders 9:00 PM Daily, 7:15 AM Daily</b>') !== false);
 ck('reminder controls: compact time max-width in account CSS', strpos(file_get_contents(__DIR__ . '/../account.php'), 'input[type=time]{width:auto;max-width:140px') !== false);
 ck('account per-charger summary uses desktop grid + mobile inline wrap',
 	($ac = file_get_contents(__DIR__ . '/../account.php')) !== false
