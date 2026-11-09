@@ -68,34 +68,45 @@ ck('sessions consolidates Session history into one .sec (filter+totals+by unit+l
 ck('diagnostics is real body not bridge placeholder',
 	strpos($diag, 'layout is in progress') === false
 	&& strpos($diag, 'use these while Session Reports') === false
-	&& strpos($diag, '<h4>Faults') !== false
-	&& strpos($diag, '<h4>WiFi drop-offs') !== false
+	&& strpos($diag, '<h4>Unit health</h4>') !== false
+	&& strpos($diag, '<h4>Fault &amp; thermal events</h4>') !== false
 	&& strpos($diag, 'id="monthly"') !== false
 	&& strpos($diag, '<h4>Unit reporting</h4>') === false
-	&& strpos($diag, 'FROM events') !== false);
+	&& strpos($diag, 'FROM events') !== false
+	&& strpos($diag, '<h4>WiFi drop-offs') === false);
 ck('diagnostics view auth + visible unit scope + footer',
 	strpos($diag, "oev_require('view')") !== false
 	&& strpos($diag, 'oev_visible_unit_ids') !== false
 	&& strpos($diag, 'oev_home_footer') !== false);
-ck('diagnostics Lifetime fault counts from unit_state high-water (not live /status)',
-	strpos($diag, 'Lifetime fault counts') !== false
-	&& strpos($diag, 'gfci_count') !== false
-	&& strpos($diag, 'nognd_count') !== false
-	&& strpos($diag, 'stuck_count') !== false
-	&& strpos($diag, 'survive WiFi restarts') !== false
-	&& strpos($diag, "gfcicount") === false);
+ck('diagnostics Unit health merges lifetime faults + WiFi from unit_state / events',
+	strpos($diag, 'Unit health') !== false
+	&& strpos($diag, 'Lifetime fault counts from each charger') !== false
+	&& strpos($diag, '$health') !== false
+	&& strpos($diag, '$u[\'gfci_count\']') !== false
+	&& strpos($diag, '$u[\'nognd_count\']') !== false
+	&& strpos($diag, '$u[\'stuck_count\']') !== false
+	&& strpos($diag, 'gfcicount') === false
+	&& strpos($diag, 'survive WiFi restarts') === false
+	&& strpos($diag, 'Not a live /status read') === false
+	&& strpos($diag, 'card uh') !== false);
 ck('unit.php Fault counts popup has no since-reset wording',
 	($up = file_get_contents("$app/unit.php")) !== false
 	&& strpos($up, "pop('Fault counts'") !== false
 	&& strpos($up, 'since reset') === false);
-ck('diagnostics WiFi per-unit summary (no per-event list; flag threshold 5/7d)',
+ck('diagnostics WiFi in Unit health (no per-event list; flag threshold 5/7d badge)',
 	strpos($diag, 'WIFI_FLAG_7D = 5') !== false
-	&& strpos($diag, 'wifi_list') !== false
+	&& strpos($diag, 'wifi_rows') !== false
 	&& strpos($diag, 'rb7') !== false
 	&& strpos($diag, 'gap7') !== false
-	&& strpos($diag, 'Per-unit WiFi restart counts') !== false
+	&& strpos($diag, 'uh-hi') !== false
 	&& strpos($diag, 'foreach ($drops as') === false
 	&& strpos($diag, "kind IN ('reach', 'reboot') AND ts BETWEEN") === false);
+ck('diagnostics top intro+filters merged into one card',
+	strpos($diag, 'diag-top') !== false
+	&& strpos($diag, 'Faults, thermal events, and WiFi health for each unit') !== false
+	&& strpos($diag, 'id="diagfilt"') !== false
+	&& strpos($diag, 'Recent logs use this date range') !== false
+	&& substr_count($diag, '<div class="sec') >= 3);
 ck('diagnostics monthly queries preserve thermal/WiFi meaning',
 	strpos($diag, "kind = 'thermal' AND reason = 'thermal'") !== false
 	&& strpos($diag, "to_val = 10") !== false

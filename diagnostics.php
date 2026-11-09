@@ -15,19 +15,50 @@ $title = 'Diagnostics';
 $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
-.card{background:#eee;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0;color:#555;font-size:15px}
+.card{background:#eee;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0;color:#555;font-size:15px;box-sizing:border-box;max-width:100%}
 .card b{color:#333}.card .r{float:right}.card .sm{font-size:13px;color:#777}
 .tag{display:inline-block;font-size:11px;padding:1px 5px;border-radius:4px;background:#ddd;color:#444;margin:2px 2px 0 0}
 .tag.f{background:#f99;color:#600}.tag.o{background:#9cf;color:#035}
 h4{margin:14px 0 4px 0;color:#333}
 .kv{display:flex;justify-content:space-between;border-bottom:1px dotted #ccc;padding:2px 0;gap:10px}
 .kv span{white-space:nowrap}.kv span:first-child{flex:0 0 auto;color:#888}.kv span:last-child{overflow:hidden;text-overflow:ellipsis;text-align:right;min-width:0}
-form.flt select,form.flt input{font-size:15px;margin:2px 0;max-width:100%}
-.ev{border-left:3px solid #aaa;padding:2px 0 2px 7px;margin:5px 0;font-size:14px}
+form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-width:100%;box-sizing:border-box}
+.ev{border-left:3px solid #aaa;padding:2px 0 2px 7px;margin:5px 0;font-size:14px;overflow-wrap:anywhere}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
-.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
-.sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
+.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444;box-sizing:border-box;max-width:100%;overflow-wrap:break-word}
+.sec>h4:first-child,.sec>h3:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
 .sm{font-size:13px;color:#777}.err{color:#b11}
+/* top intro+filters in one sec */
+.diag-top h3{margin:4px 0 4px 0;color:#333;font-size:18px}
+.diag-top .flt{background:#fff;margin:6px 0;padding:8px 10px}
+.diag-top .note{margin:2px 0 0 0}
+/* Unit health: compact grid (desktop) / stacked pills (mobile) */
+.uh{max-width:680px;padding:6px 8px}
+.uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.5fr) 2.6rem 3.6rem 2.8rem minmax(8.5rem,1.5fr);gap:4px 8px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
+.uh-h{font-size:11px;color:#888;border-bottom:1px solid #ccc;padding:2px 2px 5px;font-weight:600}
+.uh-h span:not(:first-child),.uh-c{text-align:center;font-variant-numeric:tabular-nums}
+.uh-n{color:#333;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uh-z{color:#aaa;font-weight:400}
+.uh-nz{color:#8a3030;font-weight:600}
+.uh-w{font-size:13px;color:#555;font-variant-numeric:tabular-nums;min-width:0}
+.uh-hi{display:inline-block;font-size:10px;line-height:1.3;padding:1px 6px;border-radius:8px;background:#f99;color:#600;font-weight:700;margin-left:4px;vertical-align:middle;letter-spacing:.02em}
+.uh-gap{color:#888;font-size:12px}
+.uh-r:last-child{border-bottom:0}
+.mo-row{border-top:1px dotted #ddd;padding:6px 0;margin-top:4px;overflow:hidden}
+.mo-row .r{float:none;display:block;margin:2px 0 4px}
+.mo-row .sm{display:block;overflow-wrap:anywhere}
+@media (max-width:560px){
+	.uh-h{display:none}
+	.uh-r{display:block;padding:8px 2px}
+	.uh-n{display:block;white-space:normal;margin-bottom:5px;font-size:14px}
+	.uh-c{display:inline-block;margin:0 4px 4px 0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
+	.uh-c::before{content:attr(data-l) " ";color:#777;font-weight:400}
+	.uh-nz{background:#fde8e8}
+	.uh-z{background:#f0f0f0;color:#999}
+	.uh-w{display:block;margin-top:2px;font-size:12px;line-height:1.45}
+	.uh-w::before{content:"WiFi ";color:#777}
+	.card .r{float:none;display:block;margin-top:3px}
+}
 </style>
 <?php
 if (!is_file(SESS_DB_PATH)) { echo '<div class="sec">No session data yet. The collector has not run.</div>'.oev_home_footer().'</div></body></html>'; exit; }
@@ -73,32 +104,27 @@ foreach ($db->query("SELECT $M m, unit_id,
 krsort($rows);
 $names = array(); foreach ($units as $u) $names[$u['unit_id']] = $u['unit_name'];
 $t1 = function($v){ return temp_num($v); };
-// Lifetime fault counters from collector high-water (unit_state) — not live /status (false 0s after WiFi restart)
-$life = array();
-foreach ($units as $u) {
-	if ($unit && (int)$u['unit_id'] !== $unit) continue;
-	$life[] = $u;
-}
-// WiFi lines: every in-scope unit (zeros when no events yet), sorted by unit_state name
-$wifi_list = array();
+// Per-unit health rows: lifetime fault counters (unit_state high-water) + WiFi restart windows
+$health = array();
 foreach ($units as $u) {
 	if ($unit && (int)$u['unit_id'] !== $unit) continue;
 	$uid = (int)$u['unit_id'];
 	$w = $wifi_rows[$uid] ?? array('rb7'=>0,'rb30'=>0,'rball'=>0,'gap7'=>0);
-	$wifi_list[] = array(
+	$health[] = array(
 		'unit_id' => $uid,
 		'name' => (string)$u['unit_name'],
+		'gfci' => $u['gfci_count'], 'nognd' => $u['nognd_count'], 'stuck' => $u['stuck_count'],
 		'rb7' => (int)$w['rb7'], 'rb30' => (int)$w['rb30'], 'rball' => (int)$w['rball'],
 		'gap7' => (int)$w['gap7'],
 		'flag' => ((int)$w['rb7'] >= $WIFI_FLAG_7D),
 	);
 }
-usort($wifi_list, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); });
+usort($health, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); });
 
 ?>
-<div class="sec"><h3 style="margin:4px 0 6px 0;color:#333">Diagnostics</h3>
-<p class="sm">Faults, thermal events, WiFi drop-offs, and monthly health. Energy history stays on <a href="sessions.php">Session Reports</a>. Per-unit reporting and collector / system health for admins: Settings → System status.</p></div>
-
+<div class="sec diag-top">
+<h3>Diagnostics</h3>
+<p class="sm">Faults, thermal events, and WiFi health for each unit. Energy history: <a href="sessions.php">Session Reports</a>.</p>
 <form class="flt card" method="get" id="diagfilt">
 	<select name="unit"><option value="0">All units</option>
 	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h($u['unit_name']) . '</option>'; ?>
@@ -106,35 +132,40 @@ usort($wifi_list, function($a, $b){ return strnatcasecmp($a['name'], $b['name'])
 	<input type="date" name="from" value="<?=h($from)?>"> to <input type="date" name="to" value="<?=h($to)?>">
 	<button type="submit">Show</button>
 </form>
-<p class="sec sm">Recent logs use the date range above (default last 90 days). Monthly temperatures below are all-time.</p>
+<p class="sm note">Recent logs use this date range (default last 90 days). Monthly temperatures below are all-time.</p>
+</div>
 
-<div class="sec"><h4>Faults &amp; thermal</h4>
-<div class="card" style="background:#fff"><b>Lifetime fault counts</b>
-<p class="sm" style="margin:2px 0 6px 0">Controller counters kept by the collector (survive WiFi restarts). Not a live /status read.</p>
-<?php if (!$life) echo '<p class="sm">No units in scope.</p>';
-$fc = function($v){ return ($v === null || $v === '') ? "\u{2014}" : (string)(int)$v; };
-foreach ($life as $u) {
-	$nm = $names[(int)$u['unit_id']] ?? $u['unit_name'];
-	echo '<div class="kv"><span>' . h($nm) . '</span><span>GFCI ' . $fc($u['gfci_count']) . ' &middot; No ground ' . $fc($u['nognd_count']) . ' &middot; Stuck ' . $fc($u['stuck_count']) . '</span></div>';
+<div class="sec"><h4>Unit health</h4>
+<p class="sm">Lifetime fault counts from each charger; WiFi restarts over the last 7 / 30 days<?php if ($WIFI_FLAG_7D) echo ' (badge when &ge; ' . (int)$WIFI_FLAG_7D . ' in 7 days)'; ?>.</p>
+<div class="card uh">
+<?php if (!$health) echo '<p class="sm">No units in scope.</p>';
+else {
+	$fc = function($v){ return ($v === null || $v === '') ? null : (int)$v; };
+	echo '<div class="uh-h"><span>Unit</span><span>GFCI</span><span>No ground</span><span>Stuck</span><span>WiFi 7d / 30d / all</span></div>';
+	foreach ($health as $row) {
+		$cell = function($v, $lab) use ($fc) {
+			$n = $fc($v);
+			if ($n === null) return '<span class="uh-c uh-z" data-l="' . h($lab) . '">' . "\u{2014}" . '</span>';
+			$cls = $n > 0 ? 'uh-c uh-nz' : 'uh-c uh-z';
+			return '<span class="' . $cls . '" data-l="' . h($lab) . '">' . $n . '</span>';
+		};
+		$wtxt = (int)$row['rb7'] . ' / ' . (int)$row['rb30'] . ' / ' . (int)$row['rball'];
+		if ((int)$row['gap7'] > 0) $wtxt .= ' <span class="uh-gap">' . (int)$row['gap7'] . ' gap' . ($row['gap7'] == 1 ? '' : 's') . '</span>';
+		if ($row['flag']) $wtxt .= ' <span class="uh-hi">high</span>';
+		echo '<div class="uh-r"><span class="uh-n" title="' . h($row['name']) . '">' . h($row['name']) . '</span>'
+			. $cell($row['gfci'], 'GFCI') . $cell($row['nognd'], 'No ground') . $cell($row['stuck'], 'Stuck')
+			. '<span class="uh-w">' . $wtxt . '</span></div>';
+	}
 } ?>
 </div>
+</div>
+
+<div class="sec"><h4>Fault &amp; thermal events</h4>
 <?php if (!$faults) echo '<p class="sm">None logged in this range.</p>'; ?>
 <?php foreach ($faults as $e) { ?>
 	<div class="ev <?=h($e['kind'])?>"><b><?=fdt($e['ts'])?></b> <?=h($e['unit_name'])?>: <?=h($e['detail'])?>
 	<br><span class="sm"><?=$e['temp_c'] !== null ? temp_txt($e['temp_c']) : ''?><?=$e['session_id'] ? ' &middot; <a href="sessions.php?id=' . (int)$e['session_id'] . '">session</a>' : ' &middot; not in a session'?></span></div>
 <?php } ?></div>
-
-<div class="sec"><h4>WiFi drop-offs &amp; reboots</h4>
-<p class="sm">Per-unit WiFi restart counts from the collector (not a live /status read). Flagged when &ge; <?=$WIFI_FLAG_7D?> restarts in the last 7 days. Gaps = times the collector could not reach the unit.</p>
-<?php if (!$wifi_list) echo '<p class="sm">No units in scope.</p>'; ?>
-<?php foreach ($wifi_list as $w) {
-	$bits = array((int)$w['rb7'] . ' in 7d', (int)$w['rb30'] . ' in 30d', (int)$w['rball'] . ' all');
-	if ((int)$w['gap7'] > 0) $bits[] = (int)$w['gap7'] . ' gap' . ($w['gap7'] == 1 ? '' : 's') . ' (7d)';
-	$right = implode(' &middot; ', $bits);
-	if ($w['flag']) $right = '<span class="err">' . $right . ' &middot; high</span>';
-	echo '<div class="kv"><span>' . h($w['name']) . '</span><span>' . $right . '</span></div>';
-} ?>
-</div>
 
 <div class="sec" id="monthly"><h4>Monthly temperatures &amp; thermal</h4>
 <p class="sm">Per month: thermal throttling, over-temperature faults, WiFi drop-offs, temperature (<?=temp_sym()?>, hottest sensor) avg / max while idle (ambient) and while charging, and WiFi signal where the unit reports it (v5 only). Unit filter above applies; dates do not.</p>
@@ -142,7 +173,7 @@ foreach ($life as $u) {
 <?php foreach ($rows as $m => $us_) { ksort($us_); ?>
 	<div class="card" style="background:#fff"><b><?=h(date('F Y', strtotime($m . '-01')))?></b>
 	<?php foreach ($us_ as $uid => $x) { $th = (int)($x['thermal'] ?? 0); $ot = (int)($x['overtemp'] ?? 0); $dr = (int)($x['drops'] ?? 0); ?>
-		<div style="border-top:1px dotted #ddd;padding:4px 0;margin-top:4px"><b><?=h($names[$uid] ?? "unit $uid")?></b>
+		<div class="mo-row"><b><?=h($names[$uid] ?? "unit $uid")?></b>
 			<span class="r"><?=$th ? "<span class='tag f'>$th thermal</span>" : '<span class="tag">0 thermal</span>'?><?=$ot ? "<span class='tag f'>$ot over-temp</span>" : ''?><?=$dr ? "<span class='tag'>$dr drop-off" . ($dr == 1 ? '' : 's') . "</span>" : ''?><?=!empty($x['reboots']) ? "<span class='tag'>" . (int)$x['reboots'] . " reboot" . ($x['reboots'] == 1 ? '' : 's') . "</span>" : ''?></span><br>
 			<span class="sm">idle <?=$t1($x['idle_avg'] ?? null)?> / <?=$t1($x['idle_max'] ?? null)?> &middot; charging <?=$t1($x['chg_avg'] ?? null)?> / <?=$t1($x['chg_max'] ?? null)?><?=isset($x['rssi_avg']) && $x['rssi_avg'] !== null ? ' &middot; WiFi avg ' . round($x['rssi_avg']) . ' dBm (worst ' . (int)$x['rssi_min'] . ')' : ''?></span>
 		</div>
