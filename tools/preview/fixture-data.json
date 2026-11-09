@@ -1,0 +1,106 @@
+{
+  "site_name": "MU Manager",
+  "user": {
+    "name": "Greg Hassler",
+    "email": "greg@example.com",
+    "role": "admin"
+  },
+  "csrf": "",
+  "groups": [
+    { "id": 1, "name": "Lot", "limit_a": 40 },
+    { "id": 2, "name": "N Penn Garage", "limit_a": 80 },
+    { "id": 3, "name": "Employee Parking Structure B", "limit_a": 100 },
+    { "id": null, "name": "No load group", "limit_a": null }
+  ],
+  "units": [
+    {
+      "id": 1, "name": "A1", "group_id": 1, "color": "#1f77b4",
+      "state": "ready", "state_code": 1, "pilot_a": 32, "amps": null,
+      "temp_f": 68, "plugged": false, "offline": false,
+      "gfci": 0, "nognd": 0, "stuck": 0, "wifi_rb7": 0,
+      "ip": "192.168.1.21", "host": "a1", "mac": "aa:bb:cc:00:00:01",
+      "serial": "SN-A1-001", "max_a": 32, "last_session": "2h ago · 4.2 kWh"
+    },
+    {
+      "id": 2, "name": "Bay3", "group_id": 1, "color": "#ff7f0e",
+      "state": "charging", "state_code": 3, "pilot_a": 40, "amps": 38.2,
+      "temp_f": 86, "plugged": true, "offline": false,
+      "gfci": 0, "nognd": 0, "stuck": 0, "wifi_rb7": 1,
+      "ip": "192.168.1.23", "host": "bay3", "mac": "aa:bb:cc:00:00:03",
+      "serial": "SN-BAY3-002", "max_a": 40, "last_session": "plugged 45m · 7.1 kWh"
+    },
+    {
+      "id": 3, "name": "N Penn: 1F", "group_id": 2, "color": "#2ca02c",
+      "state": "connected", "state_code": 2, "pilot_a": 48, "amps": 0,
+      "temp_f": 72, "plugged": true, "offline": false,
+      "gfci": 1, "nognd": 0, "stuck": 0, "wifi_rb7": 0,
+      "ip": "192.168.1.31", "host": "npenn-1f", "mac": "aa:bb:cc:00:01:0f",
+      "serial": "SN-NP1F-003", "max_a": 48, "last_session": "plugged 12m · 0.0 kWh"
+    },
+    {
+      "id": 4, "name": "N Penn: 2F (NACS)", "group_id": 2, "color": "#d62728",
+      "state": "ready", "state_code": 1, "pilot_a": 48, "amps": null,
+      "temp_f": 70, "plugged": false, "offline": false,
+      "gfci": 0, "nognd": 0, "stuck": 0, "wifi_rb7": 2,
+      "ip": "192.168.1.32", "host": "npenn-2f", "mac": "aa:bb:cc:00:02:0f",
+      "serial": "SN-NP2F-004", "max_a": 48, "last_session": "yesterday · 18.4 kWh"
+    },
+    {
+      "id": 5, "name": "Garage East Wall 120v", "group_id": 2, "color": "#9467bd",
+      "state": "fault", "state_code": 0, "pilot_a": 12, "amps": null,
+      "temp_f": 64, "plugged": false, "offline": false,
+      "gfci": 3, "nognd": 1, "stuck": 0, "wifi_rb7": 0,
+      "ip": "192.168.1.35", "host": "garage-east-120", "mac": "aa:bb:cc:00:05:20",
+      "serial": "SN-GE120-005", "max_a": 12, "last_session": "3d ago · 1.1 kWh"
+    },
+    {
+      "id": 6, "name": "Visitor Lot Level 2 Charger 12", "group_id": 3, "color": "#8c564b",
+      "state": "charging", "state_code": 3, "pilot_a": 32, "amps": 27.5,
+      "temp_f": 91, "plugged": true, "offline": false,
+      "gfci": 0, "nognd": 0, "stuck": 1, "wifi_rb7": 6,
+      "ip": "192.168.1.42", "host": "visitor-l2-12", "mac": "aa:bb:cc:00:12:42",
+      "serial": "SN-VL212-006", "max_a": 32, "last_session": "plugged 1h 20m · 11.3 kWh"
+    },
+    {
+      "id": 7, "name": "WarehouseDockChargerNorth", "group_id": 3, "color": "#e377c2",
+      "state": "offline", "state_code": -1, "pilot_a": 40, "amps": null,
+      "temp_f": null, "plugged": false, "offline": true,
+      "gfci": 0, "nognd": 0, "stuck": 0, "wifi_rb7": 9,
+      "ip": "192.168.1.50", "host": "warehousedockchargernorth", "mac": "aa:bb:cc:00:50:0a",
+      "serial": "SN-WHDN-007", "max_a": 40, "last_session": "5d ago · 22.0 kWh"
+    },
+    {
+      "id": 8, "name": "Shop", "group_id": null, "color": "#7f7f7f",
+      "state": "sleeping", "state_code": 254, "pilot_a": 24, "amps": null,
+      "temp_f": 66, "plugged": false, "offline": false,
+      "gfci": 0, "nognd": 0, "stuck": 0, "wifi_rb7": 0,
+      "ip": "192.168.1.60", "host": "shop", "mac": "aa:bb:cc:00:60:01",
+      "serial": "SN-SHOP-008", "max_a": 24, "last_session": "Mon · 6.8 kWh"
+    },
+    {
+      "id": 9, "name": "N Penn: 1R (J1772)", "group_id": 2, "color": "#bcbd22",
+      "state": "ready", "state_code": 1, "pilot_a": 40, "amps": null,
+      "temp_f": 71, "plugged": false, "offline": false,
+      "gfci": 0, "nognd": 2, "stuck": 0, "wifi_rb7": 3,
+      "ip": "192.168.1.33", "host": "npenn-1r", "mac": "aa:bb:cc:00:01:1r",
+      "serial": "SN-NP1R-009", "max_a": 40, "last_session": "Sun · 9.5 kWh"
+    }
+  ],
+  "reminders_by_unit": {
+    "4": [
+      { "id": 101, "at_time": "21:00", "days": 62, "label": "9:00 PM Weekdays" },
+      { "id": 102, "at_time": "08:30", "days": 65, "label": "8:30 AM Sun,Sat" }
+    ],
+    "6": [
+      { "id": 103, "at_time": "18:00", "days": 127, "label": "6:00 PM Daily" }
+    ],
+    "1": []
+  },
+  "sessions_sample": [
+    { "unit_id": 4, "title": "N Penn: 2F (NACS)", "when": "Mon 4:02p – 6:18p", "kwh": 18.4, "dur": "2h 16m" },
+    { "unit_id": 6, "title": "Visitor Lot Level 2 Charger 12", "when": "Mon 9:10a – 10:45a", "kwh": 11.3, "dur": "1h 35m" },
+    { "unit_id": 2, "title": "Bay3", "when": "Sun 7:00p – 9:22p", "kwh": 14.1, "dur": "2h 22m" },
+    { "unit_id": 7, "title": "WarehouseDockChargerNorth", "when": "Fri 2:00p – 5:40p", "kwh": 22.0, "dur": "3h 40m" }
+  ],
+  "help_blurb": "OpenEVSE MU Manager shows every charger on one home page. Tap a unit for live status and controls. Session Reports holds energy history and the 7-day chart. Account Preferences covers email alerts and plug-in reminders. Settings (admins) covers units, load groups, and System status."
+}
