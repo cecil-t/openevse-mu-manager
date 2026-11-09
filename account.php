@@ -114,12 +114,22 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .note{color:#666;font-size:14px;margin:4px 0}
 .ac .nsub{margin:-2px 0 6px 22px;font-size:13px}
 .ac .ync{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 8px;margin:8px 0;box-sizing:border-box}
-.ac .ync>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;color:#333}
+/* Desktop: chevron + fixed name + 5 aligned status columns (Errors/Reboots/Summary/Stopped/Reminder) */
+.ac .ync>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:1.1em 12.5em 5.8em 6.4em 6.6em 6.4em minmax(7.5em,1fr);column-gap:10px;row-gap:2px;align-items:baseline;color:#333}
 .ac .ync>summary::-webkit-details-marker{display:none}
-.ac .ync>summary::before{content:"▸ ";color:#035a5a;font-weight:bold}
-.ac .ync[open]>summary::before{content:"▾ "}
-.ac .ync-name{font-weight:bold}
-.ac .ync-sum{font-size:13px;color:#666;font-weight:normal}
+.ac .ync>summary::before{content:"▸";color:#035a5a;font-weight:bold;grid-column:1}
+.ac .ync[open]>summary::before{content:"▾"}
+.ac .ync-name{font-weight:bold;grid-column:2;min-width:0;overflow-wrap:anywhere}
+.ac .ync-b{font-size:13px;color:#666;font-weight:normal;white-space:nowrap;min-width:0}
+.ac .ync-b:last-child{white-space:normal;overflow-wrap:anywhere}  /* Reminder can be long */
+.ac .ync-b b{color:#333;font-weight:700}
+@media screen and (max-width:600px){
+	/* Mobile: compact inline wrap — name then bits side by side, not full-width stacks */
+	.ac .ync>summary{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+	.ac .ync>summary::before{grid-column:auto}
+	.ac .ync-name{grid-column:auto;flex:0 1 auto;margin-right:4px}
+	.ac .ync-b{white-space:nowrap}
+}
 .ac .yn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:flex-end}
 .ac .yn-row .yn{flex:1 1 110px;min-width:100px;max-width:140px;margin:0}
 .ac .yn-row .yn label{display:block;margin:0 0 2px 0;font-size:13px;color:#333}
@@ -143,7 +153,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 	.ac .yn-row .yn{flex:1 1 calc(50% - 8px);max-width:none;min-width:0}
 	.ac .yn-row .yn select{max-width:100%}
 }
-@media screen and (min-width:700px){.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
+@media screen and (min-width:700px){.ac{max-width:820px}.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
 </style>
 <div class="slidebox ac pgcard">
 <?php if ($msg) echo '<div class="msg">' . h($msg) . '</div>'; if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>

@@ -182,7 +182,7 @@ function list(){
 	R7.units.forEach(function(u){
 		var ss = R7.list.filter(function(s){ return s.u === u.id; }), kwh = 0, chg = 0;
 		ss.forEach(function(s){ kwh += s.kwh; chg += s.chg; });
-		h += '<div class="ucard"><div class="hd"><span class="sw" style="background:' + u.color + '"></span><span>' + esc(u.name) + '</span><span class="tt">' + (ss.length ? kwh.toFixed(1) + ' kWh &middot; ' + ss.length + ' session' + (ss.length === 1 ? '' : 's') + ' &middot; ' + dur(chg) + ' charging' : 'no sessions') + '</span></div>';
+		h += '<div class="ucard"><div class="hd"><span class="sw" style="background:' + u.color + '"></span><span class="nm">' + esc(u.name) + '</span><span class="tt">' + (ss.length ? kwh.toFixed(1) + ' kWh &middot; ' + ss.length + ' session' + (ss.length === 1 ? '' : 's') + ' &middot; ' + dur(chg) + ' charging' : 'no sessions') + '</span></div>';
 		ss.forEach(function(s){
 			var plugged = (s.out || R7.now) - s.in;
 			h += '<a class="srow" href="sessions.php?id=' + s.id + '"><span class="w">' + esc(ft(s.in)) + ' &middot; plugged ' + dur(plugged) + (s.out ? '' : ' <span class="o">in progress</span>') + ' &middot; charged ' + dur(s.chg) + '</span><span class="k">' + s.kwh.toFixed(2) + ' kWh' + (s.live ? ' <span class="o">so far</span>' : '') + '</span></a>';

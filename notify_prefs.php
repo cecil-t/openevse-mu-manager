@@ -67,11 +67,13 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		$rbit = '<b>' . $e($txt) . '</b>';
 	}
 	$bits[] = $rbit;
-	$sum = implode(' · ', $bits);   // separators stay unbolded
 	$uid = (int)$unit_id;
+	/* Each bit is its own cell so desktop CSS grid can align columns across rows. */
+	$sum = '';
+	foreach ($bits as $bit) $sum .= '<span class="ync-b">' . $bit . '</span>';
 	$o = '<details class="ync" id="notify-u' . $uid . '">'
 		. '<summary><span class="ync-name">' . $e($unit_name) . '</span>'
-		. '<span class="ync-sum">' . $sum . '</span></summary>'
+		. $sum . '</summary>'
 		. '<form method="post" action="notify_prefs.php" class="ynf">' . $csrf_html
 		. '<input type="hidden" name="unitid" value="' . $uid . '"><input type="hidden" name="next" value="account">'
 		. '<div class="yn-row">';

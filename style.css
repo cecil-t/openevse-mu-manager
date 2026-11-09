@@ -184,4 +184,5 @@ img.plug{
 	body.pgw .container{max-width:1200px}
 	body.pgw .pgcard{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
 	body.pgw .container>.sec,body.pgw .container>.card,body.pgw .container>p{margin-left:8px;margin-right:8px}   /* sessions.php: its filter, summary and sections line up with the main page's card */
+	body.pgw .oev-foot{margin-left:8px;margin-right:8px}   /* Home strip: same desktop gutter as .sec; omit below 700px so mobile edges match */
 }

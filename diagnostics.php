@@ -33,33 +33,27 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 .diag-top .flt{background:#fff;margin:6px 0;padding:8px 10px}
 .diag-top .note{margin:2px 0 0 0}
 /* Unit health: compact grid (desktop) / stacked pills (mobile) */
-.uh{max-width:760px;padding:6px 8px}
-.uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.4fr) 2.5rem 3.4rem 2.6rem 2.5rem 2.5rem 2.5rem 2.8rem 2.6rem;gap:4px 6px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
+.uh{max-width:640px;padding:6px 8px}
+.uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.6fr) 2.5rem 3.4rem 2.6rem minmax(6.5rem,1.1fr);gap:4px 8px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
 .uh-h{font-size:11px;color:#888;border-bottom:1px solid #ccc;padding:2px 2px 5px;font-weight:600}
-.uh-h span:not(:first-child),.uh-c,.uh-hibox{display:block;width:100%;box-sizing:border-box;text-align:center;font-variant-numeric:tabular-nums}
+.uh-h span:not(:first-child),.uh-c{display:block;width:100%;box-sizing:border-box;text-align:center;font-variant-numeric:tabular-nums}
 .uh-n{color:#333;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .uh-z{color:#aaa;font-weight:400}
 .uh-nz{color:#8a3030;font-weight:600}
-.uh-wnum{color:#555;font-weight:400}
-.uh-gapc{color:#888;font-size:12px;font-weight:400}
-.uh-hi{display:inline-block;font-size:10px;line-height:1.3;padding:1px 6px;border-radius:8px;background:#f99;color:#600;font-weight:700;letter-spacing:.02em}
-.uh-hibox{min-height:1em}
+.uh-w{color:#555;font-weight:400}
 .uh-r:last-child{border-bottom:0}
 .mo-row{border-top:1px dotted #ddd;padding:6px 0;margin-top:4px;overflow:hidden}
 .mo-row .r{float:none;display:block;margin:2px 0 4px}
 .mo-row .sm{display:block;overflow-wrap:anywhere}
 @media (max-width:560px){
 	.uh-h{display:none}
-	.uh-r{display:block;padding:8px 2px}
-	.uh-n{display:block;white-space:normal;margin-bottom:5px;font-size:14px}
-	.uh-c,.uh-hibox{display:inline-block;margin:0 4px 4px 0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
+	.uh-r{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 2px}
+	.uh-n{flex:1 0 100%;white-space:normal;margin:0 0 2px;font-size:14px}
+	.uh-c{display:inline-flex;align-items:center;width:auto;margin:0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
 	.uh-c::before{content:attr(data-l) " ";color:#777;font-weight:400}
 	.uh-nz{background:#fde8e8}
 	.uh-z{background:#f0f0f0;color:#999}
-	.uh-wnum{background:#eee;color:#555}
-	.uh-gapc{background:#f0f0f0}
-	.uh-hibox{background:transparent;padding:0;vertical-align:middle}
-	.uh-hibox:empty{display:none}
+	.uh-w{background:#eee;color:#555}
 	.card .r{float:none;display:block;margin-top:3px}
 }
 </style>
@@ -78,16 +72,13 @@ $f = strtotime($from . ' 00:00:00'); $t = strtotime($to . ' 23:59:59');
 $uw = ($unit ? " AND unit_id = $unit" : '') . $SC;
 
 $faults = $db->query("SELECT * FROM events WHERE kind IN ('fault','fault_count','thermal') AND ts BETWEEN $f AND $t$uw ORDER BY ts DESC LIMIT 40")->fetchAll();
-/* WiFi summary: fixed 7d / 30d / all-time windows (not the form date range). Flag if reboots in 7d >= threshold. */
+/* WiFi summary: restarts in the last 7 days (not the form date range). Red when >= threshold. */
 $WIFI_FLAG_7D = 5;
-$t7 = time() - 7 * 86400; $t30 = time() - 30 * 86400;
+$t7 = time() - 7 * 86400;
 $wifi_rows = array();
 foreach ($db->query("SELECT unit_id,
-	sum(CASE WHEN kind = 'reboot' AND ts >= $t7 THEN 1 ELSE 0 END) rb7,
-	sum(CASE WHEN kind = 'reboot' AND ts >= $t30 THEN 1 ELSE 0 END) rb30,
-	sum(CASE WHEN kind = 'reboot' THEN 1 ELSE 0 END) rball,
-	sum(CASE WHEN kind = 'reach' AND reason IN ('unreachable', 'push stopped') AND ts >= $t7 THEN 1 ELSE 0 END) gap7
-	FROM events WHERE kind IN ('reboot', 'reach') AND 1$SC" . ($unit ? " AND unit_id = $unit" : '') . "
+	sum(CASE WHEN kind = 'reboot' AND ts >= $t7 THEN 1 ELSE 0 END) rb7
+	FROM events WHERE kind = 'reboot' AND 1$SC" . ($unit ? " AND unit_id = $unit" : '') . "
 	GROUP BY unit_id") as $w) $wifi_rows[(int)$w['unit_id']] = $w;
 
 /* Monthly all-time thermal / WiFi */
@@ -107,19 +98,17 @@ foreach ($db->query("SELECT $M m, unit_id,
 krsort($rows);
 $names = array(); foreach ($units as $u) $names[$u['unit_id']] = $u['unit_name'];
 $t1 = function($v){ return temp_num($v); };
-// Per-unit health rows: lifetime fault counters (unit_state high-water) + WiFi restart windows
+// Per-unit health rows: lifetime fault counters (unit_state high-water) + WiFi restarts (7d)
 $health = array();
 foreach ($units as $u) {
 	if ($unit && (int)$u['unit_id'] !== $unit) continue;
 	$uid = (int)$u['unit_id'];
-	$w = $wifi_rows[$uid] ?? array('rb7'=>0,'rb30'=>0,'rball'=>0,'gap7'=>0);
+	$w = $wifi_rows[$uid] ?? array('rb7'=>0);
 	$health[] = array(
 		'unit_id' => $uid,
 		'name' => (string)$u['unit_name'],
 		'gfci' => $u['gfci_count'], 'nognd' => $u['nognd_count'], 'stuck' => $u['stuck_count'],
-		'rb7' => (int)$w['rb7'], 'rb30' => (int)$w['rb30'], 'rball' => (int)$w['rball'],
-		'gap7' => (int)$w['gap7'],
-		'flag' => ((int)$w['rb7'] >= $WIFI_FLAG_7D),
+		'rb7' => (int)$w['rb7'],
 	);
 }
 usort($health, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); });
@@ -139,12 +128,12 @@ usort($health, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); }
 </div>
 
 <div class="sec"><h4>Unit health</h4>
-<p class="sm">Lifetime fault counts from each charger; WiFi restarts over the last 7 / 30 days<?php if ($WIFI_FLAG_7D) echo ' (badge when &ge; ' . (int)$WIFI_FLAG_7D . ' in 7 days)'; ?>.</p>
+<p class="sm">Lifetime fault counts from each charger, and WiFi module restarts in the last 7 days (red when <?= (int)$WIFI_FLAG_7D ?> or more).</p>
 <div class="card uh">
 <?php if (!$health) echo '<p class="sm">No units in scope.</p>';
 else {
 	$fc = function($v){ return ($v === null || $v === '') ? null : (int)$v; };
-		echo '<div class="uh-h"><span>Unit</span><span>GFCI</span><span>No ground</span><span>Stuck</span><span title="WiFi restarts">7d</span><span title="WiFi restarts">30d</span><span title="WiFi restarts">All</span><span>Gaps</span><span></span></div>';
+		echo '<div class="uh-h"><span>Unit</span><span>GFCI</span><span>No ground</span><span>Stuck</span><span>WiFi restarts (7d)</span></div>';
 	foreach ($health as $row) {
 		$cell = function($v, $lab, $extra = '') use ($fc) {
 			$n = $fc($v);
@@ -153,15 +142,13 @@ else {
 			if ($extra) $cls .= $extra;
 			return '<span class="' . $cls . '" data-l="' . h($lab) . '">' . $n . '</span>';
 		};
-		$gap = (int)$row['gap7'];
-		$gap_html = $gap > 0
-			? '<span class="uh-c uh-gapc" data-l="Gaps">' . $gap . '</span>'
-			: '<span class="uh-c uh-z uh-gapc" data-l="Gaps">0</span>';
-		$hi = $row['flag'] ? '<span class="uh-hibox"><span class="uh-hi">high</span></span>' : '<span class="uh-hibox"></span>';
+		$rb = (int)$row['rb7'];
+		/* WiFi: red only at/above threshold; otherwise normal (uh-w) or zero-grey. */
+		$wcls = ($rb >= $WIFI_FLAG_7D) ? 'uh-c uh-nz' : ($rb > 0 ? 'uh-c uh-w' : 'uh-c uh-z');
+		$wifi = '<span class="' . $wcls . '" data-l="WiFi restarts 7d">' . $rb . '</span>';
 		echo '<div class="uh-r"><span class="uh-n" title="' . h($row['name']) . '">' . h($row['name']) . '</span>'
 			. $cell($row['gfci'], 'GFCI') . $cell($row['nognd'], 'No ground') . $cell($row['stuck'], 'Stuck')
-			. $cell($row['rb7'], '7d', ' uh-wnum') . $cell($row['rb30'], '30d', ' uh-wnum') . $cell($row['rball'], 'All', ' uh-wnum')
-			. $gap_html . $hi . '</div>';
+			. $wifi . '</div>';
 	}
 } ?>
 </div>

@@ -340,7 +340,13 @@ $view = array(
 );
 $html = unp_form_html(4, 'N Penn: 1F', $view, 'CSRF', true);
 ck('unp_form_html: details/summary + unit anchor id', strpos($html, '<details class="ync" id="notify-u4">') !== false && strpos($html, '<summary>') !== false && strpos($html, 'ync-name') !== false);
-ck('unp_form_html: collapsed summary bolds only explicit overrides', strpos($html, 'Errors On · <b>Reboots Off</b> · Summary Off · <b>Stopped On</b> · Reminder Off') !== false);
+ck('unp_form_html: collapsed summary bolds only explicit overrides (per-bit ync-b cells)',
+	strpos($html, 'class="ync-b">Errors On</span>') !== false
+	&& strpos($html, 'class="ync-b"><b>Reboots Off</b></span>') !== false
+	&& strpos($html, 'class="ync-b">Summary Off</span>') !== false
+	&& strpos($html, 'class="ync-b"><b>Stopped On</b></span>') !== false
+	&& strpos($html, 'class="ync-b">Reminder Off</span>') !== false
+	&& strpos($html, 'ync-sum') === false);
 ck('unp_form_html: short Default labels, no long Use account default', strpos($html, 'Default (On)') !== false && strpos($html, 'Default (Off)') !== false && strpos($html, 'Use account default') === false);
 ck('unp_form_html: one-row editors + small Save, no Now: stack', strpos($html, 'yn-row') !== false && strpos($html, 'ynsave') !== false && strpos($html, '>Save<') !== false && strpos($html, 'Now:') === false);
 ck('account.php opens #notify-uN details after save', strpos(file_get_contents(__DIR__ . '/../account.php'), "location.hash") !== false && strpos(file_get_contents(__DIR__ . '/../account.php'), 'DETAILS') !== false);
@@ -353,8 +359,8 @@ $sum_of = function($modes_on) {
 		$v[$k] = array('mode'=>$mode, 'on'=>$on, 'src'=>$mode==='inherit'?'account':'unit', 'account_on'=>$acc);
 	}
 	$h = unp_form_html(9, 'U9', $v, 'X', true);
-	if (!preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m)) return '';
-	return $m[1];
+	if (!preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $m)) return '';
+	return implode(' · ', $m[1]);   // join for assert readability; UI uses separate cells
 };
 // inherit (any effective): never bold
 $s = $sum_of(array('errors'=>array('inherit', true, true),'reboots'=>array('inherit', false, false),'sessions'=>array('inherit', true, true),'stops'=>array('inherit', false, false)));
@@ -385,22 +391,28 @@ $base = array(
 	'stops'=>array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
 );
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1)), true);
-preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m);
+preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: enabled time bold', strpos($m[1], '<b>Reminder 9:00 PM</b>') !== false && strpos($h, 'yn-rem') !== false && strpos($h, '<select name="unit"') === false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1)), false);
-preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m);
+preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: account gate annotated, not claiming mail', strpos($m[1], '<b>Reminder 9:00 PM (account off)</b>') !== false);
 $h = unp_form_html(4, 'U4', $base, 'X', false, array(array('id'=>1,'at_time'=>'09:30','enabled'=>1)), true);
-preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m);
+preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: site email off annotated', strpos($m[1], '<b>Reminder 9:30 AM (email off)</b>') !== false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>0)), true);
-preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m);
+preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: owned row active by existence (no per-entry off)', strpos($m[1], '<b>Reminder 9:00 PM</b>') !== false && strpos($m[1], '(off)') === false);
 ck('reminder UI has no per-row On checkbox', strpos($h, 'name="enabled"') === false && strpos($h, '>On</label>') === false);
 $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21:00','enabled'=>1), array('id'=>2,'at_time'=>'07:15','enabled'=>1)), true);
-preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m);
+preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: multiple enabled times listed', strpos($m[1], '<b>Reminders 9:00 PM, 7:15 AM</b>') !== false);
 ck('reminder controls: compact time max-width in account CSS', strpos(file_get_contents(__DIR__ . '/../account.php'), 'input[type=time]{width:auto;max-width:140px') !== false);
+ck('account per-charger summary uses desktop grid + mobile inline wrap',
+	($ac = file_get_contents(__DIR__ . '/../account.php')) !== false
+	&& strpos($ac, 'grid-template-columns:1.1em') !== false
+	&& strpos($ac, '12.5em') !== false
+	&& strpos($ac, 'max-width:600px') !== false
+	&& strpos($ac, 'ync-b') !== false);
 $up = file_get_contents(__DIR__ . '/../unit.php');
 ck('unit.php has no personal alerts/notifications UI', strpos($up, 'Your alerts') === false && strpos($up, 'Your notifications') === false && strpos($up, 'id="setyn"') === false && strpos($up, 'notify_prefs.php') === false && strpos($up, 'notifications.php') === false);
 

@@ -43,6 +43,9 @@ foreach (array('account.php','settings.php','help.php','unitlist.php','diagnosti
 }
 $hd = file_get_contents("$app/_head.php");
 ck('_head defines .oev-foot light strip', strpos($hd, '.oev-foot{') !== false && strpos($hd, 'background:rgba(246,246,246') !== false);
+$css = file_get_contents("$app/style.css");
+ck('_head oev-foot has no always-on pgw side margins', strpos($hd, 'body.pgw .oev-foot') === false);
+ck('style.css gates oev-foot side margins at 700px with .sec', (bool)preg_match('/@media screen and \(min-width:700px\)\{[\s\S]*body\.pgw \.oev-foot\{margin-left:8px;margin-right:8px\}/', $css));
 
 echo $f ? "$f of $n FAILED\n" : "all $n passed\n";
 exit($f ? 1 : 0);

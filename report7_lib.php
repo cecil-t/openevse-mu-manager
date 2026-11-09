@@ -110,10 +110,16 @@ function r7_css(){
 .r7 #r7tip b{display:block;margin-bottom:2px}
 .r7 #r7tip .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .r7 #r7tip .c{color:#07d;font-size:11px}
-.r7 .ucard{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 9px;margin:6px 0}
-.r7 .ucard .hd{display:flex;align-items:center;gap:7px;font-weight:bold;color:#333}
+.r7 .ucard{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 9px;margin:6px 0;overflow:hidden;box-sizing:border-box;max-width:100%}
+.r7 .ucard .hd{display:flex;align-items:center;gap:7px;font-weight:bold;color:#333;min-width:0}
 .r7 .ucard .hd .sw{width:12px;height:12px;border-radius:3px;flex:none}
-.r7 .ucard .hd .tt{margin-left:auto;font-weight:normal;color:#555;font-size:14px;white-space:nowrap}
+.r7 .ucard .hd .nm{min-width:0;overflow-wrap:anywhere}
+.r7 .ucard .hd .tt{margin-left:auto;font-weight:normal;color:#555;font-size:14px;white-space:nowrap;min-width:0}
+@media (max-width:699px){
+	.r7 .ucard .hd{flex-wrap:wrap;align-items:flex-start}
+	.r7 .ucard .hd .nm{flex:1 1 0;min-width:0;overflow-wrap:anywhere;word-break:normal}
+	.r7 .ucard .hd .tt{flex:1 0 100%;margin-left:0;margin-top:2px;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+}
 .r7 .srow{display:flex;gap:8px;justify-content:space-between;border-top:1px dotted #ddd;padding:3px 0;font-size:14px;color:#555;text-decoration:none}
 .r7 .srow:first-of-type{border-top:0}
 .r7 .srow span{display:inline;background:none;border:0;padding:0;margin:0;width:auto;text-align:inherit;color:inherit;font-size:inherit}

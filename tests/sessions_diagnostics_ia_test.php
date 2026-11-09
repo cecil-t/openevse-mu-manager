@@ -22,6 +22,12 @@ ck('r7_data keeps 5-min buckets / samples / segments / gaps / sessions list',
 ck('embed JS uses R7_JSON_URL refresh + chips/draw/list',
 	strpos($js, 'R7_JSON_URL') !== false && strpos($js, 'function chips') !== false
 	&& strpos($js, 'function draw') !== false && strpos($js, 'function list') !== false);
+ck('r7 unit card name has .nm; mobile stacks stats under name',
+	strpos($js, 'class="nm"') !== false
+	&& strpos($lib, '.ucard .hd .nm') !== false
+	&& strpos($lib, '@media (max-width:699px)') !== false
+	&& strpos($lib, 'flex:1 0 100%') !== false
+	&& strpos($lib, 'white-space:normal') !== false);
 ck('report7.php JSON path + HTML redirect to sessions',
 	strpos($r7, "isset(\$_GET['json'])") !== false
 	&& strpos($r7, 'r7_data()') !== false
@@ -93,16 +99,23 @@ ck('unit.php Fault counts popup has no since-reset wording',
 	($up = file_get_contents("$app/unit.php")) !== false
 	&& strpos($up, "pop('Fault counts'") !== false
 	&& strpos($up, 'since reset') === false);
-ck('diagnostics WiFi in Unit health (no per-event list; flag threshold 5/7d badge)',
+ck('diagnostics WiFi in Unit health (single 7d column; red at threshold; no 30d/All/Gaps/badge)',
 	strpos($diag, 'WIFI_FLAG_7D = 5') !== false
 	&& strpos($diag, 'wifi_rows') !== false
 	&& strpos($diag, 'rb7') !== false
-	&& strpos($diag, 'gap7') !== false
-	&& strpos($diag, 'uh-hi') !== false
-	&& strpos($diag, 'uh-wnum') !== false
-	&& strpos($diag, 'title="WiFi restarts"') !== false
+	&& strpos($diag, 'WiFi restarts (7d)') !== false
+	&& strpos($diag, 'data-l="WiFi restarts 7d"') !== false
+	&& strpos($diag, 'red when') !== false
+	&& strpos($diag, 'gap7') === false
+	&& strpos($diag, 'rb30') === false
+	&& strpos($diag, 'uh-hi') === false
+	&& strpos($diag, 'uh-wnum') === false
 	&& strpos($diag, 'foreach ($drops as') === false
 	&& strpos($diag, "kind IN ('reach', 'reboot') AND ts BETWEEN") === false);
+ck('diagnostics Unit health mobile pills are compact inline wrap',
+	strpos($diag, 'flex-wrap:wrap') !== false
+	&& strpos($diag, 'display:inline-flex') !== false
+	&& strpos($diag, 'width:auto') !== false);
 ck('diagnostics top intro+filters merged into one card',
 	strpos($diag, 'diag-top') !== false
 	&& strpos($diag, 'Faults, thermal events, and WiFi health for each unit') !== false
