@@ -41,12 +41,18 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
 	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 	$short = array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Summary', 'stops' => 'Stopped');
 	$bits = array();
-	foreach (oev_unit_notify_kinds() as $k => $t) $bits[] = $short[$k] . ' ' . (!empty($view[$k]['on']) ? 'On' : 'Off');
-	$sum = implode(' · ', $bits);
+	foreach (oev_unit_notify_kinds() as $k => $t) {
+		$c = $view[$k];
+		$txt = $short[$k] . ' ' . (!empty($c['on']) ? 'On' : 'Off');
+		$bit = $e($txt);   // escape text; bold only explicit On/Off overrides (not inherit)
+		if (($c['mode'] ?? '') === 'on' || ($c['mode'] ?? '') === 'off') $bit = '<b>' . $bit . '</b>';
+		$bits[] = $bit;
+	}
+	$sum = implode(' · ', $bits);   // separators stay unbolded
 	$uid = (int)$unit_id;
 	$o = '<details class="ync" id="notify-u' . $uid . '">'
 		. '<summary><span class="ync-name">' . $e($unit_name) . '</span>'
-		. '<span class="ync-sum">' . $e($sum) . '</span></summary>'
+		. '<span class="ync-sum">' . $sum . '</span></summary>'
 		. '<form method="post" action="notify_prefs.php" class="ynf">' . $csrf_html
 		. '<input type="hidden" name="unitid" value="' . $uid . '"><input type="hidden" name="next" value="account">'
 		. '<div class="yn-row">';

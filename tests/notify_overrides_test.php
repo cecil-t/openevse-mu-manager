@@ -340,10 +340,43 @@ $view = array(
 );
 $html = unp_form_html(4, 'N Penn: 1F', $view, 'CSRF', true);
 ck('unp_form_html: details/summary + unit anchor id', strpos($html, '<details class="ync" id="notify-u4">') !== false && strpos($html, '<summary>') !== false && strpos($html, 'ync-name') !== false);
-ck('unp_form_html: collapsed effective summary', strpos($html, 'Errors On · Reboots Off · Summary Off · Stopped On') !== false);
+ck('unp_form_html: collapsed summary bolds only explicit overrides', strpos($html, 'Errors On · <b>Reboots Off</b> · Summary Off · <b>Stopped On</b>') !== false);
 ck('unp_form_html: short Default labels, no long Use account default', strpos($html, 'Default (On)') !== false && strpos($html, 'Default (Off)') !== false && strpos($html, 'Use account default') === false);
 ck('unp_form_html: one-row editors + small Save, no Now: stack', strpos($html, 'yn-row') !== false && strpos($html, 'ynsave') !== false && strpos($html, '>Save<') !== false && strpos($html, 'Now:') === false);
 ck('account.php opens #notify-uN details after save', strpos(file_get_contents(__DIR__ . '/../account.php'), "location.hash") !== false && strpos(file_get_contents(__DIR__ . '/../account.php'), 'DETAILS') !== false);
+/* summary bold = persisted mode on/off, not effective-vs-account */
+$sum_of = function($modes_on) {
+	$short = array('errors'=>'Errors','reboots'=>'Reboots','sessions'=>'Summary','stops'=>'Stopped');
+	$v = array();
+	foreach (array('errors','reboots','sessions','stops') as $k) {
+		list($mode, $on, $acc) = $modes_on[$k];
+		$v[$k] = array('mode'=>$mode, 'on'=>$on, 'src'=>$mode==='inherit'?'account':'unit', 'account_on'=>$acc);
+	}
+	$h = unp_form_html(9, 'U9', $v, 'X', true);
+	if (!preg_match('/class="ync-sum">(.*?)<\/span>/', $h, $m)) return '';
+	return $m[1];
+};
+// inherit (any effective): never bold
+$s = $sum_of(array('errors'=>array('inherit', true, true),'reboots'=>array('inherit', false, false),'sessions'=>array('inherit', true, true),'stops'=>array('inherit', false, false)));
+ck('summary: all inherit stays unbolded', $s === 'Errors On · Reboots Off · Summary On · Stopped Off' && strpos($s, '<b>') === false);
+// explicit On: bold even when account default is also On (equal default)
+$s = $sum_of(array('errors'=>array('on', true, true),'reboots'=>array('inherit', true, true),'sessions'=>array('inherit', false, false),'stops'=>array('inherit', false, false)));
+ck('summary: explicit On bold even if equals account default', $s === '<b>Errors On</b> · Reboots On · Summary Off · Stopped Off');
+// explicit Off: bold even when account default is also Off
+$s = $sum_of(array('errors'=>array('inherit', true, true),'reboots'=>array('off', false, false),'sessions'=>array('inherit', false, false),'stops'=>array('inherit', false, false)));
+ck('summary: explicit Off bold even if equals account default', $s === 'Errors On · <b>Reboots Off</b> · Summary Off · Stopped Off');
+// each kind can bold independently
+$s = $sum_of(array('errors'=>array('on', true, false),'reboots'=>array('off', false, true),'sessions'=>array('on', true, true),'stops'=>array('off', false, false)));
+ck('summary: all four kinds bold when explicit', $s === '<b>Errors On</b> · <b>Reboots Off</b> · <b>Summary On</b> · <b>Stopped Off</b>');
+ck('summary: separators not inside bold tags', substr_count($s, '</b> · <b>') === 3 && strpos($s, '<b> · ') === false);
+// escaping: unit name + kind text escaped; bold tags not double-escaped
+$h = unp_form_html(3, 'A <B> name', array(
+	'errors'=>array('mode'=>'on','on'=>true,'src'=>'unit','account_on'=>false),
+	'reboots'=>array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
+	'sessions'=>array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
+	'stops'=>array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
+), 'X', true);
+ck('summary: escapes unit name; bold wraps escaped text only', strpos($h, 'A &lt;B&gt; name') !== false && strpos($h, '<b>Errors On</b>') !== false && strpos($h, '&lt;b&gt;') === false);
 $up = file_get_contents(__DIR__ . '/../unit.php');
 ck('unit.php has no personal alerts/notifications UI', strpos($up, 'Your alerts') === false && strpos($up, 'Your notifications') === false && strpos($up, 'id="setyn"') === false && strpos($up, 'notify_prefs.php') === false && strpos($up, 'notifications.php') === false);
 
