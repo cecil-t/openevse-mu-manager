@@ -26,7 +26,7 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 .ev{border-left:3px solid #aaa;padding:2px 0 2px 7px;margin:5px 0;font-size:14px;overflow-wrap:anywhere}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
 .sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444;box-sizing:border-box;max-width:100%;overflow-wrap:break-word}
-.sec>h4:first-child,.sec>h3:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:6px 0}
+.sec>h4:first-child,.sec>h3:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:8px 0}
 .sm{font-size:13px;color:#777}.err{color:#b11}
 /* top intro+filters in one sec */
 .diag-top h3{margin:4px 0 4px 0;color:#333;font-size:18px}

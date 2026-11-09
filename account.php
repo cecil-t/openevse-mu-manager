@@ -104,7 +104,7 @@ $title = 'Account Preferences'; $wq = '';
 $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
-.ac{font-size:16px;line-height:1.45;color:#444;text-align:left;max-width:560px;margin:0 auto}
+.ac{font-size:16px;line-height:1.45;color:#444;text-align:left;max-width:none;width:auto;margin:0;box-sizing:border-box}
 .ac .card{background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0;box-sizing:border-box}
 .ac label{display:block;margin:8px 0 2px 0;color:#333}
 .ac label.in{display:block;margin:4px 0}
@@ -163,7 +163,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 	.ac .yn-row .yn{flex:1 1 calc(50% - 8px);max-width:none;min-width:0}
 	.ac .yn-row .yn select{max-width:100%}
 }
-@media screen and (min-width:700px){.ac{max-width:820px}.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
+@media screen and (min-width:700px){.ac{max-width:820px;margin-left:auto;margin-right:auto}.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
 </style>
 <div class="slidebox ac pgcard">
 <?php if ($msg) echo '<div class="msg">' . h($msg) . '</div>'; if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>

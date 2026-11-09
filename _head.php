@@ -35,6 +35,6 @@ if ($oev_sub === '') $oev_sub = $oev_site;
 .avlogin{display:inline-block;margin-top:6px;padding:6px 12px;border-radius:16px;background:#00807f;color:#fff !important;font:bold 16px Arial,sans-serif;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.35)}</style>
 </head>
 <body<?=!empty($GLOBALS['OEV_WIDE']) ? ' class="pgw"' : ''?>>
-<div class="container">
+<div class="container oev-main">
 <div class="header" onclick="location.href='./<?=$wq?>';" style="cursor:pointer;"><h1>Open<span>EVSE</span></h1><h3><?=h($oev_sub)?></h3></div>
 <?php if (function_exists('oev_userbar') && empty($GLOBALS['OEV_NOBAR'])) echo oev_userbar(); ?>

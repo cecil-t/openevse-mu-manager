@@ -13,7 +13,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 @media screen and (min-width:700px){
 	body{zoom:100% !important}
 	.container{max-width:1200px}
-	#unit.slidebox{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
+	#unit.slidebox{max-width:none;width:auto;margin-left:0;margin-right:0;padding:10px 12px}
 	#wt tr.u td:first-child{padding-right:0}
 }
 #wide .bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:10px}
@@ -82,7 +82,7 @@ $wdata = array('units'=>$W, 'groups'=>array_values($wgroups), 'now'=>time(), 'pu
 	#wt tr.u td:first-child{font-size:14px;padding-right:0}#wt tr.u td:first-child img.plug{height:1em;margin-top:2px}#wt .bal{display:none}#wide .cnt{display:none}#wt th,#wt td{padding:6px 4px}
 	#wt{table-layout:fixed}#wt col.cu{width:49% !important}#wt col.cs{width:29% !important}#wt col.cd{width:22% !important}#wt th{font-size:12px;white-space:normal;overflow:visible;text-overflow:clip;vertical-align:bottom}#wt td.dp,#wt th.dp{padding-right:4px}
 	#wt img.plug{margin-left:3px}
-	#unit.slidebox{width:auto;max-width:none;margin:0 5px;padding:8px}}
+	#unit.slidebox{width:auto;max-width:none;margin-left:0;margin-right:0;padding:8px}}
 </style>
 <div id="wide">
 <div class="bar"><input id="wq" type="search" placeholder="Search units&hellip;" aria-label="Search units">

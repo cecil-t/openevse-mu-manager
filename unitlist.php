@@ -76,7 +76,7 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 ?>
 <style>
 @media screen and (min-width:1024px){ body{zoom:100%} }   /* this page shows a wide table: no desktop enlarging */
-.nm{--nw:min(1400px,calc(100vw - 16px));width:var(--nw);box-sizing:border-box;margin:4px 0 20px calc(50% - var(--nw) / 2);padding:10px 12px;background:#fff;border-radius:8px;font:16px/1.4 Arial,sans-serif;color:#000;text-align:left}
+.nm{width:auto;max-width:none;box-sizing:border-box;margin:0;padding:10px 12px;background:#fff;border-radius:8px;font:16px/1.4 Arial,sans-serif;color:#000;text-align:left;overflow:hidden}
 .nm-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 0 10px 0;color:#444}
 .nm-top h2{margin:0;font-size:20px;color:#035a5a}
 .nm-top a.btn{display:inline-block;padding:6px 14px;border-radius:5px;background:#00706f;color:#fff;text-decoration:none;font-weight:bold}

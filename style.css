@@ -1,10 +1,10 @@
 body{
+	margin: 0;   /* gutters come from --oev-gutter-x on .container only */
 	font-family: Arial, "sans-serif";
 	background: url("media/circuit-bg-bw.jpg");
 	background-color: rgba(32, 32, 32, 0.92);
 	background-blend-mode: darken;
 	color: #666;
-	/* border: 1px solid turquoise;  */
 	}
 @media screen and (min-width: 1024px) {
 	/* Enlarge for desktop screens & in-car browsers */
@@ -61,10 +61,44 @@ a span:hover{
     margin: -25px 0 -5px 0;
     user-select: none;
 }
-.container{
-	margin: auto;
+/* Canonical page shell: one content container, gutters via vars (all pages). */
+:root{
+	--oev-gutter-x: 10px;   /* mobile side gutter inside .container */
+	--oev-panel-mt: 10px;   /* gap below header / between stacked primary panels */
+}
+.container, .oev-main{
+	margin: 0 auto;
 	width: 100%;
-	max-width: 400px;
+	max-width: none;   /* mobile: full viewport; desktop narrow pages cap below */
+	box-sizing: border-box;
+	padding-left: var(--oev-gutter-x);
+	padding-right: var(--oev-gutter-x);
+	}
+/* Primary panels fill the container content box (no 87% / per-page width hacks). */
+.container > .sec,
+.container > .card,
+.container > .pgcard,
+.container > .slidebox,
+.container > .oev-foot,
+.container > p{
+	width: auto;
+	max-width: none;
+	margin-left: 0;
+	margin-right: 0;
+	box-sizing: border-box;
+	}
+.container > .slidebox,
+.container > .pgcard{
+	margin-top: var(--oev-panel-mt);
+	margin-bottom: var(--oev-panel-mt);
+	}
+.container > .sec{margin-top: var(--oev-panel-mt); margin-bottom: var(--oev-panel-mt);}
+.container > .oev-foot{margin-top: var(--oev-panel-mt); margin-bottom: var(--oev-panel-mt);}
+/* Wide tables/charts scroll inside the card — never widen the page */
+.container .tbl-scroll, .container .nm-wrap, .container .sgd{
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+	max-width: 100%;
 	}
 table{
 	font-size: 16px;
@@ -178,11 +212,13 @@ img.plug{
 	opacity: 0.7;
 	}
 
-/* desktop (700px and up): pages with body.pgw (_head.php) use the main page's wide card (index_wide.php) */
+/* desktop (700px and up): same container gutters (via --oev-gutter-x); pgw widens the shell */
 @media screen and (min-width:700px){
+	:root{--oev-gutter-x: 8px}
+	.container, .oev-main{max-width:400px}   /* login / non-wide pages stay a readable column */
 	body.pgw{zoom:100% !important}
-	body.pgw .container{max-width:1200px}
-	body.pgw .pgcard{max-width:none;width:auto;margin:0 8px;padding:10px 12px}
-	body.pgw .container>.sec,body.pgw .container>.card,body.pgw .container>p{margin-left:8px;margin-right:8px}   /* sessions.php: its filter, summary and sections line up with the main page's card */
-	body.pgw .oev-foot{margin-left:8px;margin-right:8px}   /* Home strip: same desktop gutter as .sec; omit below 700px so mobile edges match */
+	body.pgw .container, body.pgw .oev-main{max-width:1200px}
+	body.pgw .container > .pgcard,
+	body.pgw .container > .slidebox.pgcard,
+	body.pgw .container > #unit.slidebox{padding:10px 12px}
 }
