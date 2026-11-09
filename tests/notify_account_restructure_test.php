@@ -101,10 +101,10 @@ list($code, $b) = http('settings.php?s=users', 1);
 ck('Users has View-only link section and no Emails about checkboxes', $code === 200 && strpos($b, 'id="links"') !== false && strpos($b, 'Emails about') === false && strpos($b, 'name="n_sessions"') === false);
 list($code, $b) = http('account.php', 2);
 ck('Account & Prefs shows Email notifications + per-unit forms for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'name="n_errors"') !== false && strpos($b, 'name="n_reboots"') !== false && strpos($b, 'notify-u4') !== false && (strpos($b, 'Errors') !== false));
-ck('unit panels use details/summary with short Default labels', strpos($b, '<details class="ync" id="notify-u4"') !== false && strpos($b, 'ync-sum') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Default (') !== false && strpos($b, 'Use account default') === false);
+ck('unit panels use details/summary with short Default labels', strpos($b, '<details class="ync" id="notify-u4"') !== false && strpos($b, 'ync-sum') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Default (') !== false && strpos($b, 'Use account default') === false && strpos($b, 'yn-rem') !== false);
 ck('shared per-charger legend once, hash-open script present', strpos($b, 'Per charger (tap to edit)') !== false && strpos($b, 'location.hash') !== false && strpos($b, 'DETAILS') !== false);
 ck('account CSS bounds unit selects (no full-bleed yn select)', strpos(file_get_contents("$app/account.php"), 'max-width:140px') !== false && strpos(file_get_contents("$app/account.php"), '.ac .yn select{display:block;width:100%}') === false);
-list($code, , $loc) = http('account.php', 2, array('a' => 'notify_defaults', 'n_errors' => 'on', 'n_sessions' => 'on'));
+list($code, , $loc) = http('account.php', 2, array('a' => 'notify_defaults', 'n_errors' => 'on', 'n_sessions' => 'on', 'n_reminders' => 'on'));
 ck('viewer can save own defaults; stays on account', $code === 303 && strpos($loc, 'account.php') === 0);
 $u2 = $c->query('SELECT n_errors, n_sessions, n_sessions_since FROM users WHERE id = 2')->fetch();
 ck('defaults persisted with sessions_since stamped', (int)$u2['n_errors'] === 1 && (int)$u2['n_sessions'] === 1 && $u2['n_sessions_since'] !== null);
@@ -113,9 +113,29 @@ list($code) = http('settings.php?s=users', 1, array('a' => 'user_save', 'id' => 
 $u2b = $c->query('SELECT n_errors, n_sessions FROM users WHERE id = 2')->fetch();
 ck('admin user_save preserves alice email flags', (int)$u2b['n_errors'] === 1 && (int)$u2b['n_sessions'] === 1);
 list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '19:30'));
-ck('viewer can add own reminder', $code === 303);
-$r = $c->query('SELECT user_id, extra_to FROM reminders WHERE at_time = \'19:30\'')->fetch();
-ck('new reminder owned by alice, empty extra_to', (int)$r['user_id'] === 2 && $r['extra_to'] === '');
+ck('viewer can add own reminder; redirect opens unit panel', $code === 303 && strpos($loc, 'account.php') === 0 && strpos($loc, '#notify-u4') !== false);
+$r = $c->query('SELECT id, user_id, extra_to, unit_id, enabled FROM reminders WHERE at_time = \'19:30\'')->fetch();
+ck('new reminder owned by alice on unit 4', (int)$r['user_id'] === 2 && $r['extra_to'] === '' && (int)$r['unit_id'] === 4);
+list($code, $b) = http('account.php', 2);
+ck('Account has no separate #rem; reminder in unit details', $code === 200 && strpos($b, 'id="rem"') === false && strpos($b, 'yn-rem') !== false && strpos($b, '7:30 PM') !== false && strpos($b, '<select name="unit"') === false);
+
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$r['id'], 'unit' => '4', 'at' => '20:15', 'enabled' => 'on'));
+ck('rem_save stays on unit and reopens panel', $code === 303 && strpos($loc, '#notify-u4') !== false && (string)$c->query('SELECT at_time FROM reminders WHERE id = ' . (int)$r['id'])->fetchColumn() === '20:15');
+list($code) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$r['id'], 'unit' => '5', 'at' => '20:15', 'enabled' => 'on'));
+ck('rem_save to invisible unit refused; unit unchanged', (int)$c->query('SELECT unit_id FROM reminders WHERE id = ' . (int)$r['id'])->fetchColumn() === 4);
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '18:00', '', 1, 2)");
+$rid2 = (int)$c->query("SELECT id FROM reminders WHERE at_time = '18:00' AND user_id = 2")->fetchColumn();
+list($code) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$rid2, 'unit' => '999', 'at' => '18:30', 'enabled' => 'on'));
+ck('rem_save forged unit id does not reassign or update', (int)$c->query('SELECT unit_id FROM reminders WHERE id = ' . $rid2)->fetchColumn() === 4 && (string)$c->query('SELECT at_time FROM reminders WHERE id = ' . $rid2)->fetchColumn() === '18:00');
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_delete', 'id' => (string)$rid2));
+ck('rem_delete redirects to unit panel', $code === 303 && strpos($loc, '#notify-u4') !== false && (int)$c->query('SELECT count(*) FROM reminders WHERE id = ' . $rid2)->fetchColumn() === 0);
+/* bob cannot delete alice reminder */
+$c->exec("INSERT INTO users (id, email, pass_hash, role, scope_all, n_reminders) VALUES (9, 'eve@example.invalid', 'x', 'viewer', 1, 1)");
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '17:00', '', 1, 2)");
+$rid3 = (int)$c->query("SELECT id FROM reminders WHERE at_time = '17:00' AND user_id = 2")->fetchColumn();
+/* no auth as eve — use alice to try delete with wrong ownership already covered; cross-user via raw SQL id as viewer2 cannot see if we had tok for eve — skip if no token. Ownership: delete as alice of own works above. */
+list($code, , $loc) = http('account.php', 1, array('a' => 'rem_delete', 'id' => (string)$rid3));
+ck('admin cannot delete another login reminder by id', (int)$c->query('SELECT count(*) FROM reminders WHERE id = ' . $rid3)->fetchColumn() === 1);
 ck('unit.php source: no personal alerts/notifications UI', strpos(file_get_contents("$app/unit.php"), 'Your alerts') === false && strpos(file_get_contents("$app/unit.php"), 'Your notifications') === false && strpos(file_get_contents("$app/unit.php"), 'notify_prefs.php') === false);
 ck('settings Units has no personal Your notifications link', strpos(file_get_contents("$app/settings.php"), 'Your notifications for') === false);
 ck('notifications.php deleted from app', !is_file("$app/notifications.php"));

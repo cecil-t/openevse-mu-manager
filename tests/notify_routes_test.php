@@ -97,7 +97,7 @@ list($code, , $loc) = http('notify_prefs.php', 0, array('unitid' => '4', 'n_erro
 ck('notify_prefs: not logged in -> login page', $code === 303 && strpos($loc, 'login.php') === 0);
 list($code, $b) = http('account.php', 2);
 ck('Account & Prefs shows notify section for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'admin@example.invalid') === false);
-ck('Account unit panel: details + Default (On/Off) short labels + yn-row', strpos($b, 'details class="ync"') !== false && strpos($b, 'Default (') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Use account default') === false);
+ck('Account unit panel: details + Default (On/Off) short labels + yn-row', strpos($b, 'details class="ync"') !== false && strpos($b, 'Default (') !== false && strpos($b, 'yn-row') !== false && strpos($b, 'Use account default') === false && strpos($b, 'yn-rem') !== false && strpos($b, 'id="rem"') === false);
 ck('notifications.php deleted (app and fixture)', !is_file(__DIR__ . '/../notifications.php') && !is_file("$s/notifications.php"));
 list($code, $b) = http('settings.php?s=units', 2); ck('Settings stays admin-only for the view-only login', $code === 403);
 

@@ -35,9 +35,16 @@ function unp_next($post, $unit_id = 0){
 	return 'account.php#notify';
 }
 
-// HTML for one unit's Your notifications panel (Account): collapsed summary + expandable editors.
-// $view: one unit's oev_unit_notify_view row. id=notify-uN stays the unit anchor after save.
-function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
+// HTML for one unit's Your notifications panel (Account): collapsed summary + expandable
+// editors + that charger's plug-in reminder controls. id=notify-uN stays the unit anchor.
+// $rems: this login's reminder rows for this unit only (may be empty / several).
+// $acct_rem_on: users.n_reminders — when off, reminders do not mail (summary must not claim they will).
+function unp_rem_time_label($at){
+	if (!preg_match('/^(\d{1,2}):([0-5]\d)$/', (string)$at, $m)) return (string)$at;
+	$h = (int)$m[1]; $min = $m[2]; $ap = $h >= 12 ? 'PM' : 'AM'; $h12 = $h % 12; if ($h12 === 0) $h12 = 12;
+	return $h12 . ':' . $min . ' ' . $ap;
+}
+function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rems = array(), $acct_rem_on = true){
 	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 	$short = array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Summary', 'stops' => 'Stopped');
 	$bits = array();
@@ -48,6 +55,25 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
 		if (($c['mode'] ?? '') === 'on' || ($c['mode'] ?? '') === 'off') $bit = '<b>' . $bit . '</b>';
 		$bits[] = $bit;
 	}
+	// Reminder summary: show configured time(s); never claim mail when disabled / account gate / site email off.
+	$en = array(); $dis = array();
+	foreach ($rems as $r) {
+		$lab = unp_rem_time_label($r['at_time'] ?? '');
+		if (!empty($r['enabled'])) $en[] = $lab; else $dis[] = $lab;
+	}
+	if (!$en && !$dis) {
+		$rbit = $e('Reminder Off');
+	} elseif ($en) {
+		$txt = (count($en) === 1 ? 'Reminder ' : 'Reminders ') . implode(', ', $en);
+		if (!$acct_rem_on) $txt .= ' (account off)';
+		elseif (!$master_on) $txt .= ' (email off)';
+		$rbit = '<b>' . $e($txt) . '</b>';   // configured enabled reminder(s)
+	} else {
+		// rows exist but all disabled — keep time visible, mark off (not mailing)
+		$txt = (count($dis) === 1 ? 'Reminder ' : 'Reminders ') . implode(', ', $dis) . ' (off)';
+		$rbit = '<b>' . $e($txt) . '</b>';
+	}
+	$bits[] = $rbit;
 	$sum = implode(' · ', $bits);   // separators stay unbolded
 	$uid = (int)$unit_id;
 	$o = '<details class="ync" id="notify-u' . $uid . '">'
@@ -68,9 +94,31 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
 	}
 	$o .= '<div class="ynsave"><button type="submit" class="go">Save</button></div></div></form>';
 	if (!$master_on) $o .= '<div class="note">Outgoing email is off for the whole site, so nothing is sent right now.</div>';
-	$o .= '</details>';
+	// Plug-in reminder(s) for this charger only (no charger selector).
+	$o .= '<div class="yn-rem"><div class="note">Plug-in reminder: email if nothing is plugged in by this time (checked ~15 minutes, once a day). '
+		. 'Goes only to your account email. Needs &ldquo;Plug-in reminders&rdquo; on in your defaults above'
+		. ($acct_rem_on ? '' : ' <b>(currently off — will not email)</b>') . '.</div>';
+	foreach ($rems as $r) {
+		$rid = (int)$r['id'];
+		$o .= '<form method="post" action="account.php" class="rem-row">' . $csrf_html
+			. '<input type="hidden" name="a" value="rem_save"><input type="hidden" name="id" value="' . $rid . '">'
+			. '<input type="hidden" name="unit" value="' . $uid . '">'
+			. '<div class="rem-f"><label for="remat' . $rid . '">Plug in by</label>'
+			. '<input type="time" id="remat' . $rid . '" name="at" value="' . $e($r['at_time']) . '"></div>'
+			. '<label class="in"><input type="checkbox" name="enabled"' . (!empty($r['enabled']) ? ' checked' : '') . '>On</label>'
+			. '<button type="submit" class="go">Save</button>'
+			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(\'Remove this reminder?\')">Remove</button>'
+			. '</form>';
+	}
+	$o .= '<form method="post" action="account.php" class="rem-row rem-add">' . $csrf_html
+		. '<input type="hidden" name="a" value="rem_add"><input type="hidden" name="unit" value="' . $uid . '">'
+		. '<div class="rem-f"><label for="remadd' . $uid . '">' . ($rems ? 'Add another' : 'Plug in by') . '</label>'
+		. '<input type="time" id="remadd' . $uid . '" name="at" value="21:00"></div>'
+		. '<button type="submit" class="go">Add reminder</button></form>';
+	$o .= '</div></details>';
 	return $o;
 }
+
 
 if (!defined('UNP_LIB_ONLY')) {
 	$me = oev_require('view');

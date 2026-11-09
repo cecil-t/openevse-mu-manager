@@ -57,26 +57,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$db->prepare($sql)->execute($args);
 		$go('Email defaults saved.');
 	}
-	/* ---- own plug-in reminders (owner = this login; mail = account email only) ---- */
+	/* ---- own plug-in reminders (owner = this login; mail = account email only; live on the unit panel) ---- */
 	if ($a === 'rem_add' || $a === 'rem_save' || $a === 'rem_delete') {
-		if (!oev_reminders_have_owner($db)) $go('Reminders are not ready yet (run setup).', 'rem');
+		if (!oev_reminders_have_owner($db)) $go('Reminders are not ready yet (run setup).');
+		$anchor = function($uid){ return $uid > 0 ? ('notify-u' . (int)$uid) : 'notify'; };
+		if ($a === 'rem_delete') {
+			$rid = (int)($_POST['id'] ?? 0);
+			$st = $db->prepare('SELECT id, unit_id FROM reminders WHERE id = ? AND user_id = ?'); $st->execute(array($rid, (int)$me['id'])); $row = $st->fetch(PDO::FETCH_ASSOC);
+			if (!$row) $go('Reminder not found.', 'notify');
+			$db->prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?')->execute(array($rid, (int)$me['id']));
+			$go('Reminder removed.', $anchor((int)$row['unit_id']));
+		}
 		$uid = (int)($_POST['unit'] ?? 0);
 		$st = $db->prepare('SELECT id, loadgroupid, name FROM evses WHERE id = ?'); $st->execute(array($uid)); $unit = $st->fetch(PDO::FETCH_ASSOC);
-		if ($a !== 'rem_delete' && (!$unit || !oev_unit_visible($unit))) $go('Pick a charger you can see.', 'rem');
-		if ($a === 'rem_delete') {
-			$db->prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?')->execute(array((int)$_POST['id'], (int)$me['id']));
-			$go('Reminder removed.', 'rem');
-		}
+		if (!$unit || !oev_unit_visible($unit)) $go('Pick a charger you can see.', $anchor($uid));
 		$t = (string)($_POST['at'] ?? '');
-		if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $t)) $go('Pick a time for the reminder.', 'rem');
+		if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $t)) $go('Pick a time for the reminder.', $anchor($uid));
 		$en = isset($_POST['enabled']) ? 1 : 0;
 		if ($a === 'rem_add') {
 			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')->execute(array($uid, $t, '', (int)$me['id']));
-			$go('Reminder added. It emails only ' . $me['email'] . '.', 'rem');
+			$go('Reminder added. It emails only ' . $me['email'] . '.', $anchor($uid));
 		}
-		$db->prepare('UPDATE reminders SET unit_id = ?, at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
-			->execute(array($uid, $t, $en, '', (int)$_POST['id'], (int)$me['id']));
-		$go('Reminder saved.', 'rem');
+		/* rem_save: keep the reminder on its unit (no charger move); ownership required */
+		$rid = (int)($_POST['id'] ?? 0);
+		$st = $db->prepare('SELECT id, unit_id FROM reminders WHERE id = ? AND user_id = ?'); $st->execute(array($rid, (int)$me['id'])); $row = $st->fetch(PDO::FETCH_ASSOC);
+		if (!$row) $go('Reminder not found.', $anchor($uid));
+		if ((int)$row['unit_id'] !== $uid) $go('That reminder belongs to another charger.', $anchor((int)$row['unit_id']));
+		$db->prepare('UPDATE reminders SET at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
+			->execute(array($t, $en, '', $rid, (int)$me['id']));
+		$go('Reminder saved.', $anchor($uid));
 	}
 }
 if (isset($_GET['saved'])) $msg = 'Saved.';
@@ -122,6 +131,14 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .yn-row .yn select{display:block;width:100%;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
 .ac .yn-row .ynsave{flex:0 0 auto;margin:0 0 1px 0}
 .ac .yn-row .ynsave button{margin:0;padding:4px 12px;font-size:15px}
+.ac .yn-rem{margin-top:8px;padding-top:8px;border-top:1px solid #eee}
+.ac .yn-rem .note{font-size:13px;margin:0 0 6px 0}
+.ac .rem-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:6px 0}
+.ac .rem-row .rem-f{flex:0 1 auto}
+.ac .rem-row .rem-f label{display:block;margin:0 0 2px 0;font-size:13px}
+.ac .rem-row input[type=time]{width:auto;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
+.ac .rem-row label.in{display:inline-flex;align-items:center;gap:4px;margin:0 0 2px 0;white-space:nowrap}
+.ac .rem-row button{margin:0;padding:4px 10px;font-size:15px}
 .ac .st.on{color:#1d6b1d;font-weight:bold}.ac .st.off{color:#888;font-weight:bold}
 .ac .uh{font-weight:bold;margin-bottom:4px}
 @media screen and (max-width:420px){
@@ -161,42 +178,26 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <div class="nsub note">Default for every charger: email when charging stops while still plugged in (not load-balancer pauses), once per plug-in.</div>
 <?php } ?>
 <label class="in"><input type="checkbox" name="n_reminders"<?=!empty($me['n_reminders']) ? ' checked' : ''?>>Plug-in reminders</label>
-<div class="nsub note">Must be on for your reminders below to email you.</div>
+<div class="nsub note">Must be on for your per-charger plug-in reminders to email you.</div>
 <button type="submit" class="go">Save defaults</button></form>
 </div>
 
-<?php if ($have && $units) { ?>
+<?php
+$rems_by = array();
+foreach ($rems as $r) $rems_by[(int)$r['unit_id']][] = $r;
+$acct_rem = !empty($me['n_reminders']);
+if ($have && $units) { ?>
 <div class="note" style="margin:4px 2px 0">Per charger (tap to edit): <b>Default</b> follows your checkboxes above.
-Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stop while still plugged in (not load-balancer pauses).</div>
-<?php foreach ($units as $id => $u) echo unp_form_html($id, $u['name'], $view[$id], $CS, $master); ?>
+Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stop while still plugged in (not load-balancer pauses).
+Plug-in reminders live on each charger below (your account email only).</div>
+<?php foreach ($units as $id => $u) echo unp_form_html($id, $u['name'], $view[$id], $CS, $master, $rems_by[$id] ?? array(), $acct_rem); ?>
 <script>(function(){var h=location.hash;if(h&&h.indexOf('#notify-u')===0){var el=document.getElementById(h.slice(1));if(el&&el.tagName==='DETAILS'){el.open=true;try{el.scrollIntoView({block:'nearest'})}catch(e){el.scrollIntoView()}}}})();</script>
 <?php } elseif ($have) { ?>
-<div class="card"><div class="note">You have no chargers you can see, so there are no per-charger overrides.</div></div>
-<?php } ?>
-
-<div class="card" id="rem">
-<b>Plug-in reminders</b>
-<div class="note">An email if nothing is plugged in by the time you set (checked for 15 minutes, once a day). It goes only to <b><?=h($me['email'])?></b> — no extra recipients. Turn on &ldquo;Plug-in reminders&rdquo; in your defaults above.</div>
-<?php foreach ($rems as $r) { $id = (int)$r['id']; ?>
-<form method="post" action="account.php" style="border-top:1px solid #eee;padding-top:6px;margin-top:6px"><?=$CS?><input type="hidden" name="a" value="rem_save"><input type="hidden" name="id" value="<?=$id?>">
-<label>Charger</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '"' . ((int)$u['id'] === (int)$r['unit_id'] ? ' selected' : '') . '>' . h($u['name']) . '</option>'; ?></select>
-<label>Plug in by</label><input type="time" name="at" value="<?=h($r['at_time'])?>">
-<label class="in"><input type="checkbox" name="enabled"<?=!empty($r['enabled']) ? ' checked' : ''?>>On</label>
-<button type="submit" class="go">Save</button>
-<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm('Remove this reminder?')">Remove</button>
-</form>
-<?php } ?>
-<?php if ($units) { ?>
-<details style="margin-top:8px"><summary style="cursor:pointer;color:#035a5a;font-weight:bold">Add a reminder</summary>
-<form method="post" action="account.php"><?=$CS?><input type="hidden" name="a" value="rem_add">
-<label>Charger</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '">' . h($u['name']) . '</option>'; ?></select>
-<label>Plug in by</label><input type="time" name="at" value="21:00">
-<button type="submit" class="go">Add reminder</button></form></details>
+<div class="card"><div class="note">You have no chargers you can see, so there are no per-charger overrides or reminders.</div></div>
 <?php } ?>
 <?php if ($unres) { ?>
-<div class="note" style="margin-top:8px"><b><?=count($unres)?> legacy reminder(s)</b> could not be matched to a single login (see Settings &gt; Site settings). They are not emailed until claimed.</div>
+<div class="card"><div class="note"><b><?=count($unres)?> legacy reminder(s)</b> could not be matched to a single login. They are not emailed until claimed.</div></div>
 <?php } ?>
-</div>
 
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
