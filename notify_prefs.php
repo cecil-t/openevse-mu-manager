@@ -127,7 +127,7 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(' . $cfm . ')">Remove</button>'
 			. '</form>';
 	}
-	$o .= '<form method="post" action="account.php" class="rem-row rem-add">' . $csrf_html
+	$o .= '<form method="post" action="account.php" class="rem-row rem-add' . ($rems ? ' rem-add-after' : '') . '">' . $csrf_html
 		. '<input type="hidden" name="a" value="rem_add"><input type="hidden" name="unit" value="' . $uid . '">'
 		. '<div class="rem-f"><label for="remadd' . $uid . '">' . ($rems ? 'Add another' : 'Plug in by') . '</label>'
 		. '<input type="time" id="remadd' . $uid . '" name="at" value="21:00"></div>'

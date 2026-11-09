@@ -407,6 +407,19 @@ $h = unp_form_html(4, 'U4', $base, 'X', true, array(array('id'=>1,'at_time'=>'21
 preg_match_all('/class="ync-b">(.*?)<\/span>/', $h, $mm); $m = array(1 => implode(' · ', $mm[1]));
 ck('reminder summary: multiple enabled times listed', strpos($m[1], '<b>Reminders 9:00 PM Daily, 7:15 AM Daily</b>') !== false);
 ck('reminder controls: compact time max-width in account CSS', strpos(file_get_contents(__DIR__ . '/../account.php'), 'input[type=time]{width:auto;max-width:140px') !== false);
+ck('Per charger blurb bolds status names with strong',
+	($ac = file_get_contents(__DIR__ . '/../account.php')) !== false
+	&& strpos($ac, '<strong>Errors</strong> = faults/offline') !== false
+	&& strpos($ac, '<strong>Reboots</strong> = charger reboots') !== false
+	&& strpos($ac, '<strong>Session summary</strong> = when unplugged') !== false
+	&& strpos($ac, '<strong>Charging stopped</strong> = stopped while still plugged in') !== false
+	&& strpos($ac, '<strong>Plug-in reminders</strong> live on each charger') !== false
+	&& strpos($ac, '<b>Default</b>') !== false);
+ck('rem-add gets rem-add-after only when saved reminders exist',
+	($np = file_get_contents(__DIR__ . '/../notify_prefs.php')) !== false
+	&& strpos($np, "rem-add' . (\$rems ? ' rem-add-after' : '')") !== false
+	&& strpos(file_get_contents(__DIR__ . '/../account.php'), 'rem-add-after{border-top:1px solid #eee') !== false);
+
 ck('account per-charger summary uses desktop grid + mobile inline wrap',
 	($ac = file_get_contents(__DIR__ . '/../account.php')) !== false
 	&& strpos($ac, 'grid-template-columns:1em') !== false

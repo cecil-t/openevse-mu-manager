@@ -150,6 +150,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .rem-row input[type=time]{width:auto;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
 .ac .rem-row label.in{display:inline-flex;align-items:center;gap:4px;margin:0 0 2px 0;white-space:nowrap}
 .ac .rem-row button{margin:0;padding:4px 10px;font-size:15px}
+.ac .rem-row.rem-add-after{border-top:1px solid #eee;margin-top:10px;padding-top:10px}
 .ac .rem-days{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;flex:1 1 auto;min-width:0;max-width:100%}
 .ac .rem-days .rd{display:inline-flex;align-items:center;gap:3px;margin:0;font-size:12px;color:#333;white-space:nowrap;cursor:pointer;font-weight:normal}
 .ac .rem-days .rd input{margin:0;flex:none}
@@ -205,8 +206,8 @@ foreach ($rems as $r) $rems_by[(int)$r['unit_id']][] = $r;
 $acct_rem = !empty($me['n_reminders']);
 if ($have && $units) { ?>
 <div class="note" style="margin:4px 2px 0">Per charger (tap to edit): <b>Default</b> follows your checkboxes above.
-Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stopped while still plugged in.
-Plug-in reminders live on each charger below (your account email only).</div>
+<strong>Errors</strong> = faults/offline; <strong>Reboots</strong> = charger reboots; <strong>Session summary</strong> = when unplugged; <strong>Charging stopped</strong> = stopped while still plugged in.
+<strong>Plug-in reminders</strong> live on each charger below (your account email only).</div>
 <?php foreach ($units as $id => $u) echo unp_form_html($id, $u['name'], $view[$id], $CS, $master, $rems_by[$id] ?? array(), $acct_rem); ?>
 <script>(function(){var h=location.hash;if(h&&h.indexOf('#notify-u')===0){var el=document.getElementById(h.slice(1));if(el&&el.tagName==='DETAILS'){el.open=true;try{el.scrollIntoView({block:'nearest'})}catch(e){el.scrollIntoView()}}}})();</script>
 <script>(function(){function sync(s){var w=s&&s.closest?s.closest('.yn'):null;if(!w)return;if(s.value==='inherit')w.classList.add('yn-def');else w.classList.remove('yn-def')}document.querySelectorAll('.ac .yn-row select').forEach(function(s){sync(s);s.addEventListener('change',function(){sync(s)})})})();</script>
