@@ -213,15 +213,16 @@ function oev_userbar(){
 		. (!empty($p) ? '<span class="avdot" title="System problem: see System status"></span>' : '')
 		. '<div class="avm" hidden><div class="avn">' . $e(oev_user_name($u)) . '<span>' . $e($u['email']) . '</span></div>'
 		/* Group: navigation */
-		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a><a href="diagnostics.php">Diagnostics</a>'
+		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a>'
 		. ($adm ? '<a href="unitlist.php">Unit List / Info</a>' : '')
 		. $sep
 		/* Group: account / config */
 		. ($adm ? '<a href="settings.php">Settings</a>' : '')
 		. '<a href="account.php">Account Preferences</a>'
 		. $sep
-		/* Group: status / help; Log out keeps its own form top border */
+		/* Group: status / help; Diagnostics with System status; Log out keeps its own form top border */
 		. ($adm ? $sys : '')
+		. '<a href="diagnostics.php">Diagnostics</a>'
 		. '<a href="help.php">Help</a>'
 		. '<form method="post" action="account.php">' . oev_csrf_field() . '<button type="submit" name="a" value="logout">Log out</button></form></div></div>'
 		. '<script>function oevAv(ev){ ev.stopPropagation(); var b = ev.currentTarget, m = b.parentNode.querySelector(".avm"); m.hidden = !m.hidden; b.setAttribute("aria-expanded", m.hidden ? "false" : "true"); }'

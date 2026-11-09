@@ -97,7 +97,9 @@ function r7_css(){
 .r7 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px 0}
 .r7 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #bbb;border-radius:16px;background:#fff;color:#333;padding:4px 11px;font:14px Arial,sans-serif;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;max-width:100%;box-sizing:border-box}
 .r7 .chip .sw{display:inline-block;width:14px;height:4px;border-radius:2px;flex:none}
-.r7 .chip .sw.d{height:0;border-top:2px dashed #888;background:none!important;width:14px}
+.r7 .chip .sw.line{width:24px;height:3px;border-radius:1px;background-clip:padding-box}  /* Amps solid; match Temperature thickness */
+.r7 .chip .sw.d{width:24px;height:3px;border:0;border-radius:0;/* chart path uses stroke-dasharray 4 3; #555 matches Amps */
+background:repeating-linear-gradient(to right,#555 0 4px,transparent 4px 7px)!important}
 .r7 .chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .r7 .chip.off{background:#e4e4e4;color:#999;border-color:#ccc}
 .r7 .chip.off .sw{opacity:.25}.r7 .chip.off .nm{text-decoration:line-through}

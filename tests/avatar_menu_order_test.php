@@ -10,26 +10,28 @@ $end = strpos($src, 'function oev_home_footer');
 ck('oev_userbar present', $start !== false && $end !== false && $end > $start);
 $fn = substr($src, $start, $end - $start);
 
-// Positions in the assembly (not the $sys = assignment): find Diagnostics href then relative order of later pieces
-$nav = strpos($fn, '<a href="./">Home</a><a href="sessions.php">Session Reports</a><a href="diagnostics.php">Diagnostics</a>');
-ck('nav group Home → Session Reports → Diagnostics contiguous', $nav !== false);
+// Positions in the assembly (not the $sys = assignment)
+$nav = strpos($fn, '<a href="./">Home</a><a href="sessions.php">Session Reports</a>');
+ck('nav group Home → Session Reports contiguous (Diagnostics moved)', $nav !== false && strpos($fn, 'Session Reports</a><a href="diagnostics.php">') === false);
 
 $unit = strpos($fn, "(\$adm ? '<a href=\"unitlist.php\">Unit List / Info</a>' : '')");
 $sep1 = strpos($fn, '$sep', $nav);
 $settings = strpos($fn, "(\$adm ? '<a href=\"settings.php\">Settings</a>' : '')");
 $acct = strpos($fn, '<a href="account.php">Account Preferences</a>');
 $sysUse = strpos($fn, "(\$adm ? \$sys : '')");
+$diag = strpos($fn, '<a href="diagnostics.php">Diagnostics</a>');
 $help = strpos($fn, '<a href="help.php">Help</a>');
 $logout = strpos($fn, 'value="logout"');
 
-ck('Unit List after Diagnostics, admin-gated', $unit !== false && $unit > $nav);
+ck('Unit List after Session Reports, admin-gated', $unit !== false && $unit > $nav);
 ck('first separator after Unit List gate', $sep1 !== false && $sep1 > $unit);
 ck('Settings after sep, admin-gated, before Account Preferences', $settings !== false && $settings > $sep1 && $settings < $acct);
 ck('Account Preferences after Settings gate', $acct !== false && $acct > $settings);
 $sep2 = strpos($fn, '$sep', $acct);
 ck('second separator after Account Preferences', $sep2 !== false && $sep2 > $acct);
-ck('System status ($sys) after second sep, before Help', $sysUse !== false && $sysUse > $sep2 && $sysUse < $help);
-ck('Help after System status gate', $help !== false && $help > $sysUse);
+ck('System status ($sys) after second sep, before Diagnostics', $sysUse !== false && $sysUse > $sep2 && $sysUse < $diag);
+ck('Diagnostics after System status, before Help (same group)', $diag !== false && $diag > $sysUse && $diag < $help);
+ck('Help after Diagnostics', $help !== false && $help > $diag);
 ck('Log out after Help (existing form separator)', $logout !== false && $logout > $help);
 
 ck('status OK / problem indicator preserved on System status link', strpos($fn, 'avok') !== false && strpos($fn, 'avbad') !== false && strpos($fn, 'oev_sys_problems') !== false);

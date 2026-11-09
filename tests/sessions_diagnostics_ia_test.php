@@ -143,6 +143,14 @@ ck('sys_lib still owns site collector health for System status',
 ck('avatar menu Diagnostics points at diagnostics.php',
 	strpos(file_get_contents("$app/auth_lib.php"), 'href="diagnostics.php">Diagnostics</a>') !== false);
 ck('report7_embed.js present as static asset', is_file("$app/report7_embed.js") && strlen($js) > 500);
+ck('Temperature legend swatch uses 4px/3px gradient dash matching chart, Amps solid 24x3',
+	strpos($js, 'class="sw d"') !== false
+	&& strpos($js, 'class="sw line"') !== false
+	&& strpos($js, 'repeating-linear-gradient(to right,#555 0 4px,transparent 4px 7px)') !== false
+	&& strpos($lib, 'sw.line{width:24px;height:3px') !== false
+	&& strpos($lib, 'repeating-linear-gradient(to right,#555 0 4px,transparent 4px 7px)') !== false
+	&& strpos($lib, 'border-top:2px dashed') === false);
+
 
 foreach (array('report7_lib.php','report7.php','report7_embed.js','sessions.php','diagnostics.php','settings.php') as $pg) {
 	if (substr($pg, -3) === '.js') { ck("$pg non-empty", strlen(file_get_contents("$app/$pg")) > 100); continue; }

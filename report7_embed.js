@@ -22,8 +22,8 @@ function chips(){
 	var box = document.getElementById('r7chips'), h = '';
 	R7.units.forEach(function(u){ h += '<button type="button" class="chip' + (isOn(u.id) ? '' : ' off') + '" data-u="' + u.id + '" aria-pressed="' + isOn(u.id) + '"><span class="sw" style="background:' + u.color + '"></span><span class="nm">' + esc(u.name) + '</span></button>'; });
 	h += '<span class="sep"></span>';
-	h += '<button type="button" class="chip opt' + (prefs.amps ? '' : ' off') + '" data-o="amps" aria-pressed="' + prefs.amps + '"><span class="sw" style="background:#555"></span><span class="nm">Amps</span></button>';
-	h += '<button type="button" class="chip opt' + (prefs.temps ? '' : ' off') + '" data-o="temps" aria-pressed="' + prefs.temps + '"><span class="sw d"></span><span class="nm">Temperature</span></button>';
+	h += '<button type="button" class="chip opt' + (prefs.amps ? '' : ' off') + '" data-o="amps" aria-pressed="' + prefs.amps + '"><span class="sw line" style="background:#555"></span><span class="nm">Amps</span></button>';
+	h += '<button type="button" class="chip opt' + (prefs.temps ? '' : ' off') + '" data-o="temps" aria-pressed="' + prefs.temps + '"><span class="sw d" aria-hidden="true" style="width:24px;height:3px;background:repeating-linear-gradient(to right,#555 0 4px,transparent 4px 7px)"></span><span class="nm">Temperature</span></button>';
 	h += '<button type="button" class="chip opt' + (prefs.shade ? '' : ' off') + '" data-o="shade" aria-pressed="' + prefs.shade + '"><span class="sw" style="background:#9cc8ee;height:10px"></span><span class="nm">Charging shading</span></button>';
 	h += '<button type="button" class="chip opt' + (prefs.gaps ? '' : ' off') + '" data-o="gaps" aria-pressed="' + prefs.gaps + '"><span class="sw" style="height:10px;background:repeating-linear-gradient(45deg,#aaa 0 2px,#eee 2px 4px)"></span><span class="nm">Offline</span></button>';
 	box.innerHTML = h;
