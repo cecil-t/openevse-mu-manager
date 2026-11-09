@@ -25,7 +25,7 @@ h4{margin:14px 0 4px 0;color:#333}
 form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-width:100%;box-sizing:border-box}
 .ev{border-left:3px solid #aaa;padding:2px 0 2px 7px;margin:5px 0;font-size:14px;overflow-wrap:anywhere}
 .ev.fault,.ev.fault_count{border-color:#e33}.ev.thermal{border-color:#f90}.ev.reach,.ev.reboot{border-color:#888;border-left-style:dashed}
-.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444;box-sizing:border-box;max-width:100%;overflow-wrap:break-word}
+.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 0;margin:10px 0;color:#444;box-sizing:border-box;max-width:100%;overflow-wrap:break-word}
 .sec>h4:first-child,.sec>h3:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:8px 0}
 .sm{font-size:13px;color:#777}.err{color:#b11}
 /* top intro+filters in one sec */
@@ -33,7 +33,7 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 .diag-top .flt{background:#fff;margin:6px 0;padding:8px 10px}
 .diag-top .note{margin:2px 0 0 0}
 /* Unit health: compact grid (desktop) / stacked pills (mobile) */
-.uh{max-width:640px;padding:6px 8px}
+.uh{max-width:100%;padding:6px 8px;box-sizing:border-box}
 .uh-h,.uh-r{display:grid;grid-template-columns:minmax(6.5rem,1.6fr) 2.5rem 3.4rem 2.6rem minmax(6.5rem,1.1fr);gap:4px 8px;align-items:center;padding:6px 2px;border-bottom:1px dotted #ddd;font-size:14px}
 .uh-h{font-size:11px;color:#888;border-bottom:1px solid #ccc;padding:2px 2px 5px;font-weight:600}
 .uh-h span:not(:first-child),.uh-c{display:block;width:100%;box-sizing:border-box;text-align:center;font-variant-numeric:tabular-nums}

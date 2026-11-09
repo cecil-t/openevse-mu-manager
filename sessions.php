@@ -61,7 +61,7 @@ body.pgw .sec .sgd>svg.sessgraph path:not([stroke="#07d"]):not([stroke-dasharray
 body.pgw .sec .sgd>svg.sessgraph line{stroke-width:1px}
 body.pgw .sec .sgd>svg.sessgraph line[stroke-dasharray]{stroke-dasharray:2px 3px}
 }
-.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 10px;margin:10px 0;color:#444}
+.sec{background:rgba(246,246,246,.95);border:1px solid #ccc;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:6px 0;margin:10px 0;color:#444}
 @media screen and (min-width:700px){body.pgw .sec:has(>.sgd){padding-left:10px;padding-right:10px}}
 .sec>h4:first-child{margin-top:2px}.sec>p{margin:4px 0}.sec .card{background:#fff;margin:8px 0}
 /* style.css boxes every 'a span' (old button look); undo that inside the session cards */

@@ -65,6 +65,8 @@ a span:hover{
 :root{
 	--oev-gutter-x: 10px;   /* mobile side gutter inside .container */
 	--oev-panel-mt: 10px;   /* gap below header / between stacked primary panels */
+	--oev-inset-x: 10px;    /* primary panel → nested content horizontal inset (all pages) */
+	--oev-foot-gap: 10px;   /* last primary panel bottom → Home footer top */
 }
 .container, .oev-main{
 	margin: 0 auto;
@@ -88,12 +90,22 @@ a span:hover{
 	box-sizing: border-box;
 	}
 .container > .slidebox,
-.container > .pgcard{
+.container > .pgcard,
+.container > .sec{
 	margin-top: var(--oev-panel-mt);
+	margin-bottom: 0;                 /* foot gap owned by .oev-foot margin-top */
+	padding-left: var(--oev-inset-x);
+	padding-right: var(--oev-inset-x);
+	}
+/* .sec draws a 1px border; keep outer-edge → nested inset == --oev-inset-x */
+.container > .sec{
+	padding-left: calc(var(--oev-inset-x) - 1px);
+	padding-right: calc(var(--oev-inset-x) - 1px);
+	}
+.container > .oev-foot{
+	margin-top: var(--oev-foot-gap);
 	margin-bottom: var(--oev-panel-mt);
 	}
-.container > .sec{margin-top: var(--oev-panel-mt); margin-bottom: var(--oev-panel-mt);}
-.container > .oev-foot{margin-top: var(--oev-panel-mt); margin-bottom: var(--oev-panel-mt);}
 /* Wide tables/charts scroll inside the card — never widen the page */
 .container .tbl-scroll, .container .nm-wrap, .container .sgd{
 	overflow-x: auto;
@@ -220,5 +232,10 @@ img.plug{
 	body.pgw .container, body.pgw .oev-main{max-width:1200px}
 	body.pgw .container > .pgcard,
 	body.pgw .container > .slidebox.pgcard,
-	body.pgw .container > #unit.slidebox{padding:10px 12px}
+	body.pgw .container > #unit.slidebox,
+	body.pgw .container > .sec{
+		padding-top: 10px;
+		padding-bottom: 10px;
+		/* horizontal inset stays --oev-inset-x (do not widen to 12px) */
+	}
 }

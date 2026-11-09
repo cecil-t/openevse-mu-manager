@@ -7,7 +7,8 @@ function ck($m, $ok){ global $f,$n; $n++; echo ($ok?'PASS':'FAIL') . " $m\n"; if
 $css = file_get_contents("$app/style.css");
 $hd = file_get_contents("$app/_head.php");
 
-ck('CSS defines --oev-gutter-x and --oev-panel-mt', strpos($css, '--oev-gutter-x') !== false && strpos($css, '--oev-panel-mt') !== false);
+ck('CSS defines --oev-gutter-x / --oev-panel-mt / --oev-inset-x / --oev-foot-gap', strpos($css, '--oev-gutter-x') !== false && strpos($css, '--oev-panel-mt') !== false && strpos($css, '--oev-inset-x') !== false && strpos($css, '--oev-foot-gap') !== false);
+ck('primary panels use shared horizontal inset', strpos($css, 'padding-left: var(--oev-inset-x)') !== false && strpos($css, 'padding-right: var(--oev-inset-x)') !== false);
 ck('container/oev-main uses gutter padding', strpos($css, 'padding-left: var(--oev-gutter-x)') !== false && strpos($css, 'padding-right: var(--oev-gutter-x)') !== false);
 ck('body margin 0 (gutters only from container)', (bool)preg_match('/^body\{\s*margin:\s*0/m', $css) || strpos($css, "body{\n\tmargin: 0;") !== false);
 ck('_head emits container oev-main', strpos($hd, 'class="container oev-main"') !== false);
