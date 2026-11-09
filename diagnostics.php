@@ -44,9 +44,17 @@ $f = strtotime($from . ' 00:00:00'); $t = strtotime($to . ' 23:59:59');
 $uw = ($unit ? " AND unit_id = $unit" : '') . $SC;
 
 $faults = $db->query("SELECT * FROM events WHERE kind IN ('fault','fault_count','thermal') AND ts BETWEEN $f AND $t$uw ORDER BY ts DESC LIMIT 40")->fetchAll();
-$drops = $db->query("SELECT * FROM events WHERE kind IN ('reach', 'reboot') AND ts BETWEEN $f AND $t$uw ORDER BY ts DESC LIMIT 40")->fetchAll();
-$dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 'reboot') rb,
-	(SELECT round(avg(srssi)) FROM samples x WHERE x.unit_id = events.unit_id AND x.ts BETWEEN $f AND $t) rssi FROM events WHERE ((kind = 'reach' AND reason IN ('unreachable', 'push stopped')) OR kind = 'reboot') AND ts BETWEEN $f AND $t$uw GROUP BY unit_id ORDER BY unit_name")->fetchAll();
+/* WiFi summary: fixed 7d / 30d / all-time windows (not the form date range). Flag if reboots in 7d >= threshold. */
+$WIFI_FLAG_7D = 5;
+$t7 = time() - 7 * 86400; $t30 = time() - 30 * 86400;
+$wifi_rows = array();
+foreach ($db->query("SELECT unit_id,
+	sum(CASE WHEN kind = 'reboot' AND ts >= $t7 THEN 1 ELSE 0 END) rb7,
+	sum(CASE WHEN kind = 'reboot' AND ts >= $t30 THEN 1 ELSE 0 END) rb30,
+	sum(CASE WHEN kind = 'reboot' THEN 1 ELSE 0 END) rball,
+	sum(CASE WHEN kind = 'reach' AND reason IN ('unreachable', 'push stopped') AND ts >= $t7 THEN 1 ELSE 0 END) gap7
+	FROM events WHERE kind IN ('reboot', 'reach') AND 1$SC" . ($unit ? " AND unit_id = $unit" : '') . "
+	GROUP BY unit_id") as $w) $wifi_rows[(int)$w['unit_id']] = $w;
 
 /* Monthly all-time thermal / WiFi */
 $M = "strftime('%Y-%m', ts, 'unixepoch', 'localtime')";
@@ -65,6 +73,28 @@ foreach ($db->query("SELECT $M m, unit_id,
 krsort($rows);
 $names = array(); foreach ($units as $u) $names[$u['unit_id']] = $u['unit_name'];
 $t1 = function($v){ return temp_num($v); };
+// Lifetime fault counters from collector high-water (unit_state) — not live /status (false 0s after WiFi restart)
+$life = array();
+foreach ($units as $u) {
+	if ($unit && (int)$u['unit_id'] !== $unit) continue;
+	$life[] = $u;
+}
+// WiFi lines: every in-scope unit (zeros when no events yet), sorted by unit_state name
+$wifi_list = array();
+foreach ($units as $u) {
+	if ($unit && (int)$u['unit_id'] !== $unit) continue;
+	$uid = (int)$u['unit_id'];
+	$w = $wifi_rows[$uid] ?? array('rb7'=>0,'rb30'=>0,'rball'=>0,'gap7'=>0);
+	$wifi_list[] = array(
+		'unit_id' => $uid,
+		'name' => (string)$u['unit_name'],
+		'rb7' => (int)$w['rb7'], 'rb30' => (int)$w['rb30'], 'rball' => (int)$w['rball'],
+		'gap7' => (int)$w['gap7'],
+		'flag' => ((int)$w['rb7'] >= $WIFI_FLAG_7D),
+	);
+}
+usort($wifi_list, function($a, $b){ return strnatcasecmp($a['name'], $b['name']); });
+
 ?>
 <div class="sec"><h3 style="margin:4px 0 6px 0;color:#333">Diagnostics</h3>
 <p class="sm">Faults, thermal events, WiFi drop-offs, and monthly health. Energy history stays on <a href="sessions.php">Session Reports</a>. Per-unit reporting and collector / system health for admins: Settings → System status.</p></div>
@@ -79,6 +109,15 @@ $t1 = function($v){ return temp_num($v); };
 <p class="sec sm">Recent logs use the date range above (default last 90 days). Monthly temperatures below are all-time.</p>
 
 <div class="sec"><h4>Faults &amp; thermal</h4>
+<div class="card" style="background:#fff"><b>Lifetime fault counts</b>
+<p class="sm" style="margin:2px 0 6px 0">Controller counters kept by the collector (survive WiFi restarts). Not a live /status read.</p>
+<?php if (!$life) echo '<p class="sm">No units in scope.</p>';
+$fc = function($v){ return ($v === null || $v === '') ? "\u{2014}" : (string)(int)$v; };
+foreach ($life as $u) {
+	$nm = $names[(int)$u['unit_id']] ?? $u['unit_name'];
+	echo '<div class="kv"><span>' . h($nm) . '</span><span>GFCI ' . $fc($u['gfci_count']) . ' &middot; No ground ' . $fc($u['nognd_count']) . ' &middot; Stuck ' . $fc($u['stuck_count']) . '</span></div>';
+} ?>
+</div>
 <?php if (!$faults) echo '<p class="sm">None logged in this range.</p>'; ?>
 <?php foreach ($faults as $e) { ?>
 	<div class="ev <?=h($e['kind'])?>"><b><?=fdt($e['ts'])?></b> <?=h($e['unit_name'])?>: <?=h($e['detail'])?>
@@ -86,13 +125,16 @@ $t1 = function($v){ return temp_num($v); };
 <?php } ?></div>
 
 <div class="sec"><h4>WiFi drop-offs &amp; reboots</h4>
-<?php if (!$drops) echo '<p class="sm">None logged in this range.</p>'; ?>
-<?php foreach ($dropcount as $d) { ?>
-	<div class="kv"><span><?=h($d['unit_name'])?></span><span><?=(int)$d['n']?> drop-off<?=$d['n'] == 1 ? '' : 's'?> &middot; <?=(int)$d['rb']?> reboot<?=$d['rb'] == 1 ? '' : 's'?><?=$d['rssi'] !== null ? ' &middot; WiFi avg ' . (int)$d['rssi'] . ' dBm' : ''?></span></div>
-<?php } ?>
-<?php foreach ($drops as $e) { ?>
-	<div class="ev reach"><b><?=fdt($e['ts'])?></b> <?=h($e['unit_name'])?>: <?=h($e['detail'])?><?=$e['srssi'] !== null ? ' <span class="sm">(WiFi ' . (int)$e['srssi'] . ' dBm)</span>' : ''?></div>
-<?php } ?></div>
+<p class="sm">Per-unit WiFi restart counts from the collector (not a live /status read). Flagged when &ge; <?=$WIFI_FLAG_7D?> restarts in the last 7 days. Gaps = times the collector could not reach the unit.</p>
+<?php if (!$wifi_list) echo '<p class="sm">No units in scope.</p>'; ?>
+<?php foreach ($wifi_list as $w) {
+	$bits = array((int)$w['rb7'] . ' in 7d', (int)$w['rb30'] . ' in 30d', (int)$w['rball'] . ' all');
+	if ((int)$w['gap7'] > 0) $bits[] = (int)$w['gap7'] . ' gap' . ($w['gap7'] == 1 ? '' : 's') . ' (7d)';
+	$right = implode(' &middot; ', $bits);
+	if ($w['flag']) $right = '<span class="err">' . $right . ' &middot; high</span>';
+	echo '<div class="kv"><span>' . h($w['name']) . '</span><span>' . $right . '</span></div>';
+} ?>
+</div>
 
 <div class="sec" id="monthly"><h4>Monthly temperatures &amp; thermal</h4>
 <p class="sm">Per month: thermal throttling, over-temperature faults, WiFi drop-offs, temperature (<?=temp_sym()?>, hottest sensor) avg / max while idle (ambient) and while charging, and WiFi signal where the unit reports it (v5 only). Unit filter above applies; dates do not.</p>

@@ -77,6 +77,25 @@ ck('diagnostics view auth + visible unit scope + footer',
 	strpos($diag, "oev_require('view')") !== false
 	&& strpos($diag, 'oev_visible_unit_ids') !== false
 	&& strpos($diag, 'oev_home_footer') !== false);
+ck('diagnostics Lifetime fault counts from unit_state high-water (not live /status)',
+	strpos($diag, 'Lifetime fault counts') !== false
+	&& strpos($diag, 'gfci_count') !== false
+	&& strpos($diag, 'nognd_count') !== false
+	&& strpos($diag, 'stuck_count') !== false
+	&& strpos($diag, 'survive WiFi restarts') !== false
+	&& strpos($diag, "gfcicount") === false);
+ck('unit.php Fault counts popup has no since-reset wording',
+	($up = file_get_contents("$app/unit.php")) !== false
+	&& strpos($up, "pop('Fault counts'") !== false
+	&& strpos($up, 'since reset') === false);
+ck('diagnostics WiFi per-unit summary (no per-event list; flag threshold 5/7d)',
+	strpos($diag, 'WIFI_FLAG_7D = 5') !== false
+	&& strpos($diag, 'wifi_list') !== false
+	&& strpos($diag, 'rb7') !== false
+	&& strpos($diag, 'gap7') !== false
+	&& strpos($diag, 'Per-unit WiFi restart counts') !== false
+	&& strpos($diag, 'foreach ($drops as') === false
+	&& strpos($diag, "kind IN ('reach', 'reboot') AND ts BETWEEN") === false);
 ck('diagnostics monthly queries preserve thermal/WiFi meaning',
 	strpos($diag, "kind = 'thermal' AND reason = 'thermal'") !== false
 	&& strpos($diag, "to_val = 10") !== false

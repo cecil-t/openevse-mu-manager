@@ -418,7 +418,7 @@ document.getElementById('a_level').onclick = function(){ pop('Service level', [<
 document.getElementById('a_time').onclick = function(){ pop('Clock', <?=json_encode($clk)?>); }
 document.getElementById('a_checks').onclick = function(){ pop('Safety checks', <?=json_encode($ckl)?>); }
 document.getElementById('a_wifi').onclick = function(){ pop('WiFi', <?=json_encode(array_values(array_filter(array('SSID: ' . $e['ssid'], oev_is_admin() ? 'IP address: ' . $e['ipaddress'] : null, (oev_is_admin() && $e['hostname'] !== '') ? 'Hostname: ' . $e['hostname'] : null, $e['srssi'] !== null ? 'Signal: ' . $e['srssi'] . ' dBm' : null, 'API: ' . $e['api']))))?>); }
-if (document.getElementById('a_faults')) document.getElementById('a_faults').onclick = function(){ pop('Fault counts (since reset)', <?=json_encode(array('GFCI: ' . (int)($e['gfcicount'] ?? 0), 'No ground: ' . (int)($e['nogndcount'] ?? 0), 'Stuck relay: ' . (int)($e['stuckcount'] ?? 0)))?>); }
+if (document.getElementById('a_faults')) document.getElementById('a_faults').onclick = function(){ pop('Fault counts', <?=json_encode(array('GFCI: ' . (int)($e['gfcicount'] ?? 0), 'No ground: ' . (int)($e['nogndcount'] ?? 0), 'Stuck relay: ' . (int)($e['stuckcount'] ?? 0)))?>); }
 window.speechSynthesis.onvoiceschanged = function(){ window.speechSynthesis.getVoices(); };
 document.getElementById('b_speak').onclick = function(){
 	var msg = new SpeechSynthesisUtterance(<?=json_encode(isset($e['status']) ? $e['status'] : '')?>);
