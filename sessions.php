@@ -365,7 +365,7 @@ echo r7_embed_html($R7);
 ?>
 
 <div class="sec"><h4>Session history</h4>
-<p class="sm">Filter by unit and date. Totals and the list below follow these filters only — the Last 7 days chart above does not.</p></div>
+<p class="sm">Filter by unit and date. Totals and the list below follow these filters only — the Last 7 days chart above does not.</p>
 <form class="flt card" method="get">
 	<select name="unit"><option value="0">All units</option>
 	<?php foreach ($units as $u) echo '<option value="' . (int)$u['unit_id'] . '"' . ($unit == $u['unit_id'] ? ' selected' : '') . '>' . h(unit_short($u['unit_name'])) . '</option>'; ?>
@@ -373,17 +373,14 @@ echo r7_embed_html($R7);
 	<input type="date" name="from" value="<?=h($from)?>"> to <input type="date" name="to" value="<?=h($to)?>">
 	<button type="submit">Show</button>
 </form>
-
 <div class="card"><b><?=number_format($tot['kwh'], 1)?> kWh</b> in <?=$tot['n']?> session<?=$tot['n'] == 1 ? '' : 's'?> &middot; <?=sess_fmt_dur($tot['sec'])?> charging
 	<div class="sm"><?=h(date('M j, Y', $f))?> &ndash; <?=h(date('M j, Y', $t))?></div></div>
-
-<div class="sec"><h4>By unit</h4>
+<h4>By unit</h4>
 <?php if (!$byunit) echo '<p class="sm">No sessions in this range yet.</p>'; ?>
 <?php foreach ($byunit as $b) { ?>
 	<div class="kv"><span><?=h(unit_short($b['unit_name']))?></span><span><b><?=number_format($b['kwh'], 1)?></b> kWh &middot; <?=$b['n']?> &middot; <?=sess_fmt_dur($b['sec'])?></span></div>
-<?php } ?></div>
-
-<div class="sec"><h4>Sessions</h4>
+<?php } ?>
+<h4>Sessions</h4>
 <?php if (!$sessions) echo '<p class="sm">None yet. Sessions show up after a car is plugged in.</p>'; ?>
 <?php foreach ($sessions as $s) { ?>
 	<div class="card"><a class="blk" href="sessions.php?id=<?=(int)$s['id']?>">
@@ -399,7 +396,7 @@ echo r7_embed_html($R7);
 		<?php if ($s['partial']) echo '<span class="tag">partial</span>'; ?>
 	</a></div>
 <?php } ?>
-<p class="sm">Faults, thermal, WiFi, and unit reporting: <a href="diagnostics.php">Diagnostics</a>.</p></div>
+<p class="sm">Faults, thermal, and WiFi: <a href="diagnostics.php">Diagnostics</a>. Unit reporting for admins: Settings → System status.</p></div>
 <div class="sec"><p class="sm">History starts <?php $hs = (int)$db->query('SELECT min(plug_in_at) FROM sessions')->fetchColumn(); echo $hs ? oev_v(date('M j, Y', $hs)) : 'with the first session'; ?>. kW = amps &times; <?=oev_v(EVSE_VOLTS_L2 . ' V')?> on L2, <?=oev_v(EVSE_VOLTS_L1 . ' V')?> on L1 (assumed), unless a unit has its own voltage sensor (Settings &gt; Units) or override.</p></div>
 <?=oev_home_footer()?>
 </div></body></html>

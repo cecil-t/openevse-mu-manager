@@ -585,6 +585,49 @@ if ($sec === 'system') {
 		echo '<div class="sys"><div><b>' . h($d['name']) . ':</b> ' . ($d['size'] === null ? 'Not found' : oev_v(oev_sys_bytes($d['size']))) . ' <span class="note">' . h($d['file']) . ($x ? '; plus ' . implode(', ', $x) . ' (temporary)' : '') . '</span></div></div>';
 	}
 	echo '</div>';
+	/* Per-unit reporting (moved from Diagnostics): last good reading / push per unit */
+	require_once __DIR__ . '/sessions_lib.php';
+	require_once __DIR__ . '/evse_prefs.php';
+	echo '<h3>Unit reporting</h3><div class="card">';
+	echo '<div class="note" style="margin:0 0 8px 0">When each unit last delivered a good reading (collector or push).</div>';
+	try {
+		$sdb = oev_sess_ro(2);
+		$ustates = $sdb->query('SELECT * FROM unit_state ORDER BY unit_name')->fetchAll(PDO::FETCH_ASSOC);
+		$sdb = null;
+		if (!$ustates) {
+			echo '<div class="sys"><div>No unit state yet. The collector has not run.</div></div>';
+		} else {
+			$pre = '';
+			try {
+				$ns = $db->query('SELECT name FROM evses')->fetchAll(PDO::FETCH_COLUMN);
+				if (count($ns) > 1 && preg_match('/^([^:]{1,40}:\s*)\S/', (string)$ns[0], $m)) {
+					$pre = $m[1];
+					foreach ($ns as $x) if (strpos((string)$x, $pre) !== 0) { $pre = ''; break; }
+				}
+			} catch (Exception $e) { $pre = ''; }
+			foreach ($ustates as $u) {
+				$age = $u['last_ok_at'] ? time() - (int)$u['last_ok_at'] : null;
+				$pa = $u['last_push_at'] ? time() - (int)$u['last_push_at'] : null;
+				$stale = ($age === null || $age > 300);
+				$nm = (string)$u['unit_name'];
+				if ($pre !== '' && strpos($nm, $pre) === 0) $nm = substr($nm, strlen($pre));
+				$status = $age === null ? 'never' : ($age < 120 ? 'ok' : 'last ' . sess_fmt_dur($age) . ' ago');
+				$push = $pa !== null ? ('push ' . ($pa < 90 ? $pa . 's' : sess_fmt_dur($pa))) : 'polled';
+				$line = h($status) . ' &middot; ' . h($push);
+				if ($u['temp_c'] !== null) $line .= ' &middot; ' . temp_txt($u['temp_c']);
+				if ($u['srssi'] !== null) $line .= ' &middot; ' . (int)$u['srssi'] . 'dBm';
+				if (!empty($u['charging'])) $line .= ' &middot; charging';
+				elseif (!empty($u['connected'])) $line .= ' &middot; plugged in';
+				$tit = $u['srssi'] !== null ? ' title="WiFi ' . (int)$u['srssi'] . ' dBm"' : '';
+				echo '<div class="sys"' . $tit . '><div><b>' . h($nm) . ':</b> '
+					. ($stale ? '<span class="err">' . $line . '</span>' : $line) . '</div></div>';
+			}
+		}
+	} catch (Throwable $e) {
+		echo '<div class="sys"><div>Session database unavailable.</div></div>';
+	}
+	echo '<div class="note" style="margin-top:8px">push = seconds since the unit\'s last push; dBm = WiFi signal (v5 units only).</div>';
+	echo '</div>';
 }
 ?>
 </div>

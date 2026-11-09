@@ -57,13 +57,21 @@ ck('sessions keeps detail (?id=) and history filters + by unit + list',
 	&& strpos($sess, '<h4>By unit</h4>') !== false
 	&& strpos($sess, '<h4>Sessions</h4>') !== false
 	&& strpos($sess, 'svg_session_pair') !== false);
+ck('sessions consolidates Session history into one .sec (filter+totals+by unit+list)',
+	($iHist = strpos($sess, '<div class="sec"><h4>Session history</h4>')) !== false
+	&& ($iBy = strpos($sess, '<h4>By unit</h4>', $iHist)) !== false
+	&& ($iList = strpos($sess, '<h4>Sessions</h4>', $iHist)) !== false
+	&& ($iClose = strpos($sess, '</div>', $iList)) !== false
+	&& $iBy < $iList
+	&& strpos(substr($sess, $iHist, $iClose - $iHist), '<div class="sec">') === 0
+	&& substr_count(substr($sess, $iHist, $iClose - $iHist), '<div class="sec">') === 1);
 ck('diagnostics is real body not bridge placeholder',
 	strpos($diag, 'layout is in progress') === false
 	&& strpos($diag, 'use these while Session Reports') === false
 	&& strpos($diag, '<h4>Faults') !== false
 	&& strpos($diag, '<h4>WiFi drop-offs') !== false
 	&& strpos($diag, 'id="monthly"') !== false
-	&& strpos($diag, '<h4>Unit reporting</h4>') !== false
+	&& strpos($diag, '<h4>Unit reporting</h4>') === false
 	&& strpos($diag, 'FROM events') !== false);
 ck('diagnostics view auth + visible unit scope + footer',
 	strpos($diag, "oev_require('view')") !== false
@@ -74,8 +82,14 @@ ck('diagnostics monthly queries preserve thermal/WiFi meaning',
 	&& strpos($diag, "to_val = 10") !== false
 	&& strpos($diag, 'idle_avg') !== false
 	&& strpos($diag, 'rssi_avg') !== false);
-ck('diagnostics unit reporting uses last_ok_at / last_push_at',
-	strpos($diag, 'last_ok_at') !== false && strpos($diag, 'last_push_at') !== false);
+ck('diagnostics no longer owns unit reporting',
+	strpos($diag, '<h4>Unit reporting</h4>') === false
+	&& strpos($diag, 'last_ok_at') === false);
+ck('System status owns Unit reporting (last_ok_at / last_push_at)',
+	($set = file_get_contents("$app/settings.php")) !== false
+	&& strpos($set, 'Unit reporting') !== false
+	&& strpos($set, 'last_ok_at') !== false && strpos($set, 'last_push_at') !== false
+	&& strpos($set, "oev_sess_ro") !== false);
 ck('sys_lib still owns site collector health for System status',
 	strpos(file_get_contents("$app/sys_lib.php"), "'collector'") !== false
 	&& strpos(file_get_contents("$app/sys_lib.php"), 'Data collector') !== false);
@@ -83,7 +97,7 @@ ck('avatar menu Diagnostics points at diagnostics.php',
 	strpos(file_get_contents("$app/auth_lib.php"), 'href="diagnostics.php">Diagnostics</a>') !== false);
 ck('report7_embed.js present as static asset', is_file("$app/report7_embed.js") && strlen($js) > 500);
 
-foreach (array('report7_lib.php','report7.php','report7_embed.js','sessions.php','diagnostics.php') as $pg) {
+foreach (array('report7_lib.php','report7.php','report7_embed.js','sessions.php','diagnostics.php','settings.php') as $pg) {
 	if (substr($pg, -3) === '.js') { ck("$pg non-empty", strlen(file_get_contents("$app/$pg")) > 100); continue; }
 	exec('php -l ' . escapeshellarg("$app/$pg") . ' 2>&1', $o, $rc);
 	ck("php -l $pg", $rc === 0);

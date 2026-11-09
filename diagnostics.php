@@ -1,8 +1,8 @@
 <?php
 /******************************************************************************
- * diagnostics.php — faults, thermal, WiFi / drop-offs, monthly health,
- * and per-unit reporting (collector freshness). View auth (not public).
- * Owns the monthly thermal/WiFi health view (sessions redirects here).
+ * diagnostics.php — faults, thermal, WiFi / drop-offs, monthly health.
+ * View auth (not public). Owns the monthly thermal/WiFi health view
+ * (sessions redirects here). Per-unit reporting lives on Settings → System status.
  ******************************************************************************/
 require_once __DIR__ . '/auth_lib.php'; oev_require('view');
 $__vis = oev_visible_unit_ids();
@@ -80,7 +80,7 @@ $names = array(); foreach ($units as $u) $names[$u['unit_id']] = unit_short($u['
 $t1 = function($v){ return temp_num($v); };
 ?>
 <div class="sec"><h3 style="margin:4px 0 6px 0;color:#333">Diagnostics</h3>
-<p class="sm">Faults, thermal events, WiFi drop-offs, monthly health, and unit reporting. Energy history stays on <a href="sessions.php">Session Reports</a>. Collector / system health for admins is also under Settings → System status.</p></div>
+<p class="sm">Faults, thermal events, WiFi drop-offs, and monthly health. Energy history stays on <a href="sessions.php">Session Reports</a>. Per-unit reporting and collector / system health for admins: Settings → System status.</p></div>
 
 <form class="flt card" method="get" id="diagfilt">
 	<select name="unit"><option value="0">All units</option>
@@ -120,13 +120,6 @@ $t1 = function($v){ return temp_num($v); };
 	<?php } ?></div>
 <?php } ?>
 <p class="sm">avg / max <?=temp_sym()?>. Throttling starts at <?=temp_txt(SESS_THERMAL_C_PAGE)?> ambient.</p></div>
-
-<div class="sec"><h4>Unit reporting</h4>
-<p class="sm">When each unit last delivered a good reading (collector or push). Admins also see site-wide collector health under Settings → System status.</p>
-<?php foreach ($units as $u) { $age = $u['last_ok_at'] ? time() - $u['last_ok_at'] : null; $pa = $u['last_push_at'] ? time() - $u['last_push_at'] : null; ?>
-	<div class="kv"<?=$u['srssi'] !== null ? ' title="WiFi ' . (int)$u['srssi'] . ' dBm"' : ''?>><span><?=h(unit_short($u['unit_name']))?></span><span<?=($age === null || $age > 300) ? ' class="err"' : ''?>><?=$age === null ? 'never' : ($age < 120 ? 'ok' : 'last ' . sess_fmt_dur($age) . ' ago')?><?=$pa !== null ? ' &middot; push ' . ($pa < 90 ? $pa . 's' : sess_fmt_dur($pa)) : ' &middot; polled'?><?=$u['temp_c'] !== null ? ' &middot; ' . temp_txt($u['temp_c']) : ''?><?=$u['srssi'] !== null ? ' &middot; ' . (int)$u['srssi'] . 'dBm' : ''?><?=$u['charging'] ? ' &middot; charging' : ($u['connected'] ? ' &middot; plugged in' : '')?></span></div>
-<?php } ?>
-<p class="sm" style="margin-top:4px">push = seconds since the unit's last push; dBm = WiFi signal (v5 units only).</p></div>
 
 <?=oev_home_footer()?>
 </div></body></html>
