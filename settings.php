@@ -303,7 +303,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set label.in{display:inline-block;margin:4px 14px 2px 0;font-weight:normal}
 .set input[type=text],.set input[type=email],.set input[type=password],.set input[type=number],.set input[type=time],.set input[type=url],.set select{width:100%;box-sizing:border-box;font-size:16px;padding:5px 6px;border:1px solid #bbb;border-radius:4px;background:#fff}
 @media screen and (min-width:700px){.set{container-type:inline-size}.set input:not([type=checkbox]):not([type=radio]),.set select,.set textarea,.set .row2,.set .emrow{max-width:50vw;max-width:calc(50cqw - 40px)}}   /* desktop, all tabs: no field past the middle of the screen */
-@media screen and (min-width:700px){.set .row2.row2n{max-width:calc(25cqw - 20px)}}   /* heartbeat value+unit: half the usual .row2 desktop width */
+@media screen and (min-width:700px){.set .row2.row2n{max-width:calc(25cqw - 20px)}}   /* half the usual .row2 desktop width (heartbeat; Level 1/2 V) */
 .set input[type=checkbox],.set input[type=radio]{width:18px;height:18px;vertical-align:-3px;margin:0 5px 0 0}
 .set .row2{display:flex;gap:8px}.set .row2>div{flex:1 1 0;min-width:0}
 .set .note{color:#666;margin:4px 0}
@@ -485,7 +485,7 @@ if ($sec === 'prefs') {
 	<div class="note">Used for the link in every email, view-only links, and the Emoncms server address given to units set to Internal logging. Blank = this page's address (<?=oev_v(oev_site_url_detect())?>). Units already set up keep their address until their Emoncms setting is saved again.</div>
 	<h2>Voltage</h2>
 	<div class="note">The units only report their service level (Level 1 or Level 2), so power (kW) is worked out from these voltages. A unit with its own voltage sensor uses its reading instead.</div>
-	<div class="row2"><div><label>Level 1 (V)</label><input type="number" name="volts_l1" min="90" max="260" value="<?=h($S['volts_l1'])?>"></div><div><label>Level 2 (V)</label><input type="number" name="volts_l2" min="90" max="260" value="<?=h($S['volts_l2'])?>"></div></div>
+	<div class="row2 row2n"><div><label>Level 1 (V)</label><input type="number" name="volts_l1" min="90" max="260" value="<?=h($S['volts_l1'])?>"></div><div><label>Level 2 (V)</label><input type="number" name="volts_l2" min="90" max="260" value="<?=h($S['volts_l2'])?>"></div></div>
 	<div class="note">Usual: 120 / 240. Commercial 3-phase: 208 for Level 2.</div>
 	<h2>Temperature</h2>
 	<label class="in"><input type="radio" name="temp_unit" value="F"<?=chk($S['temp_unit'] !== 'C')?>>&deg;F</label><label class="in"><input type="radio" name="temp_unit" value="C"<?=chk($S['temp_unit'] === 'C')?>>&deg;C</label>
