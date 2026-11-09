@@ -427,7 +427,5 @@ document.getElementById('b_speak').onclick = function(){
 	speechSynthesis.speak(msg);
 }
 </script>
-</div>
 <?=evse_rapi_stats_comment()?>
-<?=oev_home_footer()?>
 </div></body></html>

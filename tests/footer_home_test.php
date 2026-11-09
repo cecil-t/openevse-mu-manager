@@ -10,12 +10,15 @@ $_SERVER['SCRIPT_NAME'] = '/openevse/account.php';
 $h = oev_home_footer();
 ck('account-like page: oev-foot Home strip, no arrow', $h === '<div class="oev-foot"><a href="./">Home</a></div>' && strpos($h, '&larr;') === false && strpos($h, 'Settings') === false);
 
-$pages = array('account.php','settings.php','help.php','sessions.php','unit.php','unitlist.php');
+$pages = array('account.php','settings.php','help.php','sessions.php','unitlist.php');
 foreach ($pages as $p) {
 	$src = file_get_contents("$app/$p");
 	ck("$p uses oev_home_footer", strpos($src, 'oev_home_footer()') !== false);
 	ck("$p has no &larr; Home footer", strpos($src, '&larr; Home') === false);
 }
+$unit = file_get_contents("$app/unit.php");
+ck('unit.php has no page-end Home footer', strpos($unit, 'oev_home_footer') === false);
+ck('unit.php still closes container cleanly', (bool)preg_match('#</script>\s*<\?=evse_rapi_stats_comment\(\)\?>\s*</div>\s*</body>#', $unit));
 $acc = file_get_contents("$app/account.php");
 ck('account footer no Settings·Help shortcuts', preg_match('/oev_home_footer[\s\S]{0,80}settings\.php/i', $acc) !== 1 && strpos($acc, '&middot; <a href="help.php">Help</a>') === false);
 $help = file_get_contents("$app/help.php");
