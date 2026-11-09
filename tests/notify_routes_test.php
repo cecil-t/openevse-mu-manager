@@ -80,6 +80,7 @@ list($code, $b) = http('settings.php?s=units', 1);
 ck('Settings > Units has no personal notifications UI', $code === 200 && strpos($b, 'Your notifications') === false && strpos($b, 'unit.php?unitid=4#yn') === false);
 list($code, $b) = http('settings.php?s=prefs', 1);
 ck('Site settings: outgoing email label, no reminders card', $code === 200 && strpos($b, 'Enable outgoing email for this site') !== false && strpos($b, 'id="rem"') === false);
+ck('Site settings: offline-after inputs use row2n half-width class', $code === 200 && strpos($b, 'Consider a charger offline after') !== false && strpos($b, 'row2 row2n') !== false && strpos($b, 'name="heartbeat_val"') !== false);
 list($code, , $loc) = http('settings.php?s=link', 1);
 ck('old link tab redirects into Users', $code === 303 && strpos($loc, 's=users') !== false);
 

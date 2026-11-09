@@ -303,6 +303,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 .set label.in{display:inline-block;margin:4px 14px 2px 0;font-weight:normal}
 .set input[type=text],.set input[type=email],.set input[type=password],.set input[type=number],.set input[type=time],.set input[type=url],.set select{width:100%;box-sizing:border-box;font-size:16px;padding:5px 6px;border:1px solid #bbb;border-radius:4px;background:#fff}
 @media screen and (min-width:700px){.set{container-type:inline-size}.set input:not([type=checkbox]):not([type=radio]),.set select,.set textarea,.set .row2,.set .emrow{max-width:50vw;max-width:calc(50cqw - 40px)}}   /* desktop, all tabs: no field past the middle of the screen */
+@media screen and (min-width:700px){.set .row2.row2n{max-width:calc(25cqw - 20px)}}   /* heartbeat value+unit: half the usual .row2 desktop width */
 .set input[type=checkbox],.set input[type=radio]{width:18px;height:18px;vertical-align:-3px;margin:0 5px 0 0}
 .set .row2{display:flex;gap:8px}.set .row2>div{flex:1 1 0;min-width:0}
 .set .note{color:#666;margin:4px 0}
@@ -498,7 +499,7 @@ if ($sec === 'prefs') {
 	<label class="in"><input type="checkbox" name="notify_on"<?=chk($S['notify_on'] === '1')?>>Enable outgoing email for this site</label>
 	<div class="note">This is the site-wide gate: when it is off, nothing is emailed to anyone. Each person chooses which emails they want under Account &amp; Prefs.</div>
 	<label>Consider a charger offline after</label>
-	<div class="row2"><div><input type="number" name="heartbeat_val" min="1" max="10080" value="<?=h($hbv)?>"></div><div><select name="heartbeat_unit"><option value="m"<?=sel($hbu, 'm')?>>minutes</option><option value="h"<?=sel($hbu, 'h')?>>hours</option></select></div></div>
+	<div class="row2 row2n"><div><input type="number" name="heartbeat_val" min="1" max="10080" value="<?=h($hbv)?>"></div><div><select name="heartbeat_unit"><option value="m"<?=sel($hbu, 'm')?>>minutes</option><option value="h"<?=sel($hbu, 'h')?>>hours</option></select></div></div>
 	<div class="note">Shared definition of offline for everyone. Who is emailed about it is each person's Errors choice under Account &amp; Prefs.</div>
 	<h2>Mail server (SMTP)</h2>
 	<div class="note">Use any mail service you have an account with. Mailjet works well and has a free plan (server in-v3.mailjet.com, port 587, TLS; the username and password are its API key and secret key).</div>

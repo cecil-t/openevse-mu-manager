@@ -123,6 +123,9 @@ ck('notifications.php deleted from app', !is_file("$app/notifications.php"));
 // source guards
 $ss = file_get_contents("$app/settings.php");
 ck('settings source: Site settings tab label, no separate link tab', strpos($ss, "'prefs' => 'Site settings'") !== false && strpos($ss, "'link' => 'View-only link'") === false);
+ck('heartbeat offline row uses half-width desktop class', strpos($ss, 'row2 row2n') !== false && strpos($ss, 'name="heartbeat_val"') !== false && preg_match('/row2 row2n[^>]*>\s*<div><input type="number" name="heartbeat_val"/', $ss));
+ck('row2n desktop max-width is half of usual row2 cap', strpos($ss, '.set .row2.row2n{max-width:calc(25cqw - 20px)}') !== false && strpos($ss, '.set .row2,.set .emrow{max-width:50vw;max-width:calc(50cqw - 40px)}') !== false);
+ck('other Site settings row2s stay full usual width (no row2n)', substr_count($ss, 'class="row2"') >= 1 && strpos($ss, 'row2 row2n') !== false && substr_count($ss, 'row2 row2n') === 1);
 ck('settings source: Users do not POST n_sessions', !preg_match('/user_save[\s\S]*n_sessions/', $ss) || strpos($ss, 'Do not touch n_errors') !== false);
 
 proc_terminate($srv); proc_close($srv); exec('rm -rf ' . escapeshellarg($s));
