@@ -170,6 +170,7 @@ $rid_dup = (int)$c->query("SELECT id FROM reminders WHERE user_id = 2 AND unit_i
 list($code, , $loc) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$rid_dup, 'unit' => '4', 'at' => '11:30', 'enabled' => ''));
 ck('save existing dupe row (self) still ok', strpos(urldecode($loc), 'Reminder saved') !== false);
 /* helper lock path: BEGIN IMMEDIATE used */
+ck('notifier selects owned reminders by existence not enabled=1', strpos(file_get_contents("$app/collector/notifier.php"), 'user_id IS NOT NULL') !== false && strpos(file_get_contents("$app/collector/notifier.php"), "SELECT * FROM reminders WHERE enabled = 1") !== false);
 ck('oev_reminder_write uses BEGIN IMMEDIATE', strpos(file_get_contents("$app/settings_lib.php"), 'BEGIN IMMEDIATE') !== false && strpos(file_get_contents("$app/settings_lib.php"), 'function oev_reminder_write') !== false);
 ck('norm 9:05 -> 09:05', oev_rem_norm_time('9:05') === '09:05' && oev_rem_norm_time('09:05') === '09:05' && oev_rem_norm_time('bad') === null);
 

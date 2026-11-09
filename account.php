@@ -72,15 +72,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$st = $db->prepare('SELECT id, loadgroupid, name FROM evses WHERE id = ?'); $st->execute(array($uid)); $unit = $st->fetch(PDO::FETCH_ASSOC);
 		if (!$unit || !oev_unit_visible($unit)) $go('Pick a charger you can see.', $anchor($uid));
 		$t = (string)($_POST['at'] ?? '');
-		$en = isset($_POST['enabled']) ? 1 : 0;
 		if ($a === 'rem_add') {
 			list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, 0);
 			if ($ok) $rmsg = 'Reminder added. It emails only ' . $me['email'] . '.';
 			$go($rmsg, $anchor((int)$au));
 		}
-		/* rem_save: keep the reminder on its unit (no charger move); ownership + dupe check under lock */
+		/* rem_save: keep the reminder on its unit (no charger move); ownership + dupe check under lock; existence=on */
 		$rid = (int)($_POST['id'] ?? 0);
-		list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, $en, $rid);
+		list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, $rid);
 		$go($rmsg, $anchor((int)$au));
 	}
 }
@@ -126,6 +125,8 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .yn-row .yn label{display:block;margin:0 0 2px 0;font-size:13px;color:#333}
 .ac .yn-row .yn select{display:block;width:100%;max-width:140px;box-sizing:border-box;font-size:15px;padding:4px 6px}
 .ac .yn-row .yn.yn-def select{color:#888}
+.ac .yn-row .yn select option[value=inherit]{color:#888}
+.ac .yn-row .yn select option[value=on],.ac .yn-row .yn select option[value=off]{color:#222}
 .ac .yn-row .ynsave{flex:0 0 auto;margin:0 0 1px 0}
 .ac .yn-row .ynsave button{margin:0;padding:4px 12px;font-size:15px}
 .ac .yn-rem{margin-top:8px;padding-top:8px;border-top:1px solid #eee}

@@ -55,22 +55,15 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		if (($c['mode'] ?? '') === 'on' || ($c['mode'] ?? '') === 'off') $bit = '<b>' . $bit . '</b>';
 		$bits[] = $bit;
 	}
-	// Reminder summary: show configured time(s); never claim mail when disabled / account gate / site email off.
-	$en = array(); $dis = array();
-	foreach ($rems as $r) {
-		$lab = unp_rem_time_label($r['at_time'] ?? '');
-		if (!empty($r['enabled'])) $en[] = $lab; else $dis[] = $lab;
-	}
-	if (!$en && !$dis) {
+	// Reminder summary: existence = on; no per-row off. Account / site email gates annotate.
+	$labs = array();
+	foreach ($rems as $r) $labs[] = unp_rem_time_label($r['at_time'] ?? '');
+	if (!$labs) {
 		$rbit = $e('Reminder Off');
-	} elseif ($en) {
-		$txt = (count($en) === 1 ? 'Reminder ' : 'Reminders ') . implode(', ', $en);
+	} else {
+		$txt = (count($labs) === 1 ? 'Reminder ' : 'Reminders ') . implode(', ', $labs);
 		if (!$acct_rem_on) $txt .= ' (account off)';
 		elseif (!$master_on) $txt .= ' (email off)';
-		$rbit = '<b>' . $e($txt) . '</b>';   // configured enabled reminder(s)
-	} else {
-		// rows exist but all disabled — keep time visible, mark off (not mailing)
-		$txt = (count($dis) === 1 ? 'Reminder ' : 'Reminders ') . implode(', ', $dis) . ' (off)';
 		$rbit = '<b>' . $e($txt) . '</b>';
 	}
 	$bits[] = $rbit;
@@ -108,7 +101,6 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 			. '<input type="hidden" name="unit" value="' . $uid . '">'
 			. '<div class="rem-f"><label for="remat' . $rid . '">Plug in by</label>'
 			. '<input type="time" id="remat' . $rid . '" name="at" value="' . $e($r['at_time']) . '"></div>'
-			. '<label class="in"><input type="checkbox" name="enabled"' . (!empty($r['enabled']) ? ' checked' : '') . '>On</label>'
 			. '<button type="submit" class="go">Save</button>'
 			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(' . $cfm . ')">Remove</button>'
 			. '</form>';

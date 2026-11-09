@@ -4,6 +4,7 @@
 $f = 0; $n = 0; function ck($m, $ok){ global $f, $n; $n++; if (!$ok) $f++; echo ($ok ? 'PASS ' : 'FAIL ') . $m . "\n"; }
 
 $src = file_get_contents(__DIR__ . '/../collector/notifier.php');
+ck('source: owned reminders by existence (user_id set)', strpos($src, 'user_id IS NOT NULL') !== false);
 ck('source: daily key includes reminder id', strpos($src, "\$dk = 'rem' . \$rm['id'] . '|' . date('Ymd')") !== false);
 ck('source: notify key includes reminder id', strpos($src, "notify('reminders', \$id, 'rem' . \$rm['id'] . date('Ymd')") !== false);
 ck('source: 15-minute window is +900s after that row\'s time', strpos($src, '$now >= $t + 900') !== false);

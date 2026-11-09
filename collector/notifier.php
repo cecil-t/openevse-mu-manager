@@ -161,7 +161,11 @@ ns_summaries($sdb, $users, $units, $st, $now, $on, $nsend('sessions'), 'ns_save_
 /* ---- plug-in reminders (one owner login; mail only to that login's account email) ---- */
 $uby = array(); foreach ($users as $u) $uby[(int)$u['id']] = $u;
 $have_own = oev_reminders_have_owner($odb);
-foreach ($odb->query('SELECT * FROM reminders WHERE enabled = 1')->fetchAll() as $rm) {
+/* Owned rows: existence = active (enabled column unused). Unowned/unmatched stay silent. Pre-owner fallback: enabled=1 only. */
+$rem_sql = $have_own
+	? "SELECT * FROM reminders WHERE user_id IS NOT NULL AND CAST(user_id AS TEXT) != ''"
+	: 'SELECT * FROM reminders WHERE enabled = 1';
+foreach ($odb->query($rem_sql)->fetchAll() as $rm) {
 	$id = (int)$rm['unit_id']; if (!preg_match('/^(\d{1,2}):(\d{2})$/', (string)$rm['at_time'], $m) || empty($units[$id]['enabled'])) continue;
 	// owned reminders only (legacy unmatched rows stay silent until claimed)
 	$oid = $have_own ? ($rm['user_id'] === null || $rm['user_id'] === '' ? 0 : (int)$rm['user_id']) : 0;

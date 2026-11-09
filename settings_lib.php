@@ -333,7 +333,7 @@ function oev_rem_norm_time($t){
 // BEGIN IMMEDIATE so concurrent posts cannot race past the check. Existing duplicate
 // rows are left alone — only blocks creating/changing into a duplicate.
 // Returns array(ok, msg, at_norm, anchor_unit_id).
-function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled, $rid = 0){
+function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled = 1, $rid = 0){  // $enabled ignored; owned rows always enabled=1
 	$user_id = (int)$user_id; $unit_id = (int)$unit_id; $rid = (int)$rid;
 	$norm = oev_rem_norm_time($at);
 	if ($norm === null) return array(false, 'Pick a time for the reminder.', null, $unit_id);
@@ -367,9 +367,10 @@ function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled, $rid = 0){
 				}
 			}
 		}
+		/* Existence = on for owned rows; always persist enabled=1 (ignore forged enabled=0). */
 		if ($rid > 0) {
-			$db->prepare('UPDATE reminders SET at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
-				->execute(array($norm, $enabled ? 1 : 0, '', $rid, $user_id));
+			$db->prepare('UPDATE reminders SET at_time = ?, enabled = 1, extra_to = ? WHERE id = ? AND user_id = ?')
+				->execute(array($norm, '', $rid, $user_id));
 			$msg = 'Reminder saved.';
 		} else {
 			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')
