@@ -240,6 +240,20 @@ function sess_update_row($db, $table, $key, $id, $u){
 	$vals[] = $id;
 	$db->prepare("UPDATE $table SET " . implode(', ', $cols) . " WHERE $key = ?")->execute($vals);
 }
+// One lifetime fault counter (GFCI / no-ground / stuck relay): monotonic. $stored = unit_state count
+// (null = none yet), $read = this reading (null = not reported), $uptime = WiFi module uptime (s, v5)
+// or null. Returns array(count to keep or null, trips to log: 0 or the rise above the stored count).
+function sess_fault_count_next($stored, $read, $uptime = null){
+	if ($read === null || $read < 0) return array($stored === null ? null : (int)$stored, 0);
+	$read = (int)$read;
+	if ($stored === null) {
+		if ($read === 0 && $uptime !== null && $uptime < 300) return array(null, 0);   // just restarted: maybe not read yet
+		return array($read, 0);   // starting count: older trips are not new
+	}
+	$stored = (int)$stored;
+	if ($read <= $stored) return array($stored, 0);   // 0 / stale / lower: never goes down
+	return array($read, ($read - $stored < 50) ? $read - $stored : 0);   // a jump of 50+ is not believable as new trips: re-baseline quietly
+}
 function sess_event($db, $unit, $sid, $segid, $ts, $kind, $detail, $from, $to, $temp, $reason){
 	$db->prepare("INSERT INTO events (unit_id, unit_name, session_id, segment_id, ts, kind, detail, from_val, to_val, temp_c, reason, srssi)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,(SELECT srssi FROM unit_state WHERE unit_id = ?))")
@@ -392,13 +406,16 @@ function sess_process($db, $unit, $r, $now){
 	if ($r['state'] >= 4 && $r['state'] <= 11 && (int)$us['state'] !== $r['state'] && !$db->query("SELECT 1 FROM events WHERE unit_id = $uid AND kind = 'fault' AND to_val = {$r['state']} AND ts BETWEEN " . ($now - 180) . " AND $now")->fetchColumn()) {
 		sess_event($db, $unit, $sid, $segid, $now, 'fault', evse_state_text($r['state']), $us['state'], $r['state'], $temp, $r['state'] == 10 ? 'thermal' : 'fault');
 	}
+	// Lifetime trip counters only ever go up. A WiFi module that has just restarted (or has not read
+	// the controller yet) reports 0 / a stale lower number for a while, so a lower reading is ignored
+	// and never lowers the stored count; only a rise above the highest real count is a new trip.
+	// First reading: becomes the starting count, no event (the past trips are not new) - except a 0
+	// in the first 5 minutes after a WiFi restart, which may just be "not read yet" (sess_fault_count_next).
 	foreach (array('gfci'=>'GFCI trip', 'nognd'=>'No-ground trip', 'stuck'=>'Stuck-relay trip') as $k => $label) {
 		$col = $k . '_count';
-		if ($r[$k] === null) continue;
-		if ($us[$col] !== null && $r[$k] > (int)$us[$col] && $r[$k] - (int)$us[$col] < 50) {
-			sess_event($db, $unit, $sid, $segid, $now, 'fault_count', "$label count +" . ($r[$k] - (int)$us[$col]) . " (now {$r[$k]})", (int)$us[$col], $r[$k], $temp, 'fault');
-		}
-		$set[$col] = $r[$k];
+		list($nv, $inc) = sess_fault_count_next($us[$col], $r[$k], $r['uptime']);
+		if ($inc) sess_event($db, $unit, $sid, $segid, $now, 'fault_count', "$label count +$inc (now $nv)", (int)$us[$col], $nv, $temp, 'fault');
+		if ($nv !== null && ($us[$col] === null || $nv !== (int)$us[$col])) $set[$col] = $nv;
 	}
 	// ---- thermal threshold crossing
 	if ($temp !== null && $us['temp_c'] !== null) {
