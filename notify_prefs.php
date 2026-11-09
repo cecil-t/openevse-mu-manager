@@ -96,7 +96,7 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 	if (!$master_on) $o .= '<div class="note">Outgoing email is off for the whole site, so nothing is sent right now.</div>';
 	// Plug-in reminder(s) for this charger only (no charger selector).
 	$o .= '<div class="yn-rem"><div class="note">Plug-in reminder: if nothing is plugged in at or shortly after this time, '
-		. 'you get one email for <b>this</b> reminder that day (a later reminder on this charger can still email separately). '
+		. 'you get one email for <b>each</b> reminder that day (a later reminder on this charger can still email separately). '
 		. 'Goes only to your account email. Needs &ldquo;Plug-in reminders&rdquo; on in your defaults above'
 		. ($acct_rem_on ? '' : ' <b>(currently off — will not email)</b>') . '.</div>';
 	foreach ($rems as $r) {
