@@ -208,10 +208,21 @@ function oev_userbar(){
 		$p = array(); try { $p = oev_sys_problems(); } catch (Throwable $x) {}
 		$sys = '<a href="settings.php?s=system">System status <span class="' . ($p ? 'avbad">' . count($p) . ' problem' . (count($p) > 1 ? 's' : '') : 'avok">OK') . '</span></a>';
 	}
+	$sep = '<hr class="avsep">';
 	$o = '<div class="av"><button type="button" class="avb" aria-haspopup="true" aria-expanded="false" title="' . $e(oev_user_name($u)) . '" onclick="oevAv(event)"><span class="avc">' . $e(oev_initials($u)) . '</span></button>'
 		. (!empty($p) ? '<span class="avdot" title="System problem: see System status"></span>' : '')
 		. '<div class="avm" hidden><div class="avn">' . $e(oev_user_name($u)) . '<span>' . $e($u['email']) . '</span></div>'
-		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a><a href="account.php">Account Preferences</a><a href="help.php">Help</a>' . ($adm ? '<a href="settings.php">Settings</a><a href="unitlist.php">Unit List / Info</a>' . $sys : '')
+		/* Group: navigation */
+		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a><a href="diagnostics.php">Diagnostics</a>'
+		. ($adm ? '<a href="unitlist.php">Unit List / Info</a>' : '')
+		. $sep
+		/* Group: account / config */
+		. ($adm ? '<a href="settings.php">Settings</a>' : '')
+		. '<a href="account.php">Account Preferences</a>'
+		. $sep
+		/* Group: status / help; Log out keeps its own form top border */
+		. ($adm ? $sys : '')
+		. '<a href="help.php">Help</a>'
 		. '<form method="post" action="account.php">' . oev_csrf_field() . '<button type="submit" name="a" value="logout">Log out</button></form></div></div>'
 		. '<script>function oevAv(ev){ ev.stopPropagation(); var b = ev.currentTarget, m = b.parentNode.querySelector(".avm"); m.hidden = !m.hidden; b.setAttribute("aria-expanded", m.hidden ? "false" : "true"); }'
 		. 'document.addEventListener("click", function(ev){ document.querySelectorAll(".av .avm").forEach(function(m){ if (!m.hidden && !m.contains(ev.target)) { m.hidden = true; m.parentNode.querySelector(".avb").setAttribute("aria-expanded", "false"); } }); });'

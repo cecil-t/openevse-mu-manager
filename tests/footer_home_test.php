@@ -34,7 +34,7 @@ ck('login logged-in shortcut says Home', strpos($login, 'Go to the home page') =
 // public safety: helper never emits view= token
 ck('footer href is ./ only (public cookie path)', strpos($h, 'view=') === false && strpos($h, 'href="./"') !== false);
 
-foreach (array('account.php','settings.php','help.php','unitlist.php') as $pg) {
+foreach (array('account.php','settings.php','help.php','unitlist.php','diagnostics.php') as $pg) {
 	$src = file_get_contents("$app/$pg");
 	ck("$pg footer after content card, before container close", (bool)preg_match('#</div>\s*<\?=oev_home_footer\(\)\?>\s*</div>\s*</body>#', $src));
 }
