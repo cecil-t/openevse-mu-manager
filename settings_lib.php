@@ -322,3 +322,64 @@ function oev_reminders_unresolved($db){
 	if (!oev_reminders_have_owner($db)) return array();
 	return $db->query('SELECT * FROM reminders WHERE user_id IS NULL ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
 }
+
+// Normalize plug-in reminder clock to HH:MM (zero-padded). Null if not a valid time.
+function oev_rem_norm_time($t){
+	if (!is_string($t) || !preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $t, $m)) return null;
+	return sprintf('%02d:%02d', (int)$m[1], (int)$m[2]);
+}
+// Write one owned reminder (add when $rid=0, else update). Duplicate identity =
+// same user_id + unit_id + normalized at_time (enabled ignored). Excludes self on update.
+// BEGIN IMMEDIATE so concurrent posts cannot race past the check. Existing duplicate
+// rows are left alone — only blocks creating/changing into a duplicate.
+// Returns array(ok, msg, at_norm, anchor_unit_id).
+function oev_reminder_write($db, $user_id, $unit_id, $at, $enabled, $rid = 0){
+	$user_id = (int)$user_id; $unit_id = (int)$unit_id; $rid = (int)$rid;
+	$norm = oev_rem_norm_time($at);
+	if ($norm === null) return array(false, 'Pick a time for the reminder.', null, $unit_id);
+	$own = !$db->inTransaction();
+	if ($own) $db->exec('BEGIN IMMEDIATE');
+	try {
+		if ($rid > 0) {
+			$st = $db->prepare('SELECT id, unit_id, at_time FROM reminders WHERE id = ? AND user_id = ?');
+			$st->execute(array($rid, $user_id));
+			$row = $st->fetch(PDO::FETCH_ASSOC);
+			if (!$row) { if ($own) $db->exec('ROLLBACK'); return array(false, 'Reminder not found.', $norm, $unit_id); }
+			if ((int)$row['unit_id'] !== $unit_id) {
+				if ($own) $db->exec('ROLLBACK');
+				return array(false, 'That reminder belongs to another charger.', $norm, (int)$row['unit_id']);
+			}
+		}
+		/* On update, keeping the same normalized time is always ok (even if sibling legacy dupes exist). */
+		$cur_norm = null;
+		if ($rid > 0) $cur_norm = oev_rem_norm_time($row['at_time']);
+		if (!($rid > 0 && $cur_norm !== null && $cur_norm === $norm)) {
+			$st = $db->prepare('SELECT id, at_time FROM reminders WHERE user_id = ? AND unit_id = ?');
+			$st->execute(array($user_id, $unit_id));
+			foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+				if ($rid > 0 && (int)$r['id'] === $rid) continue;
+				if (oev_rem_norm_time($r['at_time']) === $norm) {
+					if ($own) $db->exec('ROLLBACK');
+					$h = (int)substr($norm, 0, 2); $min = substr($norm, 3, 2);
+					$ap = $h >= 12 ? 'PM' : 'AM'; $h12 = $h % 12; if ($h12 === 0) $h12 = 12;
+					$lab = $h12 . ':' . $min . ' ' . $ap;
+					return array(false, 'You already have a plug-in reminder at ' . $lab . ' for this charger.', $norm, $unit_id);
+				}
+			}
+		}
+		if ($rid > 0) {
+			$db->prepare('UPDATE reminders SET at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
+				->execute(array($norm, $enabled ? 1 : 0, '', $rid, $user_id));
+			$msg = 'Reminder saved.';
+		} else {
+			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')
+				->execute(array($unit_id, $norm, '', $user_id));
+			$msg = 'Reminder added.';
+		}
+		if ($own) $db->exec('COMMIT');
+		return array(true, $msg, $norm, $unit_id);
+	} catch (Throwable $x) {
+		if ($own && $db->inTransaction()) $db->exec('ROLLBACK');
+		throw $x;
+	}
+}

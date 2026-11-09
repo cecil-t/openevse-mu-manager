@@ -72,20 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$st = $db->prepare('SELECT id, loadgroupid, name FROM evses WHERE id = ?'); $st->execute(array($uid)); $unit = $st->fetch(PDO::FETCH_ASSOC);
 		if (!$unit || !oev_unit_visible($unit)) $go('Pick a charger you can see.', $anchor($uid));
 		$t = (string)($_POST['at'] ?? '');
-		if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $t)) $go('Pick a time for the reminder.', $anchor($uid));
 		$en = isset($_POST['enabled']) ? 1 : 0;
 		if ($a === 'rem_add') {
-			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')->execute(array($uid, $t, '', (int)$me['id']));
-			$go('Reminder added. It emails only ' . $me['email'] . '.', $anchor($uid));
+			list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, 1, 0);
+			if ($ok) $rmsg = 'Reminder added. It emails only ' . $me['email'] . '.';
+			$go($rmsg, $anchor((int)$au));
 		}
-		/* rem_save: keep the reminder on its unit (no charger move); ownership required */
+		/* rem_save: keep the reminder on its unit (no charger move); ownership + dupe check under lock */
 		$rid = (int)($_POST['id'] ?? 0);
-		$st = $db->prepare('SELECT id, unit_id FROM reminders WHERE id = ? AND user_id = ?'); $st->execute(array($rid, (int)$me['id'])); $row = $st->fetch(PDO::FETCH_ASSOC);
-		if (!$row) $go('Reminder not found.', $anchor($uid));
-		if ((int)$row['unit_id'] !== $uid) $go('That reminder belongs to another charger.', $anchor((int)$row['unit_id']));
-		$db->prepare('UPDATE reminders SET at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
-			->execute(array($t, $en, '', $rid, (int)$me['id']));
-		$go('Reminder saved.', $anchor($uid));
+		list($ok, $rmsg, , $au) = oev_reminder_write($db, (int)$me['id'], $uid, $t, $en, $rid);
+		$go($rmsg, $anchor((int)$au));
 	}
 }
 if (isset($_GET['saved'])) $msg = 'Saved.';

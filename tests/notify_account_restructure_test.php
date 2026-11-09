@@ -136,6 +136,43 @@ $rid3 = (int)$c->query("SELECT id FROM reminders WHERE at_time = '17:00' AND use
 /* no auth as eve — use alice to try delete with wrong ownership already covered; cross-user via raw SQL id as viewer2 cannot see if we had tok for eve — skip if no token. Ownership: delete as alice of own works above. */
 list($code, , $loc) = http('account.php', 1, array('a' => 'rem_delete', 'id' => (string)$rid3));
 ck('admin cannot delete another login reminder by id', (int)$c->query('SELECT count(*) FROM reminders WHERE id = ' . $rid3)->fetchColumn() === 1);
+
+/* ---- duplicate prevention: same owner+charger+normalized time (enabled ignored) ---- */
+$before = (int)$c->query('SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = \'20:15\'')->fetchColumn();
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '20:15'));
+$after = (int)$c->query('SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = \'20:15\'')->fetchColumn();
+ck('rem_add duplicate same time refused; count unchanged', $code === 303 && $after === $before && strpos(urldecode($loc), 'already have a plug-in reminder') !== false && strpos($loc, '#notify-u4') !== false && strpos(urldecode($loc), 'Reminder added') === false);
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '9:00'));
+ck('rem_add 9:00 ok (normalized)', $code === 303 && strpos(urldecode($loc), 'Reminder added') !== false && (int)$c->query("SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '09:00'")->fetchColumn() === 1);
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '09:00'));
+ck('rem_add 09:00 collides with 9:00 norm', $code === 303 && strpos(urldecode($loc), 'already have a plug-in reminder') !== false && (int)$c->query("SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '09:00'")->fetchColumn() === 1);
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '10:00', '', 0, 2)");
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '10:00'));
+ck('rem_add blocked by disabled twin', strpos(urldecode($loc), 'already have a plug-in reminder') !== false && (int)$c->query("SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '10:00'")->fetchColumn() === 1);
+$rid_self = (int)$c->query("SELECT id FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '20:15'")->fetchColumn();
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$rid_self, 'unit' => '4', 'at' => '20:15', 'enabled' => 'on'));
+ck('rem_save self same time ok', $code === 303 && strpos(urldecode($loc), 'Reminder saved') !== false && strpos($loc, '#notify-u4') !== false);
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$rid_self, 'unit' => '4', 'at' => '09:00', 'enabled' => 'on'));
+ck('rem_save into other row time refused; self unchanged', strpos(urldecode($loc), 'already have a plug-in reminder') !== false && (string)$c->query('SELECT at_time FROM reminders WHERE id = ' . $rid_self)->fetchColumn() === '20:15');
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '5', 'at' => '20:15'));
+ck('rem_add same time other charger allowed', $code === 303 && strpos(urldecode($loc), 'Reminder added') !== false && strpos($loc, '#notify-u5') !== false);
+$c->exec("INSERT INTO users (id, email, pass_hash, role, scope_all, n_reminders) VALUES (10, 'other@example.invalid', 'x', 'viewer', 1, 1)");
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '20:15', '', 1, 10)");
+ck('other user same charger+time preserved (no collision across owners)', (int)$c->query("SELECT count(*) FROM reminders WHERE unit_id = 4 AND at_time = '20:15'")->fetchColumn() >= 2);
+/* existing duplicate rows do not break save of a third distinct time or delete */
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '11:30', '', 1, 2)");
+$c->exec("INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (4, '11:30', '', 1, 2)");
+$dupn = (int)$c->query("SELECT count(*) FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '11:30'")->fetchColumn();
+ck('seeded existing dupes left in place', $dupn === 2);
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_add', 'unit' => '4', 'at' => '12:45'));
+ck('add distinct time still works with existing dupes present', strpos(urldecode($loc), 'Reminder added') !== false);
+$rid_dup = (int)$c->query("SELECT id FROM reminders WHERE user_id = 2 AND unit_id = 4 AND at_time = '11:30' ORDER BY id LIMIT 1")->fetchColumn();
+list($code, , $loc) = http('account.php', 2, array('a' => 'rem_save', 'id' => (string)$rid_dup, 'unit' => '4', 'at' => '11:30', 'enabled' => ''));
+ck('save existing dupe row (self) still ok', strpos(urldecode($loc), 'Reminder saved') !== false);
+/* helper lock path: BEGIN IMMEDIATE used */
+ck('oev_reminder_write uses BEGIN IMMEDIATE', strpos(file_get_contents("$app/settings_lib.php"), 'BEGIN IMMEDIATE') !== false && strpos(file_get_contents("$app/settings_lib.php"), 'function oev_reminder_write') !== false);
+ck('norm 9:05 -> 09:05', oev_rem_norm_time('9:05') === '09:05' && oev_rem_norm_time('09:05') === '09:05' && oev_rem_norm_time('bad') === null);
+
 ck('unit.php source: no personal alerts/notifications UI', strpos(file_get_contents("$app/unit.php"), 'Your alerts') === false && strpos(file_get_contents("$app/unit.php"), 'Your notifications') === false && strpos(file_get_contents("$app/unit.php"), 'notify_prefs.php') === false);
 ck('settings Units has no personal Your notifications link', strpos(file_get_contents("$app/settings.php"), 'Your notifications for') === false);
 ck('notifications.php deleted from app', !is_file("$app/notifications.php"));
