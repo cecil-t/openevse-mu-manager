@@ -474,5 +474,6 @@ $dropcount = $db->query("SELECT unit_name, sum(kind = 'reach') n, sum(kind = 're
 <?php } ?>
 <p class="sm" style="margin-top:4px">push = seconds since the unit's last push; dBm = WiFi signal (v5 units only).</p></div>
 <div class="sec"><p class="sm"><a href="sessions.php?view=months">Monthly temperatures, thermal events &amp; drop-offs</a></p>
-<p class="sm">History starts <?php $hs = (int)$db->query('SELECT min(plug_in_at) FROM sessions')->fetchColumn(); echo $hs ? oev_v(date('M j, Y', $hs)) : 'with the first session'; ?>. kW = amps &times; <?=oev_v(EVSE_VOLTS_L2 . ' V')?> on L2, <?=oev_v(EVSE_VOLTS_L1 . ' V')?> on L1 (assumed), unless a unit has its own voltage sensor (Settings &gt; Units) or override. <a href="./">Back to units</a></p></div>
+<p class="sm">History starts <?php $hs = (int)$db->query('SELECT min(plug_in_at) FROM sessions')->fetchColumn(); echo $hs ? oev_v(date('M j, Y', $hs)) : 'with the first session'; ?>. kW = amps &times; <?=oev_v(EVSE_VOLTS_L2 . ' V')?> on L2, <?=oev_v(EVSE_VOLTS_L1 . ' V')?> on L1 (assumed), unless a unit has its own voltage sensor (Settings &gt; Units) or override.</p></div>
+<?=oev_home_footer()?>
 </div></body></html>

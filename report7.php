@@ -143,7 +143,7 @@ include __DIR__ . '/_head.php';
 @media (min-width:700px){.ulist{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .nav a{margin-right:12px}
 </style>
-<div class="sec nav sm"><a href="./">&larr; Home</a><a href="sessions.php">Session reports</a></div>
+<div class="sec nav sm"><a href="./">Home</a><a href="sessions.php">Session reports</a></div>
 <div class="sec">
 	<h4>Last 7 days, all units</h4>
 	<div class="chips" id="r7chips"></div>

@@ -112,4 +112,5 @@ $warn = function($want){ return '<div class="nm-w">&#9888; ' . h($want) . '</div
 </table></div>
 <div class="nm-foot">* Node: the Emoncms node number this unit posts its data to (normally its unit number).<br>Max A: the Max current setting in MU Manager (Settings &gt; Units). This is the maximum the interface will allow the Pilot to be set to.<br>Pilot: the unit's saved pilot current (not the load balancer's temporary setting).<br>Volatile: the live current in use right now (the pilot setting, or a volatile setting overridden by the load balancer which is not saved; a reboot clears it).<br>Read only: nothing is changed on the units.</div>
 </div>
+<?=oev_home_footer()?>
 </div></body></html>

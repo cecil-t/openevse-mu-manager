@@ -218,3 +218,12 @@ function oev_userbar(){
 		. 'document.addEventListener("keydown", function(ev){ if (ev.key === "Escape") document.querySelectorAll(".av .avm").forEach(function(m){ m.hidden = true; }); });</script>';
 	return $o;
 }
+
+// Simple page-end Home shortcut (no back-arrow). Empty on the home page itself.
+// href="./" keeps the public view-only cookie path; never puts a view token in the URL.
+function oev_home_footer(){
+	$script = basename(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')));
+	if ($script === '' || $script === 'index.php') return '';
+	return '<p class="oev-home"><a href="./">Home</a></p>';
+}
+

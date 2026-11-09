@@ -26,7 +26,7 @@ include __DIR__ . '/_head.php';
 </style>
 <div class="slidebox lg">
 <?php if ($u && $u['role'] !== 'public') { ?>
-<p>You are logged in as <?=h($u['email'])?>.</p><p><a href="./">Go to the home page</a> &middot; <a href="account.php">Account</a></p>
+<p>You are logged in as <?=h($u['email'])?>.</p><p><a href="./">Home</a> &middot; <a href="account.php">Account Preferences</a></p>
 <?php } else { ?>
 <?php if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>
 <form method="post" action="login.php"><?=oev_csrf_field()?><input type="hidden" name="next" value="<?=h($next)?>">

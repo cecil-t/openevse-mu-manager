@@ -154,5 +154,5 @@ $NS = oev_host_suggest($NU); $NV = array_values(array_filter($NU, 'oev_unit_visi
 </ul>
 </div>
 <?php } ?>
-<p><a href="./">&larr; Home</a><?=oev_is_admin() ? ' &middot; <a href="settings.php">Settings</a>' : ''?></p>
+<?=oev_home_footer()?>
 </div></div></body></html>

@@ -429,4 +429,5 @@ document.getElementById('b_speak').onclick = function(){
 </script>
 </div>
 <?=evse_rapi_stats_comment()?>
+<?=oev_home_footer()?>
 </body></html>

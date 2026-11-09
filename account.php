@@ -186,7 +186,7 @@ foreach ($rems as $r) $rems_by[(int)$r['unit_id']][] = $r;
 $acct_rem = !empty($me['n_reminders']);
 if ($have && $units) { ?>
 <div class="note" style="margin:4px 2px 0">Per charger (tap to edit): <b>Default</b> follows your checkboxes above.
-Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stop while still plugged in (not load-balancer pauses).
+Errors = faults/offline; Reboots = charger reboots; Session summary = when unplugged; Charging stopped = stopped while still plugged in.
 Plug-in reminders live on each charger below (your account email only).</div>
 <?php foreach ($units as $id => $u) echo unp_form_html($id, $u['name'], $view[$id], $CS, $master, $rems_by[$id] ?? array(), $acct_rem); ?>
 <script>(function(){var h=location.hash;if(h&&h.indexOf('#notify-u')===0){var el=document.getElementById(h.slice(1));if(el&&el.tagName==='DETAILS'){el.open=true;try{el.scrollIntoView({block:'nearest'})}catch(e){el.scrollIntoView()}}}})();</script>
@@ -200,5 +200,5 @@ Plug-in reminders live on each charger below (your account email only).</div>
 
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
-<p><a href="./">&larr; Home</a><?=oev_is_admin() ? ' &middot; <a href="settings.php">Settings</a>' : ''?> &middot; <a href="help.php">Help</a></p>
+<?=oev_home_footer()?>
 </div></div></body></html>

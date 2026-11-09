@@ -63,7 +63,7 @@ $units = array(); if (is_array($hb)) foreach ((array)$hb['groups'] as $g) foreac
 <input id="ft" type="search" placeholder="search"></div>
 <div class="log" id="log"><?=lbs_log_html(lbs_log_lines())?></div>
 </details>
-<div class="foot"><span id="lbdot" class="lbdot <?=is_array($hb) && $hb['fresh'] ? 'g' : 'r'?>"></span><span id="asof">as of <?=date('H:i:s')?></span><span style="margin-left:auto"><a href="./">Back to units</a></span></div>
+<div class="foot"><span id="lbdot" class="lbdot <?=is_array($hb) && $hb['fresh'] ? 'g' : 'r'?>"></span><span id="asof">as of <?=date('H:i:s')?></span><span style="margin-left:auto"><a href="./">Home</a></span></div>
 </div>
 </div></div>
 <script>

@@ -587,5 +587,5 @@ if ($sec === 'system') {
 	echo '</div>';
 }
 ?>
-<p><a href="./">&larr; Home</a></p>
+<?=oev_home_footer()?>
 </div></div></body></html>
