@@ -409,8 +409,8 @@ ck('reminder summary: multiple enabled times listed', strpos($m[1], '<b>Reminder
 ck('reminder controls: compact time max-width in account CSS', strpos(file_get_contents(__DIR__ . '/../account.php'), 'input[type=time]{width:auto;max-width:140px') !== false);
 ck('account per-charger summary uses desktop grid + mobile inline wrap',
 	($ac = file_get_contents(__DIR__ . '/../account.php')) !== false
-	&& strpos($ac, 'grid-template-columns:1.1em') !== false
-	&& strpos($ac, '12.5em') !== false
+	&& strpos($ac, 'grid-template-columns:1em') !== false
+	&& strpos($ac, '10.8em') !== false && strpos($ac, 'minmax(auto,1fr)') !== false
 	&& strpos($ac, 'max-width:600px') !== false
 	&& strpos($ac, 'ync-b') !== false);
 $up = file_get_contents(__DIR__ . '/../unit.php');

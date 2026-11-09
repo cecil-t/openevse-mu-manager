@@ -113,15 +113,15 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 .ac .err{background:#fde3e3;border:1px solid #e99;border-radius:6px;padding:6px 9px;color:#a11;font-weight:normal}
 .ac .note{color:#666;font-size:14px;margin:4px 0}
 .ac .nsub{margin:-2px 0 6px 22px;font-size:13px}
-.ac .ync{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 8px;margin:8px 0;box-sizing:border-box}
-/* Desktop: chevron + fixed name + 5 aligned status columns (Errors/Reboots/Summary/Stopped/Reminder) */
-.ac .ync>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:1.1em 12.5em 5.8em 6.4em 6.6em 6.4em minmax(7.5em,1fr);column-gap:10px;row-gap:2px;align-items:baseline;color:#333}
+.ac .ync{background:#fff;border:1px solid #ccc;border-radius:8px;padding:6px 8px;margin:8px 0;box-sizing:border-box;overflow:hidden;max-width:100%}
+/* Desktop: chevron + fixed name + 4 status cols + flexible Reminder (stays inside card) */
+.ac .ync>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:1em 10.8em 5.2em 5.7em 5.9em 5.7em minmax(auto,1fr);column-gap:8px;row-gap:2px;align-items:baseline;color:#333;min-width:0;max-width:100%}
 .ac .ync>summary::-webkit-details-marker{display:none}
 .ac .ync>summary::before{content:"▸";color:#035a5a;font-weight:bold;grid-column:1}
 .ac .ync[open]>summary::before{content:"▾"}
 .ac .ync-name{font-weight:bold;grid-column:2;min-width:0;overflow-wrap:anywhere}
 .ac .ync-b{font-size:13px;color:#666;font-weight:normal;white-space:nowrap;min-width:0}
-.ac .ync-b:last-child{white-space:normal;overflow-wrap:anywhere}  /* Reminder can be long */
+.ac .ync-b:last-child{white-space:normal;overflow-wrap:break-word;word-break:normal;min-width:0}  /* Reminder wraps inside track only if needed */
 .ac .ync-b b{color:#333;font-weight:700}
 @media screen and (max-width:600px){
 	/* Mobile: compact inline wrap — name then bits side by side, not full-width stacks */

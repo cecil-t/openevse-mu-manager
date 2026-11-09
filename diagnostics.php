@@ -50,7 +50,7 @@ form.flt select,form.flt input,form.flt button{font-size:15px;margin:2px 0;max-w
 	.uh-r{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 2px}
 	.uh-n{flex:1 0 100%;white-space:normal;margin:0 0 2px;font-size:14px}
 	.uh-c{display:inline-flex;align-items:center;width:auto;margin:0;padding:2px 7px;border-radius:10px;background:#eee;font-size:12px;text-align:left}
-	.uh-c::before{content:attr(data-l) " ";color:#777;font-weight:400}
+	.uh-c::before{content:attr(data-l);margin-right:.35em;color:#777;font-weight:400}
 	.uh-nz{background:#fde8e8}
 	.uh-z{background:#f0f0f0;color:#999}
 	.uh-w{background:#eee;color:#555}

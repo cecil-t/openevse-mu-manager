@@ -116,6 +116,8 @@ ck('diagnostics Unit health mobile pills are compact inline wrap',
 	strpos($diag, 'flex-wrap:wrap') !== false
 	&& strpos($diag, 'display:inline-flex') !== false
 	&& strpos($diag, 'width:auto') !== false);
+ck('diagnostics Unit health mobile pill label has gap before value',
+	strpos($diag, 'uh-c::before{content:attr(data-l);margin-right:.35em') !== false);
 ck('diagnostics top intro+filters merged into one card',
 	strpos($diag, 'diag-top') !== false
 	&& strpos($diag, 'Faults, thermal events, and WiFi health for each unit') !== false
