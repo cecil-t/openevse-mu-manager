@@ -75,12 +75,6 @@ table.stats td:first-child form.inl button.chip{margin:-1px 0 -1px 8px}
 .slidecontainer:not(#setpilot) .slidebox{width:300px;max-width:calc(100vw - 24px);padding:10px 12px}
 .slidecontainer .slidebox input,.slidecontainer .slidebox select{max-width:100%;box-sizing:border-box;font-size:14px}
 .slidecontainer .slidebox form{margin:4px 0}
-/* Your notifications box: never wider than the screen (popFit's table width is overridden), each choice stacks
-   label / full-width select / "Now: ..." so nothing is cut off on 360-390px phones */
-#setyn .slidebox{box-sizing:border-box;width:calc(100vw - 24px)!important;max-width:340px!important;min-width:0}
-.slidecontainer .slidebox .yn{margin:4px 0 8px}
-.slidecontainer .slidebox .yn select{display:block;width:100%;max-width:100%;min-width:0;margin:2px 0 0}
-.slidecontainer .slidebox .ynnow{display:block;font-size:85%;color:#666;margin-top:1px}
 .slidecontainer .slidebox .pf{display:inline-block;white-space:nowrap;margin:3px 2px}
 .slidecontainer .slidebox .pf input[type=time]{width:7.5em}
 .slidecontainer .slidebox .pf input[type=number]{width:4.5em}
@@ -248,11 +242,6 @@ $clkhl = $cs ? ($cs['clock_fail'] && $e['clock_offset'] !== null && abs($e['cloc
 	?></td></tr><?php } ?>
 	<tr><td>Firmware / <a id="a_wifi" href="javascript:void(0);">WiFi</a></td><td><?=h($e['firmware'])?> &nbsp;/&nbsp; <?=h($e['version'])?> <span class="api"><?=h($e['api'])?></span></td></tr>
 <?php if (!oev_is_public()) { ?><tr><td>Unit Web Admin</td><td class="nw"><?php $uw = nm_web($unit['evseurl']); echo (oev_is_admin() && $uw !== '' && nm_local($_SERVER['REMOTE_ADDR'] ?? '', (string)parse_url($unit['evseurl'], PHP_URL_HOST))) ? '<a href="' . h($uw) . '" target="_blank" rel="noopener noreferrer">' . h($uw) . '</a>' : '<span class="api" title="Admins on the units\' own network only">Unavailable</span>'; ?></td></tr><?php } ?>
-<?php // Your notifications: this login's own emails for this unit (notify_prefs.php saves; any login that sees the unit, never a view-only link)
-$YN = null;
-if (!oev_is_public() && oev_user()) { try { $ydb = oev_db(); if (oev_unit_notify_have($ydb)) $YN = oev_unit_notify_view($ydb, oev_user(), array($unitid => $unit))[$unitid]; } catch (Exception $x) { $YN = null; } }
-if ($YN) { $ynk = oev_unit_notify_kinds(); ?><tr id="yn"><td><a id="a_yn" href="javascript:void(0);">Your notifications</a></td><td><?php
-	$p = array(); foreach ($ynk as $k => $t) $p[] = ($k === 'sessions' ? 'Summary' : 'Stopped') . ' ' . ($YN[$k]['on'] ? 'On' : 'Off'); echo h(implode(' · ', $p)); ?></td></tr><?php } ?>
 </table></div>
 </div><?php /* #ucard */ ?>
 
@@ -297,20 +286,6 @@ $CAN = oev_can_control();   // false: view only (no popups that change things)
 	<form method="post" action="action.php"><?=$hidden?><input type="hidden" name="action" value="level">
 	<span class="pf">Level: <select name="value"><?php foreach (array('A'=>'Auto', '1'=>'L1', '2'=>'L2') as $k => $v) echo '<option value="' . $k . '"' . ((!empty($e['autolevel']) ? 'A' : (string)$e['level']) === (string)$k ? ' selected' : '') . '>' . $v . '</option>'; ?></select> <?=$sbtn?></span></form><div class="pclose"><a href="javascript:void(0);" onclick="closePop(this)">Close</a></div>
 </div></div>
-<?php if ($YN) { ?><div id="setyn" class="slidecontainer" onclick="closePop(this);"><div class="slidebox" onclick="event.stopPropagation();">
-	<div class="pt">Your notifications</div>
-	<form method="post" action="notify_prefs.php"><?=$hidden?>
-	<?php foreach ($ynk as $k => $t) { $c = $YN[$k]; ?>
-	<div class="yn"><label for="yn_<?=$k?>"><?=h($t)?></label><br /><select id="yn_<?=$k?>" name="n_<?=$k?>">
-		<option value="inherit"<?=$c['mode'] === 'inherit' ? ' selected' : ''?>>Use account default (<?=$c['account_on'] ? 'On' : 'Off'?>)</option>
-		<option value="on"<?=$c['mode'] === 'on' ? ' selected' : ''?>>On</option>
-		<option value="off"<?=$c['mode'] === 'off' ? ' selected' : ''?>>Off</option>
-	</select> <span class="ynnow">Now: <?=$c['on'] ? 'On' : 'Off'?></span></div>
-	<?php } ?>
-	<?=$sbtn?></form>
-	<div class="pn">Just for you and just this unit. Session summary: email when unplugged. Charging stopped: email when charging stops while still plugged in (not load-balancer pauses).<?=oev_setting('notify_on', '1') ? '' : ' Emails are turned off for the whole site right now, so nothing is sent.'?></div>
-	<div class="pclose"><a href="notifications.php">All your notifications</a> &middot; <a href="javascript:void(0);" onclick="closePop(this)">Close</a></div>
-</div></div><?php } ?>
 <form id="f_prompt" method="post" action="action.php" style="display:none"><?=$hidden?><input type="hidden" name="action" id="p_action"><input type="hidden" name="value" id="p_value"></form>
 
 <script>
@@ -440,9 +415,7 @@ document.getElementById('a_timer').onclick = function(){ pop('Start / Stop sched
 document.getElementById('a_limits').onclick = function(){ pop('Limits', [<?=json_encode('Limits: ' . $limtxt)?>, <?=json_encode($vo)?>]); }
 document.getElementById('a_level').onclick = function(){ pop('Service level', [<?=json_encode('Level: ' . ($e['level'] === null ? '-' : 'L' . $e['level']))?>, <?=json_encode($vo)?>]); }
 <?php } ?>
-<?php if ($YN) { ?>document.getElementById('a_yn').onclick = function(){ openPop('setyn'); }
-if (location.hash === '#yn') { if (document.readyState === 'complete') openPop('setyn'); else window.addEventListener('load', function(){ openPop('setyn'); }); }   // from Your notifications (notifications.php), after layout
-<?php } ?>document.getElementById('a_time').onclick = function(){ pop('Clock', <?=json_encode($clk)?>); }
+document.getElementById('a_time').onclick = function(){ pop('Clock', <?=json_encode($clk)?>); }
 document.getElementById('a_checks').onclick = function(){ pop('Safety checks', <?=json_encode($ckl)?>); }
 document.getElementById('a_wifi').onclick = function(){ pop('WiFi', <?=json_encode(array_values(array_filter(array('SSID: ' . $e['ssid'], oev_is_admin() ? 'IP address: ' . $e['ipaddress'] : null, (oev_is_admin() && $e['hostname'] !== '') ? 'Hostname: ' . $e['hostname'] : null, $e['srssi'] !== null ? 'Signal: ' . $e['srssi'] . ' dBm' : null, 'API: ' . $e['api']))))?>); }
 if (document.getElementById('a_faults')) document.getElementById('a_faults').onclick = function(){ pop('Fault counts (since reset)', <?=json_encode(array('GFCI: ' . (int)($e['gfcicount'] ?? 0), 'No ground: ' . (int)($e['nogndcount'] ?? 0), 'Stuck relay: ' . (int)($e['stuckcount'] ?? 0)))?>); }

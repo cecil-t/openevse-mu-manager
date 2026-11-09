@@ -1,16 +1,12 @@
 <?php
 /******************************************************************************
- * notify_prefs.php - "Your notifications" on the unit page (unit.php): the
- * logged-in person's own Session summary / Charging stopped choice for ONE unit
- * (Use account default / On / Off). Any login that can see the unit, view-only
- * included; never a view-only link. Changes nothing else: no unit settings, no
- * other login's choices (the login always comes from the session, never the form).
- * Stored in openevse.db user_unit_notify (settings_lib.php); used by
- * collector/notifier.php.
+ * notify_prefs.php - save one login's per-unit Session summary / Charging stopped
+ * choice (Use account default / On / Off). Called from Account. Login from the
+ * session only; never a view-only link. Nothing else is changed.
  ******************************************************************************/
 require_once __DIR__ . '/auth_lib.php';
 
-// $me: the logged-in user (oev_user()); $post: the form; $visible: fn(unit row) -> bool.
+// $me: logged-in user; $post: the form; $visible: fn(unit row) -> bool.
 // Returns array(ok, message). Nothing is saved unless every field is valid.
 function unp_handle($db, $me, $post, $visible){
 	if (!$me || ($me['role'] ?? '') === 'public' || empty($me['id'])) return array(false, 'Please log in.');
@@ -29,14 +25,42 @@ function unp_handle($db, $me, $post, $visible){
 	return array(true, $n ? 'Your notifications saved.' : 'No change.');
 }
 
+// Safe return after save: only Account (with optional unit anchor). Never an open redirect.
+function unp_next($post, $unit_id = 0){
+	$n = is_string($post['next'] ?? null) ? $post['next'] : '';
+	if ($n === 'account' || $n === '') {
+		$a = ($unit_id > 0) ? '#notify-u' . (int)$unit_id : '#notify';
+		return 'account.php?msg=' . rawurlencode('') . $a;   // msg filled by caller
+	}
+	return 'account.php#notify';
+}
+
+// HTML for one unit's Your notifications form (Account). $view: one unit's oev_unit_notify_view row.
+function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on){
+	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+	$o = '<form method="post" action="notify_prefs.php" class="ynf" id="notify-u' . (int)$unit_id . '">' . $csrf_html
+		. '<input type="hidden" name="unitid" value="' . (int)$unit_id . '"><input type="hidden" name="next" value="account">'
+		. '<b>' . $e($unit_name) . '</b>';
+	foreach (oev_unit_notify_kinds() as $k => $t) {
+		$c = $view[$k]; $id = 'yn' . (int)$unit_id . '_' . $k;
+		$o .= '<div class="yn"><label for="' . $id . '">' . $e($t) . '</label>'
+			. '<select id="' . $id . '" name="n_' . $k . '">'
+			. '<option value="inherit"' . ($c['mode'] === 'inherit' ? ' selected' : '') . '>Use account default (' . ($c['account_on'] ? 'On' : 'Off') . ')</option>'
+			. '<option value="on"' . ($c['mode'] === 'on' ? ' selected' : '') . '>On</option>'
+			. '<option value="off"' . ($c['mode'] === 'off' ? ' selected' : '') . '>Off</option>'
+			. '</select> <span class="ynnow">Now: ' . ($c['on'] ? 'On' : 'Off') . '</span></div>';
+	}
+	$o .= '<button type="submit" class="go">Save</button></form>';
+	if (!$master_on) $o .= '<div class="note">Outgoing email is off for the whole site, so nothing is sent right now.</div>';
+	return $o;
+}
+
 if (!defined('UNP_LIB_ONLY')) {
-	$me = oev_require('view');   // logged in (view-only logins too); view-only links are turned away
-	if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: index.php', true, 303); exit; }
+	$me = oev_require('view');
+	if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: account.php#notify', true, 303); exit; }
 	oev_csrf_check();
+	$uid = (is_string($_POST['unitid'] ?? null) && ctype_digit($_POST['unitid'])) ? (int)$_POST['unitid'] : 0;
 	try { list($ok, $msg) = unp_handle(oev_db(), $me, $_POST, 'oev_unit_visible'); }
 	catch (Throwable $x) { $msg = 'Could not save right now; nothing was changed. Try again in a minute.'; }
-	$u = (string)($_POST['unitid'] ?? ''); $w = (string)($_POST['with'] ?? '');
-	$q = ctype_digit($u) ? 'unitid=' . $u : '';
-	if ($q !== '' && preg_match('/^[0-9,]{1,100}$/', $w)) $q .= '&with=' . $w;
-	header('Location: ' . ($q !== '' ? 'unit.php?' . $q . '&msg=' . urlencode($msg) : 'index.php'), true, 303); exit;
+	header('Location: account.php?msg=' . rawurlencode($msg) . ($uid ? '#notify-u' . $uid : '#notify'), true, 303); exit;
 }

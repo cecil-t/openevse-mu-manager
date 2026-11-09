@@ -117,15 +117,79 @@ function oev_users_have_stops($db){ return in_array('n_stops', array_column($db-
  * mode 'on' / 'off' = override; 'inherit' = use the account default (kept only to remember continuity).
  * since: when this unit's email last became effectively ON for this login (null when not on): nothing that
  * happened before it is mailed. updated_at: when the row was saved. */
-function oev_unit_notify_table($db){
-	if (oev_unit_notify_have($db)) return false;
-	$db->exec("CREATE TABLE IF NOT EXISTS user_unit_notify (user_id INTEGER NOT NULL, unit_id INTEGER NOT NULL,
-		kind TEXT NOT NULL CHECK (kind IN ('sessions','stops')), mode TEXT NOT NULL CHECK (mode IN ('inherit','on','off')),
-		since INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, unit_id, kind))");
-	return true;
+function oev_unit_notify_kinds(){
+	return array('errors' => 'Errors', 'reboots' => 'Reboots', 'sessions' => 'Session summary', 'stops' => 'Charging stopped');
 }
 function oev_unit_notify_have($db){ return (bool)$db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify'")->fetchColumn(); }
-function oev_unit_notify_kinds(){ return array('sessions' => 'Session summary', 'stops' => 'Charging stopped'); }
+function oev_unit_notify_have_old($db){ return (bool)$db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify_old'")->fetchColumn(); }
+/* Test-only: set $GLOBALS['OEV_MIGRATE_FAIL_AT'] to a step name to abort mid-migration. */
+function oev_migrate_fail($step){
+	if (isset($GLOBALS['OEV_MIGRATE_FAIL_AT']) && $GLOBALS['OEV_MIGRATE_FAIL_AT'] === $step)
+		throw new RuntimeException('injected migrate fail: ' . $step);
+}
+function oev_migrate_txn_begin($db){
+	if ($db->inTransaction()) { $db->exec('SAVEPOINT oev_mig'); return 'sp'; }
+	$db->exec('BEGIN IMMEDIATE');
+	return 'tx';
+}
+function oev_migrate_txn_commit($db, $how){
+	if ($how === 'sp') $db->exec('RELEASE SAVEPOINT oev_mig');
+	else $db->exec('COMMIT');
+}
+function oev_migrate_txn_rollback($db, $how){
+	if ($how === 'sp') { $db->exec('ROLLBACK TO SAVEPOINT oev_mig'); $db->exec('RELEASE SAVEPOINT oev_mig'); }
+	elseif ($db->inTransaction()) $db->exec('ROLLBACK');
+}
+function oev_unit_notify_table($db){
+	$need = "kind TEXT NOT NULL CHECK (kind IN ('errors','reboots','sessions','stops'))";
+	$ddl = "CREATE TABLE user_unit_notify (user_id INTEGER NOT NULL, unit_id INTEGER NOT NULL,
+		$need, mode TEXT NOT NULL CHECK (mode IN ('inherit','on','off')),
+		since INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (user_id, unit_id, kind))";
+	$have = oev_unit_notify_have($db);
+	$old = oev_unit_notify_have_old($db);
+	if (!$have && !$old) { $db->exec($ddl); return true; }
+	$sql = $have ? (string)$db->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify'")->fetchColumn() : '';
+	$wide = $have && strpos($sql, "'errors'") !== false;
+	if ($wide && !$old) return false;   // already wide, nothing left over
+	// Rebuild / recover under one write lock (or savepoint). All existence + emptiness
+	// decisions for _old recovery are repeated inside after BEGIN — closes TOCTOU.
+	$how = oev_migrate_txn_begin($db);
+	try {
+		$have = oev_unit_notify_have($db);
+		$old = oev_unit_notify_have_old($db);
+		if (!$have && !$old) {
+			$db->exec($ddl);
+			oev_migrate_txn_commit($db, $how);
+			return true;
+		}
+		$sql = $have ? (string)$db->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify'")->fetchColumn() : '';
+		$wide = $have && strpos($sql, "'errors'") !== false;
+		if ($wide && !$old) { oev_migrate_txn_commit($db, $how); return false; }
+		// Never guess a merge: nonempty active + leftover _old must be fixed by hand.
+		if ($old && $have && (int)$db->query('SELECT count(*) FROM user_unit_notify')->fetchColumn() > 0)
+			throw new RuntimeException('user_unit_notify_old exists alongside nonempty user_unit_notify; refusing automatic recovery');
+		if ($old) {
+			// Safe only when active is missing or empty under this same lock.
+			if ($have) $db->exec('DROP TABLE user_unit_notify');
+			$db->exec('ALTER TABLE user_unit_notify_old RENAME TO user_unit_notify');
+			$sql = (string)$db->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_unit_notify'")->fetchColumn();
+			if (strpos($sql, "'errors'") !== false) { oev_migrate_txn_commit($db, $how); return true; }
+		}
+		oev_migrate_fail('rename');
+		$db->exec('ALTER TABLE user_unit_notify RENAME TO user_unit_notify_old');
+		oev_migrate_fail('create');
+		$db->exec($ddl);
+		oev_migrate_fail('copy');
+		$db->exec('INSERT INTO user_unit_notify (user_id, unit_id, kind, mode, since, updated_at) SELECT user_id, unit_id, kind, mode, since, updated_at FROM user_unit_notify_old');
+		oev_migrate_fail('drop');
+		$db->exec('DROP TABLE user_unit_notify_old');
+		oev_migrate_txn_commit($db, $how);
+		return true;
+	} catch (Throwable $x) {
+		oev_migrate_txn_rollback($db, $how);
+		throw $x;
+	}
+}
 // rows for one login: [unit_id][kind] => row
 function oev_unit_notify_rows($db, $user_id){
 	$o = array(); if (!oev_unit_notify_have($db)) return $o;
@@ -139,7 +203,8 @@ function oev_notify_account($u, $kind){
 	$on = !empty($u['n_' . $kind]);
 	if (!$on) return array('on' => false, 'since' => null);
 	if ($kind === 'stops') return array('on' => true, 'since' => empty($u['n_stops_since']) ? null : (int)$u['n_stops_since']);
-	return array('on' => true, 'since' => empty($u['n_sessions_since']) ? 0 : (int)$u['n_sessions_since']);
+	if ($kind === 'sessions') return array('on' => true, 'since' => empty($u['n_sessions_since']) ? 0 : (int)$u['n_sessions_since']);
+	return array('on' => true, 'since' => 0);   // errors / reboots: notifier is edge-triggered, no backlog clock
 }
 // What applies for this login + unit + kind: the unit override first, then the account default.
 // on, since (events before it are not mailed; null with on = never proven, nothing is mailed), src 'unit' / 'account', mode
@@ -200,4 +265,60 @@ function oev_unit_notify_forget($db, $user_id = null, $unit_id = null){
 	if (!oev_unit_notify_have($db)) return;
 	if ($user_id !== null) $db->prepare('DELETE FROM user_unit_notify WHERE user_id = ?')->execute(array((int)$user_id));
 	if ($unit_id !== null) $db->prepare('DELETE FROM user_unit_notify WHERE unit_id = ?')->execute(array((int)$unit_id));
+}
+
+/* ---- plug-in reminders: one owner login; mail goes only to that login's account email ----
+ * user_id NULL = not yet owned (legacy extra_to rows, or unmatched migration): never mailed until claimed.
+ * extra_to is kept only as migration evidence; new rows leave it blank. */
+function oev_reminders_have_owner($db){
+	return in_array('user_id', array_column($db->query('PRAGMA table_info(reminders)')->fetchAll(PDO::FETCH_ASSOC), 'name'), true);
+}
+function oev_reminders_own_cols($db){
+	if (oev_reminders_have_owner($db)) return false;
+	$db->exec('ALTER TABLE reminders ADD COLUMN user_id INTEGER');
+	return true;
+}
+// Map legacy Send-to addresses onto real logins. Never invent an owner.
+// Returns array(assigned => n, unresolved => [ {id, reason, emails} ]).
+function oev_reminders_migrate_owners($db){
+	$by = array();
+	$out = array('assigned' => 0, 'unresolved' => array());
+	$how = oev_migrate_txn_begin($db);
+	try {
+		oev_reminders_own_cols($db);
+		foreach ($db->query('SELECT id, email FROM users') as $u) $by[strtolower($u['email'])] = (int)$u['id'];
+		foreach ($db->query('SELECT id, extra_to, user_id, enabled FROM reminders')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+			if ($r['user_id'] !== null && $r['user_id'] !== '') continue;
+			$emails = array_values(array_unique(array_filter(array_map(function($e){ return strtolower(trim($e)); }, preg_split('/[,;\s]+/', (string)$r['extra_to'])))));
+			$uids = array();
+			foreach ($emails as $e) if ($e !== '' && isset($by[$e])) $uids[$by[$e]] = $e;
+			if (count($uids) === 1) {
+				$uid = (int)key($uids);
+				oev_migrate_fail('rem_owner');
+				$db->prepare('UPDATE reminders SET user_id = ? WHERE id = ? AND user_id IS NULL')->execute(array($uid, (int)$r['id']));
+				oev_migrate_fail('rem_enable');
+				// Preserve prior behavior: extra_to mail did not use n_reminders. If this reminder is on, turn the owner's switch on.
+				if ((int)$r['enabled'] && !(int)$db->query('SELECT n_reminders FROM users WHERE id = ' . $uid)->fetchColumn())
+					$db->prepare('UPDATE users SET n_reminders = 1 WHERE id = ? AND COALESCE(n_reminders, 0) = 0')->execute(array($uid));
+				$out['assigned']++;
+			} else {
+				$why = !$emails ? 'no addresses' : (!$uids ? 'no matching login' : 'matches more than one login');
+				$out['unresolved'][] = array('id' => (int)$r['id'], 'reason' => $why, 'emails' => $emails);
+			}
+		}
+		oev_migrate_txn_commit($db, $how);
+		return $out;
+	} catch (Throwable $x) {
+		oev_migrate_txn_rollback($db, $how);
+		throw $x;
+	}
+}
+function oev_reminders_for_user($db, $user_id){
+	if (!oev_reminders_have_owner($db)) return array();
+	$st = $db->prepare('SELECT * FROM reminders WHERE user_id = ? ORDER BY at_time, id'); $st->execute(array((int)$user_id));
+	return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+function oev_reminders_unresolved($db){
+	if (!oev_reminders_have_owner($db)) return array();
+	return $db->query('SELECT * FROM reminders WHERE user_id IS NULL ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
 }

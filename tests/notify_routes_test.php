@@ -1,7 +1,7 @@
 <?php
 // php tests/notify_routes_test.php — the REAL pages over HTTP (php -S) on a throwaway copy of the app made by the real
 // setup_auth.php: Settings > Users save (Session summary enable time), Settings > Units link, notify_prefs.php,
-// notifications.php; then the real notifier library on that config DB with a stub mailer. No email is sent.
+// then the real notifier library on that config DB with a stub mailer. No email is sent.
 $f = 0; $n = 0; function ck($m, $ok){ global $f, $n; $n++; if (!$ok) $f++; echo ($ok ? 'PASS ' : 'FAIL ') . $m . "\n"; }
 $php = PHP_BINARY; $app = dirname(__DIR__); $s = sys_get_temp_dir() . '/oev_routes_' . getmypid();
 $files = array_merge(explode("\0", trim(shell_exec('git -C ' . escapeshellarg($app) . ' ls-files -z'), "\0")), explode("\0", trim((string)shell_exec('git -C ' . escapeshellarg($app) . ' ls-files -z --others --exclude-standard'), "\0")));
@@ -30,7 +30,7 @@ function http($path, $uid, $post = null, $csrf = true){
 	return array((int)($m[1] ?? 0), (string)$b, $loc);
 }
 $U = function($id) use ($c){ return $c->query("SELECT * FROM users WHERE id = $id")->fetch(); };
-$save = function($on, $extra = array()) { return http('settings.php?s=users', 1, array('a' => 'user_save', 'id' => 1, 'email' => 'admin@example.invalid', 'role' => 'admin', 'scope' => 'all', 'first_name' => 'Greg', 'last_name' => '', 'password' => '', 'n_errors' => 'on') + ($on ? array('n_sessions' => 'on') : array()) + $extra); };
+$save = function($on, $extra = array()) { return http('account.php', 1, array('a' => 'notify_defaults', 'n_errors' => 'on') + ($on ? array('n_sessions' => 'on') : array()) + $extra); };
 
 // notifier library on this config DB (stub mailer)
 foreach (array('sessions_lib.php', 'settings_lib.php') as $x) require_once "$s/$x";
@@ -47,12 +47,12 @@ $mine = function() use (&$OUT){ return count(array_filter($OUT, function($m){ re
 /* 1: account Session summary Off -> unplug -> turned On in Settings > Users -> no old summary */
 $t0 = time(); $unplug(4, $t0 - 30);
 list($code, , $loc) = $save(true);
-ck('Settings > Users save (real route): redirect', $code === 303 && strpos($loc, 's=users') !== false);
+ck('Account defaults save (real route): redirect', $code === 303 && strpos($loc, 'account.php') === 0);
 $u = $U(1); ck('turning Session summary on stamps the time', (int)$u['n_sessions'] === 1 && (int)$u['n_sessions_since'] >= $t0);
 $sum(time()); ck('the unplug before it was turned on: no summary', $mine() === 0);
 sleep(1); $unplug(4, time()); $sum(time() + 5); ck('the next unplug: summary sent', $mine() === 1);
 $since = (int)$U(1)['n_sessions_since']; sleep(1); $save(true, array('first_name' => 'G'));
-ck('an unrelated save (still on) keeps the time', (int)$U(1)['n_sessions_since'] === $since);
+ck('an unrelated defaults save (still on) keeps the time', (int)$U(1)['n_sessions_since'] === $since);
 $save(false); ck('turning it off clears the time', (int)$U(1)['n_sessions'] === 0 && $U(1)['n_sessions_since'] === null);
 ck('legacy: on with no time (before this column) still means on with no limit', oev_notify_account(array('n_sessions' => 1, 'n_sessions_since' => null), 'sessions') === array('on' => true, 'since' => 0));
 // queued retry, then turned off and on again: the old one is not sent
@@ -75,27 +75,27 @@ touch("$s/stop"); $res = explode(' ', stream_get_contents($rpp[1])); proc_close(
 ck("concurrent reader during 30 real saves never sees Session summary on without its time ({$res[0]} reads)", (int)$res[0] > 50 && (int)$res[1] === 0);
 $save(true);
 
-/* 2: Settings > Units: a clearly labelled link to each unit's Your notifications, outside the unit's Save form */
+/* 2: Settings Units / Site settings — no personal notification editing */
 list($code, $b) = http('settings.php?s=units', 1);
-$p = strpos($b, 'href="unit.php?unitid=4#yn"');
-ck('Settings > Units has "Your notifications" for unit 4', $code === 200 && $p !== false && strpos($b, 'Your notifications for N Penn: 1F &lt;b&gt;') !== false);
-$fo = strrpos(substr($b, 0, $p), '<form'); $fc = strrpos(substr($b, 0, $p), '</form>');
-ck('the link is outside the unit form, name HTML-escaped', $fc !== false && $fc > $fo && strpos($b, 'Your notifications for N Penn: 1F <b>') === false);
-ck('Settings > Units links unit 5 too', strpos($b, 'href="unit.php?unitid=5#yn"') !== false);
+ck('Settings > Units has no personal notifications UI', $code === 200 && strpos($b, 'Your notifications') === false && strpos($b, 'unit.php?unitid=4#yn') === false);
+list($code, $b) = http('settings.php?s=prefs', 1);
+ck('Site settings: outgoing email label, no reminders card', $code === 200 && strpos($b, 'Enable outgoing email for this site') !== false && strpos($b, 'id="rem"') === false);
+list($code, , $loc) = http('settings.php?s=link', 1);
+ck('old link tab redirects into Users', $code === 303 && strpos($loc, 's=users') !== false);
 
-/* 3: notify_prefs.php and notifications.php over HTTP */
-list($code) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_sessions' => 'off', 'n_stops' => 'on'), false);
+/* 3: notify_prefs.php over HTTP */
+list($code) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'off','n_stops'=>'on'), false);
 ck('notify_prefs: no CSRF token -> 400, nothing saved', $code === 400 && !$c->query('SELECT count(*) FROM user_unit_notify')->fetchColumn());
-list($code, , $loc) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_sessions' => 'off', 'n_stops' => 'on', 'user_id' => '1', 'id' => '1'));
+list($code, , $loc) = http('notify_prefs.php', 2, array('unitid' => '4', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'off','n_stops'=>'on', 'user_id' => '1', 'id' => '1'));
 $r = $c->query('SELECT user_id, unit_id, kind, mode FROM user_unit_notify ORDER BY kind')->fetchAll();
-ck('notify_prefs (view-only login): saved for that login only, back to the unit page', $code === 303 && strpos($loc, 'unit.php?unitid=4') === 0 && count($r) === 2 && $r[0]['user_id'] == 2 && $r[1]['user_id'] == 2);
-list($code) = http('notify_prefs.php', 2, array('unitid' => '5', 'n_sessions' => 'on', 'n_stops' => 'on'));
+ck('notify_prefs (view-only login): saved for that login only, back to Account', $code === 303 && strpos($loc, 'account.php') === 0 && count($r) === 2 && $r[0]['user_id'] == 2 && $r[1]['user_id'] == 2);
+list($code) = http('notify_prefs.php', 2, array('unitid' => '5', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'on','n_stops'=>'on'));
 ck('notify_prefs: a unit outside the login\'s groups is refused', (int)$c->query('SELECT count(*) FROM user_unit_notify WHERE unit_id = 5')->fetchColumn() === 0);
-list($code, , $loc) = http('notify_prefs.php', 0, array('unitid' => '4', 'n_sessions' => 'on', 'n_stops' => 'on'));
+list($code, , $loc) = http('notify_prefs.php', 0, array('unitid' => '4', 'n_errors'=>'inherit','n_reboots'=>'inherit','n_sessions'=>'on','n_stops'=>'on'));
 ck('notify_prefs: not logged in -> login page', $code === 303 && strpos($loc, 'login.php') === 0);
-list($code, $b) = http('notifications.php', 2);
-ck('overview (view-only): own choices, only unit 4, nobody else\'s address', $code === 200 && strpos($b, 'unitid=4#yn') !== false && strpos($b, 'unitid=5') === false && strpos($b, 'admin@example.invalid') === false && strpos($b, 'Set for this unit') !== false);
-list($code, , $loc) = http('notifications.php', 0); ck('overview: not logged in -> login page', $code === 303 && strpos($loc, 'login.php') === 0);
+list($code, $b) = http('account.php', 2);
+ck('Account & Prefs shows notify section for viewer', $code === 200 && strpos($b, 'id="notify"') !== false && strpos($b, 'admin@example.invalid') === false);
+ck('notifications.php deleted (app and fixture)', !is_file(__DIR__ . '/../notifications.php') && !is_file("$s/notifications.php"));
 list($code, $b) = http('settings.php?s=units', 2); ck('Settings stays admin-only for the view-only login', $code === 403);
 
 proc_terminate($srv); proc_close($srv); exec('rm -rf ' . escapeshellarg($s));

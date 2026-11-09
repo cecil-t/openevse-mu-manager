@@ -1,7 +1,7 @@
 <?php
 /******************************************************************************
  * settings.php - Settings (admins only): OpenEVSE units, load groups,
- * preferences (voltages, temperature, time zone, email, plug-in reminders),
+ * site settings (voltages, temperature, time zone, outgoing email; plug-in reminders until personal ownership is finished),
  * users, view-only links and System status (sys_lib.php). Unit setup that needs the unit itself (Emoncms,
  * MQTT) is queued in openevse.db `jobs` and done within a minute by
  * collector/jobs.php (root task "OpenEVSE jobs and notifications").
@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['a'] ?? '', array('
 require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
 $db = oev_db();
 $sec = in_array($_GET['s'] ?? '', array('units', 'groups', 'prefs', 'users', 'link', 'system'), true) ? $_GET['s'] : 'units';
+if ($sec === 'link') { header('Location: settings.php?s=users#links', true, 303); exit; }   // View-only link now under Users
 
 function back($sec, $msg, $anchor = ''){ header('Location: settings.php?s=' . $sec . '&msg=' . urlencode($msg) . ($anchor ? '#' . $anchor : ''), true, 303); exit; }
 function norm_url($u){
@@ -231,25 +232,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($a === 'mail_test') { $r = oev_mail($me['email'], 'Test email', 'This is a test from ' . oev_site_name() . ".\nIf you can read this, email notifications work."); back('prefs', $r === true ? 'Saved. Test email sent to ' . $me['email'] . '.' : 'Saved, but: ' . $r, 'mail'); }
 		back('prefs', 'Saved.', 'mail');
 	}
-	if ($a === 'rem_add' || $a === 'rem_save') {
-		$uid = (int)$P('unit'); $t = $P('at');
-		if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $t)) back('prefs', 'Pick a time for the reminder.', 'rem');
-		$xl = array_values(array_unique(array_filter(array_map('trim', preg_split('/[,;\s]+/', $P('extra'))))));
-		if (!$xl) back('prefs', 'Enter at least one email address under "Send to".', 'rem');
-		foreach ($xl as $e) if (!filter_var($e, FILTER_VALIDATE_EMAIL)) back('prefs', '"' . $e . '" is not an email address.', 'rem');
-		$x = implode(', ', $xl);
-		if ($a === 'rem_add') $db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled) VALUES (?, ?, ?, 1)')->execute(array($uid, $t, $x));
-		else $db->prepare('UPDATE reminders SET unit_id = ?, at_time = ?, extra_to = ?, enabled = ? WHERE id = ?')->execute(array($uid, $t, $x, isset($_POST['enabled']) ? 1 : 0, (int)$P('id')));
-		back('prefs', 'Saved.', 'rem');
-	}
-	if ($a === 'rem_delete') { $db->prepare('DELETE FROM reminders WHERE id = ?')->execute(array((int)$P('id'))); back('prefs', 'Reminder removed.', 'rem'); }
 	/* ---- users ---- */
 	if ($a === 'user_add' || $a === 'user_save') {
 		$id = (int)$P('id'); $email = strtolower($P('email')); $role = $P('role') === 'admin' ? 'admin' : 'viewer'; $all = ($role === 'admin' || $P('scope') === 'all') ? 1 : 0;   // admins always see everything
 		$gs = array_values(array_intersect(array_map('intval', (array)($_POST['groups'] ?? array())), array_keys($gname)));
-		$n = array(); foreach (array('errors', 'reboots', 'sessions') as $k) $n[$k] = isset($_POST['n_' . $k]) ? 1 : 0;
-		$hss = oev_users_have_col($db, 'n_sessions_since');   // added by setup_auth.php
-		$hs = oev_users_have_stops($db); $nst = isset($_POST['n_stops']) ? 1 : 0;   // Charging stopped (column added by setup_auth.php)
 		$fn = substr($P('first_name'), 0, 60); $ln = substr($P('last_name'), 0, 60);
 		if (!filter_var($email, FILTER_VALIDATE_EMAIL)) back('users', 'Enter a valid email address.', $id ? "p$id" : 'addu');
 		if (!$all && !$gs) back('users', 'Pick at least one load group, or All load groups.', $id ? "p$id" : 'addu');
@@ -257,44 +243,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($a === 'user_add' || $pw !== '') { $pp = oev_password_problem($pw); if ($pp) back('users', $pp, $id ? "p$id" : 'addu'); }
 		try {
 			if ($a === 'user_add') {
-				// Session summary and its start time in ONE statement (a reader never sees it on without its time)
-				$db->prepare('INSERT INTO users (email, first_name, last_name, pass_hash, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders, created_at' . ($hss ? ', n_sessions_since' : '') . ') VALUES (?,?,?,?,?,?,?,?,?,0,?' . ($hss ? ',?' : '') . ')')
-					->execute(array_merge(array($email, $fn, $ln, password_hash($pw, PASSWORD_DEFAULT), $role, $all, $n['errors'], $n['reboots'], $n['sessions'], time()), $hss ? array($n['sessions'] ? time() : null) : array()));
+				// Personal email flags stay at defaults (off); each login sets them on their own email page
+				$db->prepare('INSERT INTO users (email, first_name, last_name, pass_hash, role, scope_all, n_errors, n_reboots, n_sessions, n_reminders, created_at) VALUES (?,?,?,?,?,?,0,0,0,0,?)')
+					->execute(array($email, $fn, $ln, password_hash($pw, PASSWORD_DEFAULT), $role, $all, time()));
 				$id = (int)$db->lastInsertId();
-				if ($hs && $nst) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
 			} else {
 				if ($id === (int)$me['id'] && $role !== 'admin') back('users', 'You can\'t take admin away from your own login.', "p$id");
-				// Session summary and its start time in ONE statement (CASE reads the row as it was): off -> on stamps now,
-				// on -> off clears it, unchanged keeps it (an old "on" with no time stays as it is)
-				$db->prepare('UPDATE users SET email = ?, first_name = ?, last_name = ?, role = ?, scope_all = ?, n_errors = ?, n_reboots = ?, n_sessions = ?'
-					. ($hss ? ', n_sessions_since = CASE WHEN CAST(? AS INTEGER) = 0 THEN NULL WHEN coalesce(n_sessions, 0) = 0 THEN CAST(? AS INTEGER) ELSE n_sessions_since END' : '') . ' WHERE id = ?')
-					->execute(array_merge(array($email, $fn, $ln, $role, $all, $n['errors'], $n['reboots'], $n['sessions']), $hss ? array($n['sessions'], time()) : array(), array($id)));
-				if ($hs) {   // Charging stopped: remember when it was turned on (nothing older is sent)
-					$was = (int)$db->query('SELECT n_stops FROM users WHERE id = ' . $id)->fetchColumn();
-					if ($nst && !$was) $db->prepare('UPDATE users SET n_stops = 1, n_stops_since = ? WHERE id = ?')->execute(array(time(), $id));
-					elseif (!$nst && $was) $db->prepare('UPDATE users SET n_stops = 0, n_stops_since = NULL WHERE id = ?')->execute(array($id));
-				}
+				// Do not touch n_errors / n_reboots / n_sessions / n_stops / n_reminders (personal)
+				$db->prepare('UPDATE users SET email = ?, first_name = ?, last_name = ?, role = ?, scope_all = ? WHERE id = ?')
+					->execute(array($email, $fn, $ln, $role, $all, $id));
 				if ($pw !== '') { $db->prepare('UPDATE users SET pass_hash = ? WHERE id = ?')->execute(array(password_hash($pw, PASSWORD_DEFAULT), $id)); if ($id !== (int)$me['id']) $db->prepare('DELETE FROM auth_tokens WHERE user_id = ?')->execute(array($id)); }
 			}
 		} catch (PDOException $e) { back('users', 'That email address already has a login.', $id ? "p$id" : 'addu'); }
 		$db->prepare('DELETE FROM user_groups WHERE user_id = ?')->execute(array($id));
 		if (!$all) foreach ($gs as $g) $db->prepare('INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)')->execute(array($id, $g));
-		back('users', $a === 'user_add' ? 'Login added. Give them the password; they can change it under Account.' : 'Saved.', "p$id");
+		back('users', $a === 'user_add' ? 'Login added. Give them the password; they can change it under Account &amp; Prefs.' : 'Saved.', "p$id");
 	}
 	if ($a === 'user_delete') {
 		$id = (int)$P('id');
 		if ($id === (int)$me['id']) back('users', 'You can\'t remove your own login.');
 		foreach (array('DELETE FROM auth_tokens WHERE user_id = ?', 'DELETE FROM user_groups WHERE user_id = ?', 'DELETE FROM users WHERE id = ?') as $q) $db->prepare($q)->execute(array($id));
 		oev_unit_notify_forget($db, $id, null);   // their per-unit notification choices
+		if (oev_reminders_have_owner($db)) $db->prepare('DELETE FROM reminders WHERE user_id = ?')->execute(array($id));
 		back('users', 'Login removed.');
 	}
 	/* ---- view-only links ---- */
 	if ($a === 'link_add') {
 		list($sel, $val) = oev_new_token();
 		$db->prepare('INSERT INTO public_links (selector, token_hash, token_enc, label, created_at, created_by) VALUES (?,?,?,?,?,?)')->execute(array($sel, hash('sha256', $val), oev_enc("$sel.$val"), $P('label') ?: 'View-only link', time(), $me['id']));
-		back('link', 'Link made. Copy it below and share it.');
+		back('users', 'Link made. Copy it below and share it.', 'links');
 	}
-	if ($a === 'link_revoke') { $db->prepare('UPDATE public_links SET revoked_at = ? WHERE id = ?')->execute(array(time(), (int)$P('id'))); back('link', 'Link turned off. Anyone using it is shut out now.'); }
+	if ($a === 'link_revoke') { $db->prepare('UPDATE public_links SET revoked_at = ? WHERE id = ?')->execute(array(time(), (int)$P('id'))); back('users', 'Link turned off. Anyone using it is shut out now.', 'links'); }
 	back($sec, 'Nothing changed.');
 }
 
@@ -349,7 +328,7 @@ function chk($v){ return $v ? ' checked' : ''; }
 </style>
 <div class="slidebox set pgcard s-<?=h($sec)?>">
 <div class="tabs">
-<?php foreach (array('units' => 'Units', 'groups' => 'Load groups', 'prefs' => 'Preferences', 'users' => 'Users', 'link' => 'View-only link', 'system' => 'System status') as $k => $t) echo '<a href="settings.php?s=' . $k . '"' . ($k === $sec ? ' class="on"' : '') . '>' . $t . '</a>'; ?>
+<?php foreach (array('units' => 'Units', 'groups' => 'Load groups', 'prefs' => 'Site settings', 'users' => 'Users', 'system' => 'System status') as $k => $t) echo '<a href="settings.php?s=' . $k . '"' . ($k === $sec ? ' class="on"' : '') . '>' . $t . '</a>'; ?>
 </div>
 <?php if (isset($_GET['msg'])) echo '<div class="msg">' . h($_GET['msg']) . '</div>'; ?>
 <?php
@@ -412,8 +391,6 @@ if ($sec === 'units') {
 		$id = (int)$u['id'];
 		echo '<details class="card" id="u' . $id . '"' . ((isset($_GET['msg']) && strpos($_SERVER['REQUEST_URI'], "#u$id") !== false) ? ' open' : '') . '><summary>' . h($u['name']) . ' <span>&middot; ' . ($u['enabled'] ? '' : 'disabled &middot; ') . ($u['loadgroupid'] ? oev_v($gname[(int)$u['loadgroupid']] ?? 'group ' . $u['loadgroupid']) : 'no group') . '</span></summary>';
 		echo unit_form($u, $groups, $CS, $emon_names);
-		// your own emails for this unit: a link (outside the unit's Save form), the same box every login has on the unit page
-		echo '<div class="note" style="margin:6px 0"><a href="unit.php?unitid=' . $id . '#yn" style="color:#035a5a;font-weight:bold">Your notifications for ' . h($u['name']) . '</a> (just your own emails; <a href="notifications.php">all units</a>)</div>';
 		foreach ($jobs[$id] ?? array() as $j) {
 			$w = $j['status'] === 'queued' || $j['status'] === 'running' ? 'waiting to run (within a minute)' : h($j['msg']);
 			echo '<div class="job ' . h($j['status']) . '"><b>' . h($jk[$j['kind']] ?? $j['kind']) . ($j['kind'] === 'emon' ? ' (' . h($emon_names[$j['arg']] ?? $j['arg']) . ')' : '') . ', ' . oev_v(ago($j['done_at'] ?: $j['created_at'])) . ':</b> ' . $w . '</div>';
@@ -518,10 +495,11 @@ if ($sec === 'prefs') {
 
 	<div class="card" id="mail"><form method="post" action="settings.php?s=prefs"><?=$CS?>
 	<h2 style="margin-top:2px">Email notifications</h2>
-	<label class="in"><input type="checkbox" name="notify_on"<?=chk($S['notify_on'] === '1')?>>Send notifications</label>
-	<div class="note">Who gets errors, reboots, session summaries and charging-stopped emails is set for each user under Users. Plug-in reminders go only to the addresses on each reminder below.</div>
-	<label>Error if a unit is not heard from for</label>
+	<label class="in"><input type="checkbox" name="notify_on"<?=chk($S['notify_on'] === '1')?>>Enable outgoing email for this site</label>
+	<div class="note">This is the site-wide gate: when it is off, nothing is emailed to anyone. Each person chooses which emails they want under Account &amp; Prefs.</div>
+	<label>Consider a charger offline after</label>
 	<div class="row2"><div><input type="number" name="heartbeat_val" min="1" max="10080" value="<?=h($hbv)?>"></div><div><select name="heartbeat_unit"><option value="m"<?=sel($hbu, 'm')?>>minutes</option><option value="h"<?=sel($hbu, 'h')?>>hours</option></select></div></div>
+	<div class="note">Shared definition of offline for everyone. Who is emailed about it is each person's Errors choice under Account &amp; Prefs.</div>
 	<h2>Mail server (SMTP)</h2>
 	<div class="note">Use any mail service you have an account with. Mailjet works well and has a free plan (server in-v3.mailjet.com, port 587, TLS; the username and password are its API key and secret key).</div>
 	<div class="note">Port 587 goes with TLS, 465 with SSL.</div><label>Server</label><input type="text" name="smtp_host" value="<?=h($S['smtp_host'])?>" autocapitalize="off">
@@ -536,26 +514,12 @@ if ($sec === 'prefs') {
 	<div class="note">Check login connects and logs in without sending. The test email goes to <?=oev_v($me['email'])?>.</div>
 	</form></div>
 
-	<div class="card" id="rem"><h2 style="margin-top:2px">Plug-in reminders</h2>
-	<div class="note">An email if no car is plugged into the unit by the set time (checked for 15 minutes after it, once a day). It goes only to the addresses in "Send to" (a phone's text-message address works too).</div>
-	<?php foreach ($db->query('SELECT * FROM reminders ORDER BY at_time')->fetchAll() as $r) { ?>
-		<form method="post" action="settings.php?s=prefs" style="border-top:1px solid #ddd;padding-top:4px;margin-top:8px"><?=$CS?><input type="hidden" name="id" value="<?=(int)$r['id']?>">
-		<div class="row2"><div style="flex:1.3"><label>Unit</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '"' . sel($u['id'], $r['unit_id']) . '>' . h($u['name']) . '</option>'; ?></select></div><div><label>Plug in by</label><input type="time" name="at" value="<?=h($r['at_time'])?>"></div></div>
-		<label>Send to</label><input type="text" name="extra" value="<?=h($r['extra_to'])?>" placeholder="email addresses, comma between them" autocapitalize="off" required>
-		<label class="in"><input type="checkbox" name="enabled"<?=chk($r['enabled'])?>>On</label>
-		<br><button type="submit" name="a" value="rem_save" class="go">Save</button><button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm('Remove this reminder?')">Remove</button></form>
-	<?php } ?>
-	<details style="margin-top:8px"><summary style="cursor:pointer;color:#035a5a;font-weight:bold">Add a reminder</summary><form method="post" action="settings.php?s=prefs"><?=$CS?><input type="hidden" name="a" value="rem_add">
-	<div class="row2"><div style="flex:1.3"><label>Unit</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '">' . h($u['name']) . '</option>'; ?></select></div><div><label>Plug in by</label><input type="time" name="at" value="21:00"></div></div>
-	<label>Send to</label><input type="text" name="extra" placeholder="email addresses, comma between them" autocapitalize="off" required>
-	<button type="submit" class="go">Add reminder</button></form></details></div>
 	<?php
 }
 /* ----------------------------- USERS ----------------------------- */
 if ($sec === 'users') {
 	function user_form($u, $groups, $CS, $me){
 		$id = $u ? (int)$u['id'] : 0; $ug = $id ? oev_user_groups($id) : array(); $all = $u ? (int)$u['scope_all'] : 1;
-		static $hstops = null; if ($hstops === null) $hstops = oev_users_have_stops(oev_db());
 		ob_start(); ?>
 		<form method="post" action="settings.php?s=users"><?=$CS?><input type="hidden" name="a" value="<?=$id ? 'user_save' : 'user_add'?>"><input type="hidden" name="id" value="<?=$id?>">
 		<div class="row2"><div><label>First name</label><input type="text" name="first_name" value="<?=h($u['first_name'] ?? '')?>" maxlength="60"></div><div><label>Last name</label><input type="text" name="last_name" value="<?=h($u['last_name'] ?? '')?>" maxlength="60"></div></div>
@@ -567,12 +531,7 @@ if ($sec === 'users') {
 		<label class="in"><input type="radio" name="scope" value="all"<?=chk($all)?> onchange="gsx(this)">All load groups</label><label class="in"><input type="radio" name="scope" value="some"<?=chk(!$all)?> onchange="gsx(this)">Only these load groups:</label>
 		<div class="gsx" style="margin-left:22px;<?=$all ? 'display:none' : ''?>"><?php foreach ($groups as $g) echo '<label class="in"><input type="checkbox" name="groups[]" value="' . (int)$g['id'] . '"' . chk(in_array((int)$g['id'], $ug, true)) . '>' . h($g['name']) . '</label>'; ?>
 		<div class="note">Units that are not in a load group are only shown to users who see all load groups.</div></div></div>
-		<label>Emails about</label>
-		<?php foreach (array('errors' => 'Errors', 'reboots' => 'Reboots') as $k => $t) echo '<label class="in"><input type="checkbox" name="n_' . $k . '"' . chk(!empty($u['n_' . $k])) . '>' . $t . '</label>'; ?>
-		<label class="in"><input type="checkbox" name="n_sessions"<?=chk(!empty($u['n_sessions']))?>>Session summary</label><div class="note nsub">Email when unplugged: total energy and charging time.</div>
-		<?php if ($hstops) { ?><label class="in"><input type="checkbox" name="n_stops"<?=chk(!empty($u['n_stops']))?>>Charging stopped</label><div class="note nsub">Email when charging stops while still plugged in (limit, schedule, manual stop, fault, or the vehicle stopped drawing power), once per plug-in. Load-balancer pauses are not included.</div><?php } ?>
-		<div class="note">Session summary and Charging stopped are defaults: each login can set any unit On or Off for themselves on the unit page (Your notifications; overview at <a href="notifications.php">notifications.php</a>, their own only).</div>
-		<div class="note">Plug-in reminders are set on each reminder (Preferences), not here.</div>
+		<div class="note">Email choices are each person's own under <a href="account.php#notify">Account &amp; Prefs</a>. Admins do not set them here.</div>
 		<button type="submit" class="go"><?=$id ? 'Save' : 'Add login'?></button></form>
 		<?php return ob_get_clean();
 	}
@@ -586,26 +545,23 @@ if ($sec === 'users') {
 		echo '</details>';
 	}
 	echo '<details class="card" id="addu"><summary>Add a login</summary>' . user_form(null, $groups, $CS, $me) . '</details>';
-	?><script>function gsx(r){ r.form.querySelector('.gsx').style.display = r.value === 'some' ? '' : 'none'; }
-	function rsx(r){ var f = r.form, a = f.querySelector('input[name=role][value=admin]').checked; f.querySelector('.scx').style.display = a ? 'none' : ''; }   // admins always see all load groups
-	document.querySelectorAll('input[name=role][value=admin]').forEach(rsx);
-	if (location.hash) { var d = document.querySelector(location.hash); if (d && d.tagName === 'DETAILS') d.open = true; }</script><?php
-}
-/* ----------------------------- VIEW-ONLY LINK ----------------------------- */
-if ($sec === 'link') {
-	echo '<div class="note">A view-only link shows only what is happening right now: the home page and each unit\'s live status, without a login. It does not show session reports, graphs, history, energy totals or logs, and nobody can press buttons or change settings with it. Turn a link off at any time.</div>';
+	echo '<h2 id="links" style="margin:16px 0 6px">View-only link</h2>';
+	echo '<div class="note">A view-only link shows only what is happening right now: the home page and each unit\'s live status, without a login. It does not show session reports, graphs, history, energy totals or logs, and nobody can press buttons or change settings.</div>';
 	$links = $db->query('SELECT * FROM public_links WHERE revoked_at IS NULL ORDER BY id')->fetchAll();
 	if (!$links) echo '<div class="card">No view-only links yet.</div>';
 	foreach ($links as $l) {
 		$url = oev_site_url() . '?view=' . oev_dec($l['token_enc']);
-		?><div class="card"><b><?=h($l['label'])?></b><div class="note">Made <?=oev_v(date('n/j/Y', (int)$l['created_at']))?> &middot; last used <?=oev_v(ago($l['last_used_at']))?></div>
-		<div class="lnk"><?=h($url)?></div>
-		<button type="button" onclick="cp(this, <?=h(json_encode($url))?>)">Copy link</button>
-		<form method="post" action="settings.php?s=link" style="display:inline" onsubmit="return confirm('Turn this link off? Anyone using it will be shut out.')"><?=$CS?><input type="hidden" name="a" value="link_revoke"><input type="hidden" name="id" value="<?=(int)$l['id']?>"><button type="submit" class="del">Turn off</button></form></div><?php
+		echo '<div class="card"><b>' . h($l['label']) . '</b><div class="note">Made ' . oev_v(date('n/j/Y', (int)$l['created_at'])) . ' &middot; last used ' . oev_v(ago($l['last_used_at'])) . '</div>';
+		echo '<div class="lnk">' . h($url) . '</div>';
+		echo '<button type="button" onclick="cp(this, ' . h(json_encode($url)) . ')">Copy link</button> ';
+		echo '<form method="post" action="settings.php?s=users" style="display:inline" onsubmit="return confirm(\'Turn this link off? Anyone using it will be shut out.\')">' . $CS . '<input type="hidden" name="a" value="link_revoke"><input type="hidden" name="id" value="' . (int)$l['id'] . '"><button type="submit" class="del">Turn off</button></form></div>';
 	}
-	?><details class="card"><summary>Make a new link</summary><form method="post" action="settings.php?s=link"><?=$CS?><input type="hidden" name="a" value="link_add">
-	<label>Label (for you)</label><input type="text" name="label" placeholder="e.g. Garage tablet"><button type="submit" class="go">Make link</button></form></details>
-	<script>function cp(b, t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ b.textContent = 'Copied'; }, function(){ prompt('Copy this link:', t); }); }</script><?php
+	echo '<details class="card"><summary>Make a new link</summary><form method="post" action="settings.php?s=users">' . $CS . '<input type="hidden" name="a" value="link_add"><label>Label (for you)</label><input type="text" name="label" placeholder="e.g. Garage tablet"><button type="submit" class="go">Make link</button></form></details>';
+	?><script>function cp(b, t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ b.textContent = 'Copied'; }, function(){ prompt('Copy this link:', t); }); }
+function gsx(r){ r.form.querySelector('.gsx').style.display = r.value === 'some' ? '' : 'none'; }
+	function rsx(r){ var f = r.form, a = f.querySelector('input[name=role][value=admin]').checked; f.querySelector('.scx').style.display = a ? 'none' : ''; }   // admins always see all load groups
+	document.querySelectorAll('input[name=role][value=admin]').forEach(rsx);
+	if (location.hash) { var d = document.querySelector(location.hash); if (d && d.tagName === 'DETAILS') d.open = true; }</script><?php
 }
 /* ----------------------------- SYSTEM STATUS ----------------------------- */
 if ($sec === 'system') {

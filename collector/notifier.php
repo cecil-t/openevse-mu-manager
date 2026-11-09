@@ -15,7 +15,7 @@
  *               plugged in (limit, schedule, manual, fault, vehicle stopped drawing);
  *               not load-balancer pauses. Off for everyone until each user turns it on.
  *  - reminders: Plug-in reminders: a unit has no car plugged in by its set time.
- *               Sent only to the reminder's own "Send to" addresses (not to users).
+ *               Sent only to the owning login's account email (users.n_reminders); unmatched legacy rows are not mailed.
  * Errors/reboots/reminders: at most one email per unit per kind per hour (sessions/stops: once per plug-in, see the lib). State: collector/notify_state.json.
  ******************************************************************************/
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
@@ -61,7 +61,7 @@ $sdb = sess_db();
 $units = array(); foreach ($odb->query('SELECT id, name, enabled, loadgroupid FROM evses') as $u) $units[(int)$u['id']] = $u;
 $users = $odb->query('SELECT * FROM users')->fetchAll();
 foreach ($users as &$u) $u['groups'] = array_map('intval', $odb->query('SELECT group_id FROM user_groups WHERE user_id = ' . (int)$u['id'])->fetchAll(PDO::FETCH_COLUMN)); unset($u);
-// each login's per-unit choices (Your notifications on the unit page); none yet / no table = account defaults
+// each login's per-unit choices (Account & Prefs); none yet / no table = account defaults
 foreach ($users as &$u) $u['ovr'] = oev_unit_notify_rows($odb, (int)$u['id']); unset($u);
 
 function nm($id){ global $units; return isset($units[$id]) ? $units[$id]['name'] : "unit $id"; }
@@ -70,10 +70,13 @@ function rcpt($kind, $uid){
 	global $users, $units;
 	$o = array();
 	foreach ($users as $u) {
-		if (empty($u['n_' . $kind])) continue;
 		if ($u['role'] === 'admin') $u['scope_all'] = 1;   // admins always see everything
-		if ($uid && empty($u['scope_all'])) { $g = (int)($units[$uid]['loadgroupid'] ?? 0); if (!$g || !in_array($g, $u['groups'], true)) continue; }
+		// per-unit override first (errors/reboots/sessions/stops), else account default
+		$ef = oev_notify_effective($u, $u['ovr'][$uid][$kind] ?? null, $kind);
+		if (!$ef['on']) continue;
+		if ($uid && empty($u['scope_all'])) { $g = (int)($units[$uid]['loadgroupid'] ?? 0); if (!$g || !in_array($g, array_map('intval', (array)$u['groups']), true)) continue; }
 		if (!$uid && empty($u['scope_all']) && $kind !== 'errors') continue;
+		if (empty($u['email']) || !filter_var($u['email'], FILTER_VALIDATE_EMAIL)) continue;
 		$o[] = $u['email'];
 	}
 	return $o;
@@ -155,9 +158,21 @@ if (ns_baseline($st, $sdb, $now, 'ns_save_state')) $nlog('session emails: baseli
 ns_stops($sdb, $users, $units, $st, $now, $on, $nsend('stops'), 'ns_save_state', $nlog);       // a closed session's stop is decided before its summary
 ns_summaries($sdb, $users, $units, $st, $now, $on, $nsend('sessions'), 'ns_save_state', $nlog);
 
-/* ---- plug-in reminders ---- */
+/* ---- plug-in reminders (one owner login; mail only to that login's account email) ---- */
+$uby = array(); foreach ($users as $u) $uby[(int)$u['id']] = $u;
+$have_own = oev_reminders_have_owner($odb);
 foreach ($odb->query('SELECT * FROM reminders WHERE enabled = 1')->fetchAll() as $rm) {
 	$id = (int)$rm['unit_id']; if (!preg_match('/^(\d{1,2}):(\d{2})$/', (string)$rm['at_time'], $m) || empty($units[$id]['enabled'])) continue;
+	// owned reminders only (legacy unmatched rows stay silent until claimed)
+	$oid = $have_own ? ($rm['user_id'] === null || $rm['user_id'] === '' ? 0 : (int)$rm['user_id']) : 0;
+	if ($have_own && !$oid) continue;
+	$ou = $oid ? ($uby[$oid] ?? null) : null;
+	if ($have_own) {
+		if (!$ou || empty($ou['n_reminders'])) continue;   // owner turned reminders off
+		if (empty($ou['email']) || !filter_var($ou['email'], FILTER_VALIDATE_EMAIL)) continue;
+		$all = ($ou['role'] === 'admin') || !empty($ou['scope_all']);
+		if (!$all) { $g = (int)($units[$id]['loadgroupid'] ?? 0); if (!$g || !in_array($g, array_map('intval', (array)($ou['groups'] ?? array())), true)) continue; }
+	}
 	$t = mktime((int)$m[1], (int)$m[2], 0);
 	$dk = 'rem' . $rm['id'] . '|' . date('Ymd');
 	if ($now < $t || $now >= $t + 900 || !empty($st['rem'][$dk])) continue;   // 15-minute window, once a day
@@ -165,7 +180,10 @@ foreach ($odb->query('SELECT * FROM reminders WHERE enabled = 1')->fetchAll() as
 	if (!$r || $now - max((int)$r['last_ok_at'], (int)$r['last_push_at']) > 600) continue;   // no fresh reading: can't tell
 	$st['rem'][$dk] = 1;
 	if (!empty($r['connected'])) continue;
-	$extra = array_values(array_filter(array_map('trim', preg_split('/[,;\s]+/', (string)$rm['extra_to'])), function($e){ return filter_var($e, FILTER_VALIDATE_EMAIL); }));
+	if ($have_own) $extra = array($ou['email']);
+	else {   // pre-migration fallback (should not run after setup_auth)
+		$extra = array_values(array_filter(array_map('trim', preg_split('/[,;\s]+/', (string)$rm['extra_to'])), function($e){ return filter_var($e, FILTER_VALIDATE_EMAIL); }));
+	}
 	if ($on && $extra) notify('reminders', $id, 'rem' . $rm['id'] . date('Ymd'), nm($id) . ': not plugged in', nm($id) . ' has no car plugged in, and the plug-in reminder time is ' . date('g:i a', $t) . '.', $extra);
 }
 if (isset($st['rem'])) foreach (array_keys($st['rem']) as $k) if (substr($k, -8) < date('Ymd', $now - 3 * 86400)) unset($st['rem'][$k]);

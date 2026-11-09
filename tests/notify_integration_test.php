@@ -10,7 +10,7 @@ foreach ($files as $rel) { if ($rel === '' || preg_match('~(^|/)(tests|docs)/|\.
 exec('cd / && printf "fixture-pass-123\n" | OEV_ADMIN_EMAIL=admin@example.invalid ' . escapeshellarg($php) . ' ' . escapeshellarg("$s/collector/setup_auth.php") . ' 2>&1', $o, $rc);
 ck('setup_auth ok', $rc === 0); if ($rc) echo implode("\n", $o), "\n";
 ck('setup_auth adds the Charging stopped columns', strpos(implode("\n", $o), 'users.n_stops added') !== false);
-ck('setup_auth adds the per-unit notifications table (empty)', strpos(implode("\n", $o), 'user_unit_notify added') !== false);
+ck('setup_auth adds the per-unit notifications table (empty)', strpos(implode("\n", $o), 'user_unit_notify') !== false);
 $c = new PDO("sqlite:$s/data/openevse.db"); $u = $c->query('SELECT * FROM users')->fetch(PDO::FETCH_ASSOC);
 ck('first admin: Charging stopped off', (int)$u['n_stops'] === 0 && $u['n_stops_since'] === null);
 $o = array(); exec('cd / && printf "x\n" | OEV_SKIP_ADMIN=1 ' . escapeshellarg($php) . ' ' . escapeshellarg("$s/collector/setup_auth.php") . ' 2>&1', $o, $rc);

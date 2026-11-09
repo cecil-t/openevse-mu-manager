@@ -1,54 +1,120 @@
 <?php
-// My account: change password, log out (this device or everywhere).
+/******************************************************************************
+ * account.php - My account: name, password, and Email notifications (draft host;
+ * page may be renamed/moved to Preferences without changing the storage).
+ * Self-service only: never admin privilege. Public links refused.
+ ******************************************************************************/
 require_once __DIR__ . '/auth_lib.php';
 $me = oev_require('view');
-require_once __DIR__ . '/util_lib.php';   // h(), ago(), oev_sess_ro()
-$msg = ''; $err = '';
+require_once __DIR__ . '/util_lib.php';
+define('UNP_LIB_ONLY', 1);
+require_once __DIR__ . '/notify_prefs.php';
+
+$msg = ''; $err = ''; $db = oev_db();
+$go = function($m, $hash = 'notify'){ header('Location: account.php?msg=' . rawurlencode($m) . '#' . $hash, true, 303); exit; };
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	oev_csrf_check();
 	$a = $_POST['a'] ?? '';
 	if ($a === 'logout' || $a === 'logout_all') { oev_logout($a === 'logout_all'); header('Location: login.php', true, 303); exit; }
 	if ($a === 'name') {
 		$fn = trim(substr((string)($_POST['first_name'] ?? ''), 0, 60)); $ln = trim(substr((string)($_POST['last_name'] ?? ''), 0, 60));
-		$em = strtolower(trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : ''));   // stored lower-case, as Settings > Users does; login compares case-insensitively
+		$em = strtolower(trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : ''));
 		if (strlen($em) > 254 || filter_var($em, FILTER_VALIDATE_EMAIL) !== $em) $err = 'Enter a valid email address.';
 		else {
-			$st = oev_db()->prepare('SELECT count(*) FROM users WHERE email = ? COLLATE NOCASE AND id != ?'); $st->execute(array($em, $me['id']));
+			$st = $db->prepare('SELECT count(*) FROM users WHERE email = ? COLLATE NOCASE AND id != ?'); $st->execute(array($em, $me['id']));
 			if ((int)$st->fetchColumn()) $err = 'That email address already has a login.';
 			else {
-				try { oev_db()->prepare('UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?')->execute(array($fn, $ln, $em, $me['id'])); }
+				try { $db->prepare('UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?')->execute(array($fn, $ln, $em, $me['id'])); }
 				catch (PDOException $e) { $err = 'That email address already has a login.'; }
 				if ($err === '') { header('Location: account.php?saved=1', true, 303); exit; }
 			}
 		}
 	}
 	if ($a === 'password') {
-		$st = oev_db()->prepare('SELECT pass_hash FROM users WHERE id = ?'); $st->execute(array($me['id'])); $hash = $st->fetchColumn();
+		$st = $db->prepare('SELECT pass_hash FROM users WHERE id = ?'); $st->execute(array($me['id'])); $hash = $st->fetchColumn();
 		$new = (string)($_POST['new'] ?? '');
 		if (!password_verify((string)($_POST['current'] ?? ''), $hash)) $err = 'Your current password is not right.';
 		elseif ($new !== (string)($_POST['new2'] ?? '')) $err = 'The two new passwords are not the same.';
 		elseif ($p = oev_password_problem($new)) $err = $p;
 		else {
-			oev_db()->prepare('UPDATE users SET pass_hash = ? WHERE id = ?')->execute(array(password_hash($new, PASSWORD_DEFAULT), $me['id']));
-			oev_db()->prepare('DELETE FROM auth_tokens WHERE user_id = ? AND id != ?')->execute(array($me['id'], $me['token_id']));   // other devices log in again
+			$db->prepare('UPDATE users SET pass_hash = ? WHERE id = ?')->execute(array(password_hash($new, PASSWORD_DEFAULT), $me['id']));
+			$db->prepare('DELETE FROM auth_tokens WHERE user_id = ? AND id != ?')->execute(array($me['id'], $me['token_id']));
 			$msg = 'Password changed. Other devices will need to log in again.';
 		}
 	}
+	/* ---- personal email defaults (never another login's row) ---- */
+	if ($a === 'notify_defaults') {
+		$ne = isset($_POST['n_errors']) ? 1 : 0; $nr = isset($_POST['n_reboots']) ? 1 : 0;
+		$ns = isset($_POST['n_sessions']) ? 1 : 0; $nst = isset($_POST['n_stops']) ? 1 : 0;
+		$nrem = isset($_POST['n_reminders']) ? 1 : 0;
+		$hss = oev_users_have_col($db, 'n_sessions_since'); $hs = oev_users_have_stops($db);
+		$sql = 'UPDATE users SET n_errors = ?, n_reboots = ?, n_sessions = ?, n_reminders = ?';
+		$args = array($ne, $nr, $ns, $nrem);
+		if ($hss) { $sql .= ', n_sessions_since = CASE WHEN CAST(? AS INTEGER) = 0 THEN NULL WHEN coalesce(n_sessions, 0) = 0 THEN CAST(? AS INTEGER) ELSE n_sessions_since END'; $args[] = $ns; $args[] = time(); }
+		if ($hs) { $sql .= ', n_stops = ?, n_stops_since = CASE WHEN CAST(? AS INTEGER) = 0 THEN NULL WHEN coalesce(n_stops, 0) = 0 THEN CAST(? AS INTEGER) ELSE n_stops_since END'; $args[] = $nst; $args[] = $nst; $args[] = time(); }
+		$sql .= ' WHERE id = ?'; $args[] = (int)$me['id'];
+		$db->prepare($sql)->execute($args);
+		$go('Email defaults saved.');
+	}
+	/* ---- own plug-in reminders (owner = this login; mail = account email only) ---- */
+	if ($a === 'rem_add' || $a === 'rem_save' || $a === 'rem_delete') {
+		if (!oev_reminders_have_owner($db)) $go('Reminders are not ready yet (run setup).', 'rem');
+		$uid = (int)($_POST['unit'] ?? 0);
+		$st = $db->prepare('SELECT id, loadgroupid, name FROM evses WHERE id = ?'); $st->execute(array($uid)); $unit = $st->fetch(PDO::FETCH_ASSOC);
+		if ($a !== 'rem_delete' && (!$unit || !oev_unit_visible($unit))) $go('Pick a charger you can see.', 'rem');
+		if ($a === 'rem_delete') {
+			$db->prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?')->execute(array((int)$_POST['id'], (int)$me['id']));
+			$go('Reminder removed.', 'rem');
+		}
+		$t = (string)($_POST['at'] ?? '');
+		if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $t)) $go('Pick a time for the reminder.', 'rem');
+		$en = isset($_POST['enabled']) ? 1 : 0;
+		if ($a === 'rem_add') {
+			$db->prepare('INSERT INTO reminders (unit_id, at_time, extra_to, enabled, user_id) VALUES (?, ?, ?, 1, ?)')->execute(array($uid, $t, '', (int)$me['id']));
+			$go('Reminder added. It emails only ' . $me['email'] . '.', 'rem');
+		}
+		$db->prepare('UPDATE reminders SET unit_id = ?, at_time = ?, enabled = ?, extra_to = ? WHERE id = ? AND user_id = ?')
+			->execute(array($uid, $t, $en, '', (int)$_POST['id'], (int)$me['id']));
+		$go('Reminder saved.', 'rem');
+	}
 }
 if (isset($_GET['saved'])) $msg = 'Saved.';
-$title = 'Account'; $wq = '';
+if (isset($_GET['msg']) && $_GET['msg'] !== '') $msg = (string)$_GET['msg'];
+
+// refresh me from DB for flags
+$st = $db->prepare('SELECT * FROM users WHERE id = ?'); $st->execute(array((int)$me['id'])); $me = $st->fetch(PDO::FETCH_ASSOC) ?: $me;
+$me['groups'] = oev_user_groups((int)$me['id']);
+$units = array(); foreach ($db->query('SELECT id, name, loadgroupid FROM evses ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC) as $r) if (oev_unit_visible($r)) $units[(int)$r['id']] = $r;
+$have = oev_unit_notify_have($db);
+$view = $have ? oev_unit_notify_view($db, $me, $units) : array();
+$master = (bool)oev_setting('notify_on', '0');
+$CS = oev_csrf_field();
+$rems = oev_reminders_for_user($db, (int)$me['id']);
+$unres = oev_is_admin() ? oev_reminders_unresolved($db) : array();
+
+$title = 'Account & Prefs'; $wq = '';
 $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 ?>
 <style>
-.ac{font-size:16px;line-height:1.45;color:#444;text-align:left}
-.ac .card{background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0}
+.ac{font-size:16px;line-height:1.45;color:#444;text-align:left;max-width:560px;margin:0 auto}
+.ac .card{background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px 10px;margin:8px 0;box-sizing:border-box}
 .ac label{display:block;margin:8px 0 2px 0;color:#333}
-.ac input[type=password],.ac input[type=text],.ac input[type=email]{width:100%;box-sizing:border-box;font-size:16px;padding:5px 6px;border:1px solid #bbb;border-radius:4px}
+.ac label.in{display:block;margin:4px 0}
+.ac input[type=password],.ac input[type=text],.ac input[type=email],.ac input[type=time],.ac select{width:100%;max-width:100%;box-sizing:border-box;font-size:16px;padding:5px 6px;border:1px solid #bbb;border-radius:4px}
 .ac button{font-size:16px;padding:5px 14px;margin:10px 8px 2px 0;border:1px solid #888;border-radius:5px;background:#f6f6f6;cursor:pointer}
 .ac button.go{background:#00706f;border-color:#00706f;color:#fff}
+.ac button.del{color:#a11}
 .ac .msg{background:#e3f4e3;border:1px solid #9c9;border-radius:6px;padding:6px 9px;color:#245a24}
-@media screen and (min-width:700px){.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2{margin:8px 0}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}   /* desktop: name and password side by side */
 .ac .err{background:#fde3e3;border:1px solid #e99;border-radius:6px;padding:6px 9px;color:#a11;font-weight:normal}
+.ac .note{color:#666;font-size:14px;margin:4px 0}
+.ac .nsub{margin:-2px 0 6px 22px;font-size:13px}
+.ac .yn{margin:6px 0}
+.ac .yn select{display:block;width:100%}
+.ac .ynnow{font-size:85%;color:#666}
+.ac .st.on{color:#1d6b1d;font-weight:bold}.ac .st.off{color:#888;font-weight:bold}
+.ac .uh{font-weight:bold;margin-bottom:4px}
+@media screen and (min-width:700px){.ac .ac2{display:flex;gap:12px;align-items:flex-start}.ac .ac2>.card{flex:1 1 0;min-width:0;margin:0}}
 </style>
 <div class="slidebox ac pgcard">
 <?php if ($msg) echo '<div class="msg">' . h($msg) . '</div>'; if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>
@@ -58,7 +124,7 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <div style="display:flex;gap:8px"><div style="flex:1;min-width:0"><label>First name</label><input type="text" name="first_name" value="<?=h($me['first_name'] ?? '')?>" maxlength="60" autocomplete="given-name"></div>
 <div style="flex:1;min-width:0"><label>Last name</label><input type="text" name="last_name" value="<?=h($me['last_name'] ?? '')?>" maxlength="60" autocomplete="family-name"></div></div>
 <label>Email</label><input type="email" name="email" value="<?=h(is_string($_POST['email'] ?? null) ? $_POST['email'] : $me['email'])?>" maxlength="254" autocapitalize="off" autocomplete="email" required>
-<div style="color:#666;margin-top:4px">You log in with this email, and notification emails go to it. Your initials show in the circle at the top right.</div>
+<div class="note">You log in with this email, and notification emails go to it.</div>
 <button type="submit" class="go">Save</button></form></div>
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?><input type="hidden" name="a" value="password">
 <b>Change password</b>
@@ -66,7 +132,55 @@ $OEV_WIDE = 1; include __DIR__ . '/_head.php';
 <label>New password</label><input type="password" name="new" autocomplete="new-password" required>
 <label>New password again</label><input type="password" name="new2" autocomplete="new-password" required>
 <button type="submit" class="go">Change password</button></form></div></div>
-<div class="card"><b>Notifications</b><br><a href="notifications.php">Your notifications</a>: your email choices for every charger you can see, in one place.</div>
+
+<div class="card" id="notify">
+<b>Email notifications</b> <span class="note">(Account &amp; Prefs)</span>
+<div class="note">These are your own choices (defaults, not a master switch). The site-wide gate and mail server are under Settings &gt; Site settings<?=oev_is_admin() ? '' : ' (an admin)'?>.<?=$master ? '' : ' Outgoing email is currently off for the whole site, so nothing is sent.'?></div>
+<form method="post" action="account.php"><?=$CS?><input type="hidden" name="a" value="notify_defaults">
+<label class="in"><input type="checkbox" name="n_errors"<?=!empty($me['n_errors']) ? ' checked' : ''?>>Errors</label>
+<div class="nsub note">Charger faults and when a charger is offline longer than the site threshold.</div>
+<label class="in"><input type="checkbox" name="n_reboots"<?=!empty($me['n_reboots']) ? ' checked' : ''?>>Reboots</label>
+<label class="in"><input type="checkbox" name="n_sessions"<?=!empty($me['n_sessions']) ? ' checked' : ''?>>Session summary</label>
+<div class="nsub note">Account default for every charger you can see. Per-charger overrides below (Use account default / On / Off).</div>
+<?php if (oev_users_have_stops($db)) { ?>
+<label class="in"><input type="checkbox" name="n_stops"<?=!empty($me['n_stops']) ? ' checked' : ''?>>Charging stopped</label>
+<div class="nsub note">Default for every charger: email when charging stops while still plugged in (not load-balancer pauses), once per plug-in.</div>
+<?php } ?>
+<label class="in"><input type="checkbox" name="n_reminders"<?=!empty($me['n_reminders']) ? ' checked' : ''?>>Plug-in reminders</label>
+<div class="nsub note">Must be on for your reminders below to email you.</div>
+<button type="submit" class="go">Save defaults</button></form>
+</div>
+
+<?php if ($have && $units) { foreach ($units as $id => $u) { ?>
+<div class="card"><?=unp_form_html($id, $u['name'], $view[$id], $CS, $master)?></div>
+<?php } } elseif ($have) { ?>
+<div class="card"><div class="note">You have no chargers you can see, so there are no per-charger overrides.</div></div>
+<?php } ?>
+
+<div class="card" id="rem">
+<b>Plug-in reminders</b>
+<div class="note">An email if nothing is plugged in by the time you set (checked for 15 minutes, once a day). It goes only to <b><?=h($me['email'])?></b> — no extra recipients. Turn on &ldquo;Plug-in reminders&rdquo; in your defaults above.</div>
+<?php foreach ($rems as $r) { $id = (int)$r['id']; ?>
+<form method="post" action="account.php" style="border-top:1px solid #eee;padding-top:6px;margin-top:6px"><?=$CS?><input type="hidden" name="a" value="rem_save"><input type="hidden" name="id" value="<?=$id?>">
+<label>Charger</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '"' . ((int)$u['id'] === (int)$r['unit_id'] ? ' selected' : '') . '>' . h($u['name']) . '</option>'; ?></select>
+<label>Plug in by</label><input type="time" name="at" value="<?=h($r['at_time'])?>">
+<label class="in"><input type="checkbox" name="enabled"<?=!empty($r['enabled']) ? ' checked' : ''?>>On</label>
+<button type="submit" class="go">Save</button>
+<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm('Remove this reminder?')">Remove</button>
+</form>
+<?php } ?>
+<?php if ($units) { ?>
+<details style="margin-top:8px"><summary style="cursor:pointer;color:#035a5a;font-weight:bold">Add a reminder</summary>
+<form method="post" action="account.php"><?=$CS?><input type="hidden" name="a" value="rem_add">
+<label>Charger</label><select name="unit"><?php foreach ($units as $u) echo '<option value="' . (int)$u['id'] . '">' . h($u['name']) . '</option>'; ?></select>
+<label>Plug in by</label><input type="time" name="at" value="21:00">
+<button type="submit" class="go">Add reminder</button></form></details>
+<?php } ?>
+<?php if ($unres) { ?>
+<div class="note" style="margin-top:8px"><b><?=count($unres)?> legacy reminder(s)</b> could not be matched to a single login (see Settings &gt; Site settings). They are not emailed until claimed.</div>
+<?php } ?>
+</div>
+
 <div class="card"><form method="post" action="account.php"><?=oev_csrf_field()?>
 <button type="submit" name="a" value="logout">Log out</button><button type="submit" name="a" value="logout_all">Log out on all devices</button></form></div>
 <p><a href="./">&larr; Home</a><?=oev_is_admin() ? ' &middot; <a href="settings.php">Settings</a>' : ''?> &middot; <a href="help.php">Help</a></p>
