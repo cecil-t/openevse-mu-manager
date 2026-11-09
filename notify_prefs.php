@@ -85,7 +85,8 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 	foreach (oev_unit_notify_kinds() as $k => $t) {
 		$c = $view[$k]; $id = 'yn' . $uid . '_' . $k;
 		$def = 'Default (' . ($c['account_on'] ? 'On' : 'Off') . ')';
-		$o .= '<div class="yn"><label for="' . $id . '">' . $e($t) . '</label>'
+		$cls = 'yn' . (($c['mode'] ?? '') === 'inherit' ? ' yn-def' : '');
+		$o .= '<div class="' . $cls . '"><label for="' . $id . '">' . $e($t) . '</label>'
 			. '<select id="' . $id . '" name="n_' . $k . '">'
 			. '<option value="inherit"' . ($c['mode'] === 'inherit' ? ' selected' : '') . '>' . $e($def) . '</option>'
 			. '<option value="on"' . ($c['mode'] === 'on' ? ' selected' : '') . '>On</option>'
