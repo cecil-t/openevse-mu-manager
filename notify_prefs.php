@@ -101,6 +101,7 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 		. ($acct_rem_on ? '' : ' <b>(currently off — will not email)</b>') . '.</div>';
 	foreach ($rems as $r) {
 		$rid = (int)$r['id'];
+		$cfm = json_encode('Remove the ' . unp_rem_time_label($r['at_time'] ?? '') . ' reminder?', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 		$o .= '<form method="post" action="account.php" class="rem-row">' . $csrf_html
 			. '<input type="hidden" name="a" value="rem_save"><input type="hidden" name="id" value="' . $rid . '">'
 			. '<input type="hidden" name="unit" value="' . $uid . '">'
@@ -108,7 +109,7 @@ function unp_form_html($unit_id, $unit_name, $view, $csrf_html, $master_on, $rem
 			. '<input type="time" id="remat' . $rid . '" name="at" value="' . $e($r['at_time']) . '"></div>'
 			. '<label class="in"><input type="checkbox" name="enabled"' . (!empty($r['enabled']) ? ' checked' : '') . '>On</label>'
 			. '<button type="submit" class="go">Save</button>'
-			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(\'Remove this reminder?\')">Remove</button>'
+			. '<button type="submit" name="a" value="rem_delete" class="del" onclick="return confirm(' . $cfm . ')">Remove</button>'
 			. '</form>';
 	}
 	$o .= '<form method="post" action="account.php" class="rem-row rem-add">' . $csrf_html
