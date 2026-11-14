@@ -260,7 +260,7 @@ function sess_event($db, $unit, $sid, $segid, $ts, $kind, $detail, $from, $to, $
 		->execute(array((int)$unit['id'], $unit['name'], $sid, $segid, $ts, $kind, $detail, $from, $to, $temp, $reason, (int)$unit['id']));
 	if (in_array($kind, array('fault', 'fault_count', 'thermal'))) {
 		slog('warn', "{$unit['name']}: $kind - $detail" . ($temp !== null ? " ({$temp} C)" : ''));
-		if ($sid) $db->exec("UPDATE sessions SET faults = faults + 1 WHERE id = " . (int)$sid);
+		if ($sid && $reason !== 'thermal restore') $db->exec("UPDATE sessions SET faults = faults + 1 WHERE id = " . (int)$sid);
 	}
 }
 
@@ -418,12 +418,19 @@ function sess_process($db, $unit, $r, $now){
 		if ($nv !== null && ($us[$col] === null || $nv !== (int)$us[$col])) $set[$col] = $nv;
 	}
 	// ---- thermal threshold crossing
+	// Restore is only logged if a throttle was armed (65 C crossing or a thermal derate).
+	// thermal_armed lives in unit_state so it survives each collector/push run.
+	$armed = !empty($us['thermal_armed']);
 	if ($temp !== null && $us['temp_c'] !== null) {
-		if ($temp >= SESS_THERMAL_C && (float)$us['temp_c'] < SESS_THERMAL_C)
+		if ($temp >= SESS_THERMAL_C && (float)$us['temp_c'] < SESS_THERMAL_C) {
 			sess_event($db, $unit, $sid, $segid, $now, 'thermal', 'temperature reached throttle threshold (' . SESS_THERMAL_C . ' C)', (float)$us['temp_c'], $temp, $temp, 'thermal');
-		elseif ($temp <= SESS_THERMAL_RESTORE_C && (float)$us['temp_c'] > SESS_THERMAL_RESTORE_C && (float)$us['temp_c'] >= SESS_THERMAL_C - 3)
+			$armed = true;
+		} elseif ($armed && $temp <= SESS_THERMAL_RESTORE_C && (float)$us['temp_c'] > SESS_THERMAL_RESTORE_C) {
 			sess_event($db, $unit, $sid, $segid, $now, 'thermal', 'temperature back below restore threshold (' . SESS_THERMAL_RESTORE_C . ' C)', (float)$us['temp_c'], $temp, $temp, 'thermal restore');
+			$armed = false;
+		}
 	}
+	if ($armed !== !empty($us['thermal_armed'])) $set['thermal_armed'] = $armed ? 1 : 0;
 	if ($temp !== null) $set['temp_c'] = $temp;
 	foreach (array('temp1_c', 'temp2_c', 'temp3_c') as $k) if ($r[$k] !== null) $set[$k] = $r[$k];
 
@@ -515,7 +522,10 @@ function sess_process($db, $unit, $r, $now){
 			elseif ($r['pilot'] > $prev_pilot && $us['temp_c'] !== null && (float)$us['temp_c'] >= SESS_THERMAL_C - 5) $reason = 'thermal restore';
 			elseif ($r['cmax'] !== null && $r['pilot'] == $r['cmax']) $reason = 'setting change (user)';
 			sess_event($db, $unit, $sid, $segid, $now, 'pilot', "pilot $prev_pilot A -> {$r['pilot']} A", $prev_pilot, $r['pilot'], $temp, $reason);
-			if ($reason == 'thermal derate') sess_event($db, $unit, $sid, $segid, $now, 'thermal', "thermal derate, pilot $prev_pilot -> {$r['pilot']} A", $prev_pilot, $r['pilot'], $temp, 'thermal');
+			if ($reason == 'thermal derate') {
+				sess_event($db, $unit, $sid, $segid, $now, 'thermal', "thermal derate, pilot $prev_pilot -> {$r['pilot']} A", $prev_pilot, $r['pilot'], $temp, 'thermal');
+				$set['thermal_armed'] = 1;
+			}
 			// the load starting or stopping in the same reading as the pilot change is still logged
 			$ea = $us['evt_amps'] !== null ? (float)$us['evt_amps'] : null;
 			if ($charging && $prev_charging && $r['amps'] !== null && $ea !== null && (($ea >= 2.0) !== ($r['amps'] >= 2.0)))

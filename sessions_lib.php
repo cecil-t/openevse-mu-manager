@@ -18,7 +18,7 @@
 
 require_once __DIR__ . '/sess_path.php';   // SESS_DB_PATH
 require_once __DIR__ . '/volts_lib.php';
-define('SESS_SCHEMA_VERSION', 7);
+define('SESS_SCHEMA_VERSION', 8);
 
 function sess_db($readonly = false){
 	if (!$readonly && !is_file(SESS_DB_PATH) && !is_dir(dirname(SESS_DB_PATH))) @mkdir(dirname(SESS_DB_PATH), 0750, true);   // new install: data/
@@ -153,6 +153,8 @@ function sess_schema($db){
 	sess_add_cols($db, 'sessions', array('first_push_at'=>'INTEGER', 'unplug_push_at'=>'INTEGER'));
 	// ---- v7: boot lock (WiFi firmware that has it): NULL = not supported, else 0/1 as last read; when we last turned it on
 	sess_add_cols($db, 'unit_state', array('boot_lock'=>'INTEGER', 'boot_lock_set_at'=>'INTEGER'));
+	// ---- v8: thermal_armed = 1 after a 65 C crossing or a thermal derate; cleared on restore
+	sess_add_cols($db, 'unit_state', array('thermal_armed'=>'INTEGER'));
 	// ---- v4: kW is no longer stored (derived = amps x volts, computed at report time).
 	// One-off: give old samples their voltage (from the stored kW, else the unit's),
 	// then clear the stored kW / avg / peak kW so nothing reads stale derived values.
@@ -192,7 +194,8 @@ function sess_cols_ok($db){
 	$ok = 0;
 	foreach ($db->query("PRAGMA table_info(unit_state)") as $c) if ($c['name'] == 'temp_max_c') $ok++;
 	foreach ($db->query("PRAGMA table_info(sessions)") as $c) if ($c['name'] == 'first_push_at') $ok++;
-	return $ok == 2;
+	foreach ($db->query("PRAGMA table_info(unit_state)") as $c) if ($c['name'] == 'thermal_armed') $ok++;
+	return $ok == 3;
 }
 
 // additive migration: ADD COLUMN for any column a table doesn't have yet
