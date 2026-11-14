@@ -45,7 +45,7 @@
 const LB_MIN_AMPS = 6;
 // headroom tuning (seconds / amps)
 const LB_HR = [
-	'grace'        => 180,   // no cuts in the first 3 min after charging starts or after the unit was raised
+	'grace'        => 120,   // no cuts in the first 2 min after charging starts or after the unit was raised
 	'below_a'      => 4,     // cut when drawing at least 4 A under its allocation ...
 	'below_for'    => 120,   // ... for 2 min
 	'margin_a'     => 4,     // cap = draw + 4 A, at least 6 A

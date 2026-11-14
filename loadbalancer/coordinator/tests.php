@@ -42,10 +42,10 @@ check('charging unit whose share fits under its saved value: saved left for late
 echo "== headroom state machine\n";
 $h = []; $ev = null; $evs = [];
 for ($s = 0; $s <= 600; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'amps'=>($s < 60 ? 10 : 30), 'alloc'=>34], $s); if ($ev) $evs[] = $ev; }
-check('grace: slow ramp in first 3 min is not cut; steady 30 of 34 A never cut (<4 A gap)', !$evs, json_encode($evs));
+check('grace: slow ramp in first 2 min is not cut; steady 30 of 34 A never cut (<4 A gap)', !$evs, json_encode($evs));
 $h = []; $evs = [];
 for ($s = 0; $s <= 900; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'amps'=>3.2, 'alloc'=>34], $s); if ($ev) $evs[] = [$s, $ev]; }
-check('cell balancing 3.2 A of 34: one cut to 8 A at 3 min (grace), no more (8-8<2)', count($evs) == 1 && $evs[0][1][2] == 8 && $evs[0][0] == 180, json_encode($evs));
+check('cell balancing 3.2 A of 34: one cut to 8 A at 2 min (grace), no more (8-8<2)', count($evs) == 1 && $evs[0][1][2] == 8 && $evs[0][0] == 120, json_encode($evs));
 $h = []; $evs = [];
 for ($s = 0; $s <= 900; $s += 5) { [$h, $ev] = lb_hr_step($h, ['charging'=>true, 'amps'=>($s % 120 < 60 ? 26 : 34), 'alloc'=>34], $s); if ($ev) $evs[] = [$s, $ev]; }
 check('hysteresis: car swinging 26/34 A every minute is never cut', !$evs, json_encode($evs));

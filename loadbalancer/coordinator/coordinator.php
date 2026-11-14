@@ -365,7 +365,7 @@ while (true) {
 		foreach ($g['units'] as $id) { $settings[$id] = $state['units'][$id]['setting'] ?? null; $savedv[$id] = $state['units'][$id]['saved'] ?? null; $ratings[$id] = lb_rating($id); $chg[$id] = !empty($readings[$id]['charging']); }
 		$p['writes'] = lb_write_order($p, $settings, $savedv, $ratings, $chg);
 		$p['pause_req'] = []; foreach ($g['units'] as $id) if (($armed && $pausable[$id]) || !empty($p['units'][$id]['pause'])) $p['pause_req'][] = $id;
-		// a unit whose allocation went up gets the 3 min headroom grace (its car needs time to ramp)
+		// a unit whose allocation went up gets the 2 min headroom grace (its car needs time to ramp)
 		foreach ($p['units'] as $id => $x) {
 			$prevT = $state['units'][$id]['plan_target'] ?? null;
 			if ($x['target'] !== null && $prevT !== null && $x['target'] > $prevT && isset($state['units'][$id]['hr'])) $state['units'][$id]['hr']['last_raise'] = $now;
