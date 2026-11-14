@@ -18,7 +18,7 @@
  *     (limit / units in the group), never below 6 A;
  *   - a unit we can't read keeps whatever it had (counted as is);
  *   - more units than fit at 6 A (80 / 6 = 13): lowest priority cars pause, warning.
- * Headroom: a car drawing clearly less than its share gets a cap = draw + margin;
+ * Headroom: a car drawing clearly less than its share gets a cap = draw + 4 A;
  *   the freed amps go to the other cars (lb_hr_step), lifted when it pushes back.
  * Idle pause: when 2+ cars are charging and at least one is held below what it
  *   can take (rating or cap), idle units that are awake with nothing plugged in
@@ -48,8 +48,7 @@ const LB_HR = [
 	'grace'        => 180,   // no cuts in the first 3 min after charging starts or after the unit was raised
 	'below_a'      => 4,     // cut when drawing at least 4 A under its allocation ...
 	'below_for'    => 120,   // ... for 2 min
-	'margin_a'     => 4,     // cap = draw + max(4 A, 15 %), at least 6 A
-	'margin_pct'   => 0.15,
+	'margin_a'     => 4,     // cap = draw + 4 A, at least 6 A
 	'claw_a'       => 2,     // lift the cap when drawing within 2 A of it ...
 	'claw_for'     => 15,    // ... for 15 s
 	'down_every'   => 300,   // at most one cut per unit every 5 min
@@ -238,7 +237,7 @@ function lb_hr_step(array $h, array $in, $now){
 	else $h['below_since'] = null;
 	$grace = ($now - $h['charge_start'] < $H['grace']) || ($h['last_raise'] !== null && $now - $h['last_raise'] < $H['grace']);
 	if (!$grace && $h['below_since'] !== null && $now - $h['below_since'] >= $H['below_for'] && ($h['last_cut'] === null || $now - $h['last_cut'] >= $H['down_every'])) {
-		$new = max(LB_MIN_AMPS, (int)ceil($a + max($H['margin_a'], $H['margin_pct'] * $a)));
+		$new = max(LB_MIN_AMPS, (int)ceil($a + $H['margin_a']));
 		if ($ref - $new >= $H['ignore_a']) {
 			$ev = ['cut', $ref, $new, $a];
 			$h['cap'] = $new; $h['idle_cap'] = (isset($in['real']) && !$in['real']); $h['last_cut'] = $now; $h['below_since'] = null; $h['near_since'] = null;

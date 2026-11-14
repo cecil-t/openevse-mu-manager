@@ -11,7 +11,7 @@ Shares one circuit's amps between the chargers in a load group (openevse.db `loa
   <= the group limit (if the server or coordinator dies, nothing can overload the circuit).
 - Headroom: amps of charging units are read every 5 s (charging units only). A car drawing
   4+ A under its share for 2 min (not in its first 3 min, or 3 min after a raise) is capped
-  at draw + max(4 A, 15 %) (min 6 A); the spare goes to the other cars, then idle units.
+  at draw + 4 A (min 6 A); the spare goes to the other cars, then idle units.
   The cap is lifted when the car draws within 2 A of it for 15 s (others lowered first).
   Max one cut per 5 min, one raise per 30 s per unit, changes under 2 A ignored; raises wait
   5 s after a lower. Cuts are saved; headroom raises are temporary (`$SC N V`), so after a

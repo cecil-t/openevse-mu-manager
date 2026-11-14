@@ -133,9 +133,9 @@ $fin = function($s){ return json_encode($s['final_live']) . ' draw ' . json_enco
 $a1 = lb_sim(80, $R, [5=>['plug'=>0, 'demand'=>$car28]], 900);
 check('28 A car alone (27.8 A): capped at 32 A, idle units up to their fair share, <= 80 A', $a1['final_live'][5] == 32 && $a1['over_s'] == 0 && $a1['max_live'] <= 80 && max($a1['final_live'][1], $a1['final_live'][3], $a1['final_live'][4]) <= 20, $fin($a1));
 $a2 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$cap40]], 900);
-check('40 A car alone: capped at 46 A (frees 2 A), <= 80 A', $a2['final_live'][1] == 46 && $a2['over_s'] == 0 && $a2['max_live'] <= 80, $fin($a2));
+check('40 A car alone: capped at 44 A (frees 4 A), <= 80 A', $a2['final_live'][1] == 44 && $a2['over_s'] == 0 && $a2['max_live'] <= 80, $fin($a2));
 $a3 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$cap40], 5=>['plug'=>0, 'demand'=>$car28]], 900);
-check('40 A car + 28 A car: idle units paused, 28 A car capped at 32, 40 A car gets 46, <= 80 A', $a3['final_live'][5] == 32 && $a3['final_live'][1] >= 44 && $a3['over_s'] == 0 && $a3['max_live'] <= 80, $fin($a3) . ' paused ' . json_encode($a3['final_paused']));
+check('40 A car + 28 A car: idle units paused, 28 A car capped at 32, 40 A car gets 44, <= 80 A', $a3['final_live'][5] == 32 && $a3['final_live'][1] == 44 && $a3['over_s'] == 0 && $a3['max_live'] <= 80, $fin($a3) . ' paused ' . json_encode($a3['final_paused']));
 $a4 = lb_sim(80, $R, [1=>['plug'=>0, 'demand'=>$cap40], 3=>['plug'=>0, 'demand'=>$cap32], 5=>['plug'=>0, 'demand'=>$car28]], 900);
 check('all three: unit 4 paused, shares 26/27/27 below every car\'s maximum, no caps needed, <= 80 A', $a4['cuts'] == 0 && $a4['over_s'] == 0 && $a4['max_live'] <= 80, $fin($a4));
 $a5 = lb_sim(80, $R, [5=>['plug'=>0, 'demand'=>$car28], 3=>['plug'=>600, 'demand'=>$cap32], 1=>['plug'=>1200, 'demand'=>$cap40, 'unplug'=>2400]], 3000);
