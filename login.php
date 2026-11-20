@@ -25,7 +25,7 @@ include __DIR__ . '/_head.php';
 .lg .note{color:#666;margin-top:10px}
 </style>
 <div class="slidebox lg">
-<?php if ($u && $u['role'] !== 'public') { ?>
+<?php if ($u && $u['role'] !== 'public' && empty($u['demo'])) { ?>
 <p>You are logged in as <?=h($u['email'])?>.</p><p><a href="./">Home</a> &middot; <a href="account.php">Account Preferences</a></p>
 <?php } else { ?>
 <?php if ($err) echo '<div class="err">' . h($err) . '</div>'; ?>
@@ -34,6 +34,6 @@ include __DIR__ . '/_head.php';
 <label>Password</label><input type="password" name="password" autocomplete="current-password" required>
 <button type="submit">Log in</button>
 </form>
-<div class="note">You stay logged in on this device until you log out.<?=$u ? ' You are using a view-only link now.' : ''?></div>
+<div class="note">You stay logged in on this device until you log out.<?=$u ? (empty($u['demo']) ? ' You are using a view-only link now.' : ' You are using the demo login now.') : ''?></div>
 <?php } ?>
 </div></div></body></html>

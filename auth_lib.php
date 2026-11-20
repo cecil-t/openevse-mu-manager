@@ -10,6 +10,10 @@
  *  - Public read-only links (`public_links`): a random token in the URL gives
  *    view-only access to the home page, unit details and load balancer status.
  *  - CSRF: every POST form carries a token matching a cookie (oev_csrf_field()).
+ *  - Demo login (setting `demo_user` = a user id, collector/demo_user.php): demo.php
+ *    signs a visitor in as that user with one click. It is always a viewer, whatever
+ *    its row says, and every POST is refused except "Log out" on this device, so it
+ *    can't change its name, email, password, emails, reminders or log others out.
  * Pages call oev_require('public' | 'view' | 'admin') before any output.
  * Command-line scripts (collector, load balancer, tools) are never gated.
  ******************************************************************************/
@@ -49,6 +53,8 @@ function oev_user(){
 				unset($r['token_hash'], $r['pass_hash']);
 				$r['groups'] = oev_user_groups((int)$r['id']);
 				$r['token_id'] = (int)$r['tid'];
+				$r['demo'] = oev_demo_user_id() === (int)$r['id'];
+				if ($r['demo']) { $r['role'] = 'viewer'; $r['scope_all'] = 1; $r['groups'] = array(); }   // demo: always view only
 				return $GLOBALS['OEV_USER'] = $r;
 			}
 		}
@@ -61,6 +67,11 @@ function oev_user_groups($uid){ $st = oev_db()->prepare('SELECT group_id FROM us
 function oev_is_admin(){ $u = oev_user(); return $u && $u['role'] === 'admin'; }
 function oev_can_control(){ return PHP_SAPI === 'cli' || oev_is_admin(); }
 function oev_is_public(){ $u = oev_user(); return $u && $u['role'] === 'public'; }
+// the demo login (Settings key demo_user, set by collector/demo_user.php): 0 = none
+function oev_demo_user_id(){ $v = oev_setting('demo_user', ''); return ctype_digit((string)$v) ? (int)$v : 0; }
+function oev_is_demo(){ $u = oev_user(); return $u && !empty($u['demo']); }
+// a POST the demo login may make: only "Log out" on this device
+function oev_demo_post_ok(){ return basename(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''))) === 'account.php' && ($_POST['a'] ?? '') === 'logout'; }
 
 /* ---------- scope: which units a user may see ---------- */
 // null = everything; otherwise the list of load group ids (units with no group are hidden)
@@ -110,6 +121,8 @@ function oev_require($need = 'view', $json = false){
 	}
 	$u = oev_user();
 	if ($u && $u['role'] !== 'public') oev_csrf_token();   // cookie set before output (the avatar menu's Log out form)
+	if ($u && !empty($u['demo']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'HEAD' && !oev_demo_post_ok())
+		oev_deny($json, 'This is a demo login: you can look around, but nothing can be changed.', 403);
 	$ok = $u && ($need === 'public' || ($need === 'view' && $u['role'] !== 'public') || ($need === 'admin' && $u['role'] === 'admin'));
 	if ($ok) return $u;
 	if ($u && $u['role'] !== 'public') oev_deny($json, 'Your login can only view. Ask an admin if you need to change settings.', 403);
@@ -202,7 +215,7 @@ function oev_userbar(){
 	$u = oev_user(); if (!$u) return '';
 	$e = function($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 	if ($u['role'] === 'public') return '<div class="av"><a class="avlogin" href="login.php" title="You are using a view-only link">Log in</a></div>';
-	$adm = $u['role'] === 'admin'; $sys = ''; $p = array();
+	$adm = $u['role'] === 'admin'; $demo = !empty($u['demo']); $sys = ''; $p = array();
 	if ($adm) {
 		require_once __DIR__ . '/sys_lib.php';
 		$p = array(); try { $p = oev_sys_problems(); } catch (Throwable $x) {}
@@ -211,14 +224,14 @@ function oev_userbar(){
 	$sep = '<hr class="avsep">';
 	$o = '<div class="av"><button type="button" class="avb" aria-haspopup="true" aria-expanded="false" title="' . $e(oev_user_name($u)) . '" onclick="oevAv(event)"><span class="avc">' . $e(oev_initials($u)) . '</span></button>'
 		. (!empty($p) ? '<span class="avdot" title="System problem: see System status"></span>' : '')
-		. '<div class="avm" hidden><div class="avn">' . $e(oev_user_name($u)) . '<span>' . $e($u['email']) . '</span></div>'
+		. '<div class="avm" hidden><div class="avn">' . $e(oev_user_name($u)) . '<span>' . ($demo ? 'Demo: view only' : $e($u['email'])) . '</span></div>'
 		/* Group: navigation */
 		. '<a href="./">Home</a><a href="sessions.php">Session Reports</a>'
 		. ($adm ? '<a href="unitlist.php">Unit List / Info</a>' : '')
 		. $sep
 		/* Group: account / config */
 		. ($adm ? '<a href="settings.php">Settings</a>' : '')
-		. '<a href="account.php">Account Preferences</a>'
+		. ($demo ? '' : '<a href="account.php">Account Preferences</a>')
 		. $sep
 		/* Group: status / help; Diagnostics with System status; Log out keeps its own form top border */
 		. ($adm ? $sys : '')
