@@ -39,7 +39,6 @@ It's built for a home with a few chargers, but the same setup works for a small 
 - **Several locations.** The units can be anywhere the server can reach over the network, for example through a VPN between sites.
 - **Several users.** Each login is an admin, who can see and change everything, or a viewer, who can only look. You can limit a viewer to the units in chosen load groups.
 - **View-only links.** Share a status page without giving out a login, for example on a status monitor display.
-- **Demo login.** `sudo -u <web user> php collector/demo_user.php on` makes a view-only demo user, and `demo.php` signs anyone in as it with one click (for a link on your own web site). It sees what a viewer sees, minus the WiFi name, and can't change anything, not even its own name or password. `off` turns it off again.
 
 License: MIT (see LICENSE). The bundled PHPMailer keeps its own license (LGPL 2.1).
 

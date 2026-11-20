@@ -39,7 +39,7 @@ if (oev_is_admin()) {   // unit address: admins only
 	$d['host'] = $v($e['hostname'] ?? '');
 	if (!empty($e['ipaddress'])) $d['ip'] = h($e['ipaddress']);
 }
-$d['ssid'] = oev_is_demo() ? $v('Hidden in the demo') : $v($e['ssid'] ?? '');   // demo login: no home WiFi name
+$d['ssid'] = $v($e['ssid'] ?? '');
 if (isset($e['srssi']) && $e['srssi'] !== null) $d['rssi'] = idx_bars_html($e['srssi']);
 if (isset($e['timerstart']) && $e['timerstart'] !== '') $d['start'] = ($e['timerstart'] === 'None') ? 'None' : h($e['timerstart'] . ' / ' . $e['timerend']);
 $lim = array();

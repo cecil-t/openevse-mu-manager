@@ -85,15 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$go($rmsg, $anchor((int)$au));
 	}
 }
-/* demo login: nothing to change here, only "Log out" (oev_require() refuses every other POST) */
-if (!empty($me['demo'])) {
-	$title = 'Account Preferences'; $wq = '';
-	$OEV_WIDE = 1; include __DIR__ . '/_head.php';
-	echo '<div class="slidebox pgcard" style="text-align:left;font-size:16px;line-height:1.5"><p><b>Demo login</b><br>You can look around everything a view-only login sees. Nothing can be changed, and no emails are sent.</p>'
-		. '<form method="post" action="account.php">' . oev_csrf_field() . '<button type="submit" name="a" value="logout">Log out</button></form></div>'
-		. oev_home_footer() . '</div></body></html>';
-	exit;
-}
 if (isset($_GET['saved'])) $msg = 'Saved.';
 if (isset($_GET['msg']) && $_GET['msg'] !== '') $msg = (string)$_GET['msg'];
 
