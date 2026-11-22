@@ -12,6 +12,9 @@ if ($oev_sub === '') $oev_sub = $oev_site;
 <head>
 	<title><?=h($title)?></title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+<?php if (!empty($GLOBALS['OEV_NOINDEX'])): ?>
+	<meta name="robots" content="noindex">
+<?php endif; ?>
 	<meta name="mobile-web-app-capable" content="yes">
 	<link rel="manifest" href="./manifest.json">
 	<link rel=icon type="image/png" href="media/favicon-32x32.png" sizes="32x32">

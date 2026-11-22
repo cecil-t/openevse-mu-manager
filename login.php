@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $u = oev_user();
 $title = 'Log in'; $wq = '';
 $GLOBALS['OEV_NOBAR'] = 1;
+$GLOBALS['OEV_NOINDEX'] = 1;
 include __DIR__ . '/_head.php';
 ?>
 <style>
