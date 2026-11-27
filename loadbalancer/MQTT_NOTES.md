@@ -15,7 +15,9 @@ same switch. Nothing in the charging controller changes because of MQTT.
   on Level 2, 24 A on Level 1.
 - **(b) Max current.** What MU Manager will let that unit's pilot be set to. Stored as
   `evses.breaker` (Settings > Units, "Max current (Amps)"). It can't be above the unit's
-  hardware maximum.
+  hardware maximum. Next to it, Settings shows the required minimum circuit breaker:
+  the setting × 125% (chargers are a continuous load), rounded up to the next standard
+  breaker size.
 - **(c) Pilot setting.** The current saved on the unit. It survives a reboot. It can't be
   above (a) or (b).
 - **(d) Temporary limit.** What the coordinator sets (`$SC N V` on WiFi 2.x, a claim on v5).
