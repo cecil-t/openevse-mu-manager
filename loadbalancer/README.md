@@ -4,31 +4,33 @@ Shares one circuit's amps between the chargers in a load group (openevse.db `loa
 `evses.loadgroupid`). Two containers: **mosquitto** (MQTT broker, LAN only) and
 **coordinator** (PHP, reuses the site's tagged/retrying RAPI + HTTP helpers).
 
+The four current limits are named in [MQTT_NOTES.md](MQTT_NOTES.md): the unit's own pilot
+menu, Max current (`evses.breaker`), the pilot setting saved on the unit, and the temporary
+limit the coordinator sets.
+
 ## Rules it follows
-- Equal share among plugged-in units, capped at each unit's rating (Max current and the
-  unit's saved current, whichever is lower), min 6 A.
+- Equal share among plugged-in units, capped at Max current (`evses.breaker`) and the unit's
+  pilot setting, min 6 A.
 - Units with nothing plugged in get the leftover amps up to the fair share (limit / units in
-  the group, e.g. 80 / 4 = 20 A), never below 6 A. That share is temporary. When two or more
-  cars are charging and one is held below what it can take, idle units that are awake are
-  paused and draw nothing, and their 6 A go to the cars. The saved currents are each unit's
-  own full rating. They are not written here, and they do not have to add up to the limit.
+  the group, e.g. 80 / 4 = 20 A), never below 6 A, so the temporary limits always add up to
+  the group limit or less. While the units stay powered, the coordinator being down cannot
+  overload the circuit. A unit that loses power comes back on its pilot setting.
 - Headroom: amps of charging units are read every 5 s (charging units only). A car drawing
   4+ A under its share for 2 min (not in its first 2 min, or 2 min after a raise) is capped
   at draw + 4 A (min 6 A); the spare goes to the other cars, then idle units.
   The cap is lifted when the car draws within 2 A of it for 15 s (others lowered first).
   Max one cut per 5 min, one raise per 30 s per unit, changes under 2 A ignored; raises wait
-  5 s after a lower. Every share is temporary (`$SC N V` on WiFi 2.x, a claim on v5). After
-  a reboot the controller is back at its saved (full) current until the coordinator sets the
-  share again. Tuning: `LB_HR` in lb_core.php.
+  5 s after a lower. Those changes are temporary limits (`$SC N V` on WiFi 2.x, a claim on
+  v5). After a reboot the unit is back on its pilot setting until the coordinator sets the
+  temporary limit again. Tuning: `LB_HR` in lb_core.php.
 - Schedules: a unit asleep on its schedule counts as idle even with a car plugged in; when it
   wakes, MQTT reports it and it gets its share (others lowered first). The coordinator never
   sends schedule or sleep commands; every RAPI command passes a whitelist ($SC >= 6, $FD,
   $FE, reads) in lb_core.php.
-- Pause (cars that do not fit at 6 A each, and idle units when two or more cars are
-  charging and one is held below what it can take): WiFi 2.x `$FD`, resume `$FE`
-  (`$FS` isn't used: the schedule timer would wake it). No saved-current write.
-  v5: a claim `{"state":"disabled"}` that also carries the share; resume is a claim
-  without a state. A claim cannot set a current above the unit's saved soft max.
+- Pause (only if cars don't fit at 6 A each): WiFi 2.x `$FD`, resume `$FE`
+  (`$FS` isn't used: the schedule timer would wake it). v5: claim
+  {"state":"disabled"}, resume is a claim without a state. Neither writes the pilot
+  setting. A claim can't go above the pilot setting.
 - Tests: `php coordinator/tests.php -v` (split, headroom, second-by-second simulation).
 - If cars don't fit at 6 A each, the lowest priority pauses (first plugged in = highest
   priority, unless an optional integer column `evses.lb_priority` is set; lower = first).
