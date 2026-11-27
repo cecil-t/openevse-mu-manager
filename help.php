@@ -58,9 +58,9 @@ $hbm = (int)$S['heartbeat_min'];
 <li>Units in a load group are fed from the same breaker panel or main breaker. Each unit can still have its own branch breaker. The group's capacity is the limit for that panel or feeder: the load balancer splits it between the cars that are plugged in, and never goes over it.</li>
 <li><b>Max current</b> (Settings &gt; Units) is the most a unit will ever give a car. It can't be more than the unit's own hardware maximum. The unit's branch breaker must be at least 125% of it, rounded up to a standard size: <?php $ex = array(); foreach (array(16, 32, 40, 48) as $a) $ex[] = $a . ' A needs ' . oev_v(oev_min_breaker($a) . ' A'); echo implode(', ', $ex); ?>.</li>
 <li>To delete a load group, first set each of its units to Load group "None" under Settings &gt; Units.</li>
-<li>Each unit's <b>saved</b> current is kept at its full rating. The load balancer sets a <b>temporary</b> current below it, shown in parentheses, like (16 A).</li>
+<li>Each unit's <b>pilot setting</b> is what is saved on the unit (kept after a restart), up to Max current. The load balancer sets a <b>temporary limit</b> below it, shown in parentheses, like (16 A).</li>
 <li>Joining a group turns on MQTT on the unit with its own login. Leaving the group turns it off. Units that are not in a group can use MQTT any way you like.</li>
-<li>If the server stops, units keep charging at their last setting. The load balancer restarts on its own.</li>
+<li>If the server stops, units that stay powered keep their last temporary limit. The load balancer restarts on its own. A unit that loses power comes back on its pilot setting, so the group can go over until the temporary limit is set again.</li>
 </ul>
 
 <h2 id="clock">How unit clocks are set and kept right</h2>
@@ -84,7 +84,7 @@ $hbm = (int)$S['heartbeat_min'];
 <li><b>Logins on 2.9.1:</b> 2.9.1 uses a stronger login method (Digest). The site handles both; just enter the unit's username and password in Settings if it has one.</li>
 <li><b>Mixed-up replies:</b> the WiFi module talks to the charger on the same line the server uses, so a reply can come back to the wrong question. The server tags each question and only uses replies that carry its tag, and retries when one is wrong.</li>
 <li><b>MQTT on 2.9.1:</b> replies to commands sent over MQTT are not tagged, so the load balancer only listens on MQTT and makes all changes over the web.</li>
-<li><b>Starting up on 2.9.1:</b> after a restart the charger starts at its saved current straight away, before WiFi is up. That is why the saved currents in a load group must fit the group's capacity.</li>
+<li><b>Starting up on 2.9.1:</b> after a restart the charger starts at its pilot setting straight away, before WiFi is up, not at the temporary limit. The pilot settings do not have to add up to the group's capacity.</li>
 <li><b>Sleeping units:</b> while a unit is asleep, its pilot setting can show an old value until it wakes.</li>
 </ul>
 <h2 id="volts">Voltage and power (kW)</h2>
@@ -114,7 +114,7 @@ $NS = oev_host_suggest($NU); $NV = array_values(array_filter($NU, 'oev_unit_visi
 <li><b>Name</b>: what you call the unit on this site, for example <?=$NV ? oev_v($NV[0]['name']) : 'Garage 1'?>. Change it any time.</li>
 <li><b>Emoncms node</b> = the unit number (unit 4 sends as node <?=oev_v('4')?>). Set for you by Internal logging.</li>
 <li><b>MQTT topic</b> = <?=oev_v('openevse/u')?> + the unit number, for units in a load group. The load balancer finds each unit by this topic, so it can't be renamed.</li>
-<li><b>Hostname</b>: the name the unit gives itself on the network. Routers like the Deco usually show it, unless you renamed the device in the router's app. Settings &gt; Units suggests one made from the name:
+<li><b>Hostname</b>: the name the unit gives itself on the network. Your router usually shows it, unless you renamed the device in the router's app. Settings &gt; Units suggests one made from the name:
 <ul>
 <li>lowercase; anything that is not a letter <?=oev_v('a-z')?> or digit <?=oev_v('0-9')?> becomes a dash; repeated dashes become one; dashes at the ends are dropped;</li>
 <li>at most <?=oev_v(OEV_HOST_MAX . ' characters')?>;</li>

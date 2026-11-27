@@ -13,7 +13,7 @@ if (!function_exists('evse_state_text')) { function evse_state_text($c){ return 
 if (!function_exists('slog')) { function slog($lvl, $msg){ $GLOBALS['SESS_LOG'][] = array(time(), $lvl, $msg); } }
 
 function mkdb(){ $d = new PDO('sqlite::memory:'); $d->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $d->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC); sess_schema($d); return $d; }
-$unit = array('id'=>2, 'name'=>'N Penn: 3R', 'breaker'=>48, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
+$unit = array('id'=>2, 'name'=>'Garage: Bay 3', 'breaker'=>48, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
 
 function rd($temp, $extra = array()){
 	return array_merge(array(
@@ -46,7 +46,7 @@ foreach ($d->query("PRAGMA table_info(unit_state)") as $c) $cols[$c['name']] = 1
 ck('schema v8 adds unit_state.thermal_armed', isset($cols['thermal_armed']) && (int)$d->query("SELECT v FROM meta WHERE k = 'schema_version'")->fetchColumn() === 8);
 ck('sess_cols_ok is true on a fresh v8 schema', sess_cols_ok($d) === true);
 
-// the 3R session 25 pattern: peak 63.5 C, then a drop across 62 with no prior 65 C throttle
+// one session pattern: peak 63.5 C, then a drop across 62 with no prior 65 C throttle
 $d = run(array(40, 61, 63.5, 62.4, 61.5));
 ck('drop across 62 C with no prior throttle: no thermal events', evs($d) === array());
 ck('... faults stay 0', faults($d) === 0);
@@ -89,8 +89,8 @@ ck('63 C peak, unchanged pilot: no events, not armed', evs($d) === array() && ar
 
 // sess_event itself: restore must not bump faults; throttle must
 $d = mkdb();
-$d->exec("INSERT INTO unit_state (unit_id, unit_name) VALUES (2, '3R')");
-$d->exec("INSERT INTO sessions (id, unit_id, unit_name, plug_in_at, open, faults) VALUES (1, 2, '3R', 1790000000, 1, 0)");
+$d->exec("INSERT INTO unit_state (unit_id, unit_name) VALUES (2, 'Bay 3')");
+$d->exec("INSERT INTO sessions (id, unit_id, unit_name, plug_in_at, open, faults) VALUES (1, 2, 'Bay 3', 1790000000, 1, 0)");
 sess_event($d, $unit, 1, null, 1790000000, 'thermal', 'temperature back below restore threshold (62 C)', 63, 61.5, 61.5, 'thermal restore');
 ck('sess_event: thermal restore does not increment faults', faults($d) === 0);
 sess_event($d, $unit, 1, null, 1790000060, 'thermal', 'temperature reached throttle threshold (65 C)', 64, 65, 65, 'thermal');

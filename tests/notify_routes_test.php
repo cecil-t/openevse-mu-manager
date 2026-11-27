@@ -12,7 +12,7 @@ ck('setup_auth ok, adds users.n_sessions_since', $rc === 0 && strpos(implode("\n
 $c = new PDO("sqlite:$s/data/openevse.db"); $c->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $c->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 $c->exec("UPDATE users SET n_sessions = 0, n_sessions_since = NULL WHERE id = 1");
 $c->exec("INSERT INTO load_groups (id, name) VALUES (1, 'G1'), (2, 'G2')");
-$c->exec("INSERT INTO evses (id, name, evseurl, loadgroupid, enabled) VALUES (4, 'N Penn: 1F <b>', 'http://192.0.2.4/', 1, 1), (5, 'Other: 9X', 'http://192.0.2.5/', 2, 1)");
+$c->exec("INSERT INTO evses (id, name, evseurl, loadgroupid, enabled) VALUES (4, 'Garage: Bay 1 <b>', 'http://192.0.2.4/', 1, 1), (5, 'Other: 9X', 'http://192.0.2.5/', 2, 1)");
 $c->exec("INSERT INTO users (id, email, pass_hash, role, scope_all, n_sessions) VALUES (2, 'viewer@example.invalid', 'x', 'viewer', 0, 1)"); $c->exec('INSERT INTO user_groups VALUES (2, 1)');
 $tok = array(); foreach (array(1, 2) as $uid) { $sel = bin2hex(random_bytes(8)); $sec = bin2hex(random_bytes(24)); $c->prepare('INSERT INTO auth_tokens (selector, token_hash, user_id, created_at, last_used_at) VALUES (?,?,?,?,?)')->execute(array($sel, hash('sha256', $sec), $uid, time(), time())); $tok[$uid] = "$sel.$sec"; }
 $port = 20000 + getmypid() % 20000;

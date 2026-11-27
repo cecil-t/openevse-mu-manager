@@ -168,7 +168,7 @@ the steps are also written out so you can do them by hand.
 
    A systemd timer (`OnCalendar=minutely`) running the same commands works too (write `%` as `%%` there).
 
-   On a Synology NAS, make the same two tasks in Task Scheduler however you like (user root, every minute).
+   On a Synology NAS, put the same two tasks in DSM Task Scheduler (user root, every minute). The web user there is often `http` instead of `www-data`.
 
 6. **Log in** at your site's address. The password can be changed under Account (tap your initials,
    top right). Open **Settings** once: that saves the site's web address for the scheduled scripts.

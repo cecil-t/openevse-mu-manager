@@ -25,7 +25,7 @@ function cfgdb(){
 			n_errors INTEGER DEFAULT 0, n_reboots INTEGER DEFAULT 0, n_sessions INTEGER DEFAULT 0, n_reminders INTEGER DEFAULT 0);
 		CREATE TABLE user_groups (user_id INTEGER NOT NULL, group_id INTEGER NOT NULL, PRIMARY KEY (user_id, group_id));");
 	oev_users_stop_cols($c);
-	$c->exec("INSERT INTO evses (id, name, loadgroupid) VALUES (4, 'N Penn: 1F', 1), (5, 'Other: 9X', 2)");
+	$c->exec("INSERT INTO evses (id, name, loadgroupid) VALUES (4, 'Garage: Bay 1', 1), (5, 'Other: 9X', 2)");
 	// A: admin, account defaults OFF.  B: view-only, group 1 only, account defaults ON.
 	$c->exec("INSERT INTO users (id, email, pass_hash, role, scope_all, n_sessions, n_stops, n_stops_since) VALUES
 		(1, 'a@example.test', 'x', 'admin', 1, 0, 0, NULL), (2, 'b@example.test', 'x', 'viewer', 0, 1, 1, " . ($GLOBALS['T0'] - 99999) . ")");
@@ -176,7 +176,7 @@ ck('view-only B cannot set a unit outside their load groups', post($c, 2, array(
 $r = post($c, 2, array('unitid'=>'4', 'n_errors'=>'inherit', 'n_reboots'=>'inherit', 'n_sessions'=>'off', 'n_stops'=>'inherit'));
 ck('view-only B can set their own email for a unit they see', $r[0] && me($c, 2)['ovr'][4]['sessions']['mode'] === 'off' && !isset(me($c, 2)['ovr'][4]['stops']));
 ck("B's save did not change A's choices", me($c, 1)['ovr'][4]['sessions']['mode'] === 'on' && me($c, 1)['ovr'][4]['stops']['mode'] === 'on');
-ck('unit settings untouched (evses unchanged)', json_encode($c->query('SELECT * FROM evses ORDER BY id')->fetchAll()) === json_encode(array(array('id'=>4, 'name'=>'N Penn: 1F', 'loadgroupid'=>1, 'breaker'=>40), array('id'=>5, 'name'=>'Other: 9X', 'loadgroupid'=>2, 'breaker'=>40))));
+ck('unit settings untouched (evses unchanged)', json_encode($c->query('SELECT * FROM evses ORDER BY id')->fetchAll()) === json_encode(array(array('id'=>4, 'name'=>'Garage: Bay 1', 'loadgroupid'=>1, 'breaker'=>40), array('id'=>5, 'name'=>'Other: 9X', 'loadgroupid'=>2, 'breaker'=>40))));
 ck('a view-only link (public) cannot save', unp_handle($c, array('id'=>0, 'role'=>'public'), array('unitid'=>'4', 'n_errors'=>'inherit', 'n_reboots'=>'inherit', 'n_sessions'=>'on', 'n_stops'=>'on'), function(){ return true; })[0] === false);
 ck('nobody logged in cannot save', unp_handle($c, null, array('unitid'=>'4', 'n_errors'=>'inherit', 'n_reboots'=>'inherit', 'n_sessions'=>'on', 'n_stops'=>'on'), function(){ return true; })[0] === false);
 ck('same choice again: "No change", start time kept', ($t = me($c, 1)['ovr'][4]['stops']['since']) && post($c, 1, array('unitid'=>'4', 'n_errors'=>'inherit', 'n_reboots'=>'inherit', 'n_sessions'=>'on', 'n_stops'=>'on'))[1] === 'No change.' && me($c, 1)['ovr'][4]['stops']['since'] == $t);
@@ -237,7 +237,7 @@ function seg($d, $sid, $unit, $start, $stop){ $d->prepare("INSERT INTO segments 
 $OUT = array(); $FAIL = array();
 $send = function($to, $subj, $body) use (&$OUT, &$FAIL){ if (!empty($FAIL[$to])) { $FAIL[$to]--; return 'smtp down'; } $OUT[] = array($to, $subj); return true; };
 $save = function(){};
-$U = array(4 => array('name'=>'N Penn: 1F', 'loadgroupid'=>1), 5 => array('name'=>'Other: 9X', 'loadgroupid'=>2));
+$U = array(4 => array('name'=>'Garage: Bay 1', 'loadgroupid'=>1), 5 => array('name'=>'Other: 9X', 'loadgroupid'=>2));
 function go($d, $c, &$st, $now, $on = true){ global $U, $send, $save; $us = urows($c); ns_baseline($st, $d, $now - 100000, $save); ns_stops($d, $us, $U, $st, $now, $on, $send, $save); ns_summaries($d, $us, $U, $st, $now, $on, $send, $save); }
 function mails($to, $pat){ global $OUT; return count(array_filter($OUT, function($m) use ($to, $pat){ return $m[0] === $to && preg_match($pat, $m[1]); })); }
 // one stop (schedule, still plugged in) and one summary on each unit, after everything was set
@@ -247,7 +247,7 @@ $c = cfgdb(); oev_unit_notify_table($c); $d = sdb(); $st = array(); ns_baseline(
 oev_unit_notify_save($c, 1, 4, array('errors'=>'inherit','reboots'=>'inherit','sessions'=>'on','stops'=>'on'), $T0);   // A: account Off, unit 4 On
 oev_unit_notify_save($c, 2, 4, array('errors'=>'inherit','reboots'=>'inherit','sessions'=>'off','stops'=>'off'), $T0);  // B: account On, unit 4 Off (B cannot see unit 5)
 events($d, $T0 + 100); go($d, $c, $st, $T0 + 2000);
-ck('A: account Off + unit 4 On -> stop and summary for unit 4 only', mails('a@example.test', '/1F: charging stopped/') === 1 && mails('a@example.test', '/1F: session done/') === 1 && mails('a@example.test', '/9X/') === 0);
+ck('A: account Off + unit 4 On -> stop and summary for unit 4 only', mails('a@example.test', '/Bay 1: charging stopped/') === 1 && mails('a@example.test', '/Bay 1: session done/') === 1 && mails('a@example.test', '/9X/') === 0);
 ck('B: account On + unit 4 Off -> nothing for unit 4; unit 5 not visible -> nothing', mails('b@example.test', '/./') === 0);
 go($d, $c, $st, $T0 + 3000); ck('next run: nothing sent twice', count($OUT) === 2);
 
@@ -338,7 +338,7 @@ $view = array(
 	'sessions' => array('mode'=>'inherit','on'=>false,'src'=>'account','account_on'=>false),
 	'stops' => array('mode'=>'on','on'=>true,'src'=>'unit','account_on'=>false),
 );
-$html = unp_form_html(4, 'N Penn: 1F', $view, 'CSRF', true);
+$html = unp_form_html(4, 'Garage: Bay 1', $view, 'CSRF', true);
 ck('unp_form_html: details/summary + unit anchor id', strpos($html, '<details class="ync" id="notify-u4">') !== false && strpos($html, '<summary>') !== false && strpos($html, 'ync-name') !== false);
 ck('unp_form_html: collapsed summary bolds only explicit overrides (per-bit ync-b cells)',
 	strpos($html, 'class="ync-b">Errors On</span>') !== false

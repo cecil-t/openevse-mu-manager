@@ -37,12 +37,12 @@ if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
 	exit(0);
 }
 
-// Task Scheduler starts us (sudo -u http) in root's home, which http can't
+// A scheduled task may start in a home directory the web user cannot
 // enter; include_v5.php restores the starting folder, so start from the site.
 chdir(SESS_WEB);
 
 // Maintenance: private/sess_writers_pause freezes sessions.db writers (cutover).
-// Exit 0 so Task Scheduler does not treat this as failure; do not open the DB.
+// Exit 0 so the scheduler does not treat this as failure; do not open the DB.
 if (is_file(SESS_WEB . '/private/sess_writers_pause')) {
 	file_put_contents(SESS_DIR . '/collector.log', date('Y-m-d H:i:s') . " INFO writers paused (private/sess_writers_pause); skipped\n", FILE_APPEND | LOCK_EX);
 	flock($lock, LOCK_UN); fclose($lock);

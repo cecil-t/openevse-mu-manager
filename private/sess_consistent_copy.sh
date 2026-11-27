@@ -1,6 +1,6 @@
 #!/bin/sh
 # Consistent copy of sessions.db AFTER writers are paused (private/sess_writers_pause).
-# Runs sqlite3 as the web user only. Never open the live DB as grokbot.
+# Runs sqlite3 as the web user only. Never open the live DB as your own login.
 # Usage: private/sess_consistent_copy.sh /abs/path/to/dest.db
 # Prefers VACUUM INTO (SQLite ≥3.27); falls back to .backup.
 set -e

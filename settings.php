@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if ($a === 'unit_test') {
 		header('Content-Type: application/json'); header('Cache-Control: no-store');
 		$id = (int)$P('id'); $url = norm_url($P('url'));
-		if ($url === '') { echo json_encode(array('ok' => false, 'html' => 'Enter an address first (for example 192.168.1.120).', 'msg' => 'Enter an address first.')); exit; }
+		if ($url === '') { echo json_encode(array('ok' => false, 'html' => 'Enter an address first (for example 192.0.2.120).', 'msg' => 'Enter an address first.')); exit; }
 		$old = null; if ($id) { $st = $db->prepare('SELECT * FROM evses WHERE id = ?'); $st->execute(array($id)); $old = $st->fetch(); }
 		$pw = (string)($_POST['password'] ?? '');
 		// the saved password is only sent to the saved address, never to a new one
@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($now === '') { $hlog("restart sent; no answer after {$secs}s"); $done(false, 'Hostname saved and the WiFi module restarted, but the unit has not answered again after ' . oev_v("$secs seconds") . '. Check it in a minute.'); }
 		$hlog("verified '$now' after {$secs}s");
 		$done($now === $want, $now === $want
-			? 'Done. The unit restarted its WiFi module and answered again after ' . oev_v("about $secs seconds") . '. Its hostname is now ' . oev_v($now) . '. The router (Deco) may show the new name only after the unit next asks it for an address, and keeps any name you typed in its app.'
+			? 'Done. The unit restarted its WiFi module and answered again after ' . oev_v("about $secs seconds") . '. Its hostname is now ' . oev_v($now) . '. The router may show the new name only after the unit next asks it for an address, and keeps any name you typed in its app.'
 			: 'The WiFi module restarted, but the hostname reads ' . oev_v($now) . ', not ' . oev_v($want) . '.');
 	}
 	/* ---- units ---- */
@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$hw = (int)$P('hw_max'); if ($hw < 6 || $hw > 80) $hw = $old && $old['hw_max'] ? (int)$old['hw_max'] : null;
 		$gid = (int)$P('group'); if ($gid && !isset($gname[$gid])) $gid = 0;
 		$em = in_array($P('emon'), array('none', 'internal', 'external'), true) ? $P('emon') : 'internal';
-		if ($name === '' || $url === '') back('units', 'Each unit needs a name and an address that works (for example 192.168.1.120).', $id ? "u$id" : 'add');
+		if ($name === '' || $url === '') back('units', 'Each unit needs a name and an address that works (for example 192.0.2.120).', $id ? "u$id" : 'add');
 		if ($brk < 6 || $brk > 80) back('units', 'Max current must be between 6 and 80 A.', $id ? "u$id" : 'add');
 		if ($hw && $brk > $hw && $old && $en) {   // the stored hardware max may be stale (the unit moved to another circuit): ask the unit
 			require_once __DIR__ . '/include_v5.php'; require_once __DIR__ . '/cap_lib.php';
@@ -343,7 +343,7 @@ if ($sec === 'units') {
 		ob_start(); ?>
 		<form method="post" action="settings.php?s=units"><?=$CS?><input type="hidden" name="a" value="<?=$id ? 'unit_save' : 'unit_add'?>"><input type="hidden" name="id" value="<?=$id?>">
 		<label>Name</label><input type="text" name="name" value="<?=h($u['name'] ?? '')?>" required>
-		<label>Address</label><input type="text" name="url" value="<?=h($u['evseurl'] ?? '')?>" placeholder="192.168.1.120 or openevse-1234.local" autocapitalize="off" autocorrect="off" required>
+		<label>Address</label><input type="text" name="url" value="<?=h($u['evseurl'] ?? '')?>" placeholder="192.0.2.120 or openevse-1234.local" autocapitalize="off" autocorrect="off" required>
 		<div class="note">Any way this server can reach the unit: local IP, host name, public address or full URL.</div>
 		<div class="row2"><div><label>Unit username</label><input type="text" name="username" value="<?=h($u['username'] ?? '')?>" autocapitalize="off" autocomplete="off"></div>
 		<div><label>Unit password</label><input type="password" name="password" value="" placeholder="<?=!empty($u['password']) ? '(saved)' : '(none)'?>" autocomplete="new-password"></div></div>

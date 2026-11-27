@@ -55,7 +55,7 @@ function oev_sys_checks($full = false){
 	// 3. load balancer (coordinator container + heartbeat)
 	$cs = $cst('openevse-lb-coordinator');
 	if (!$hb) $add('coordinator', 'Load balancer (coordinator)', $grouped ? false : null, $grouped ? 'No heartbeat found. Grouped units are not balanced.' : 'Not needed: no units are in a load group.');
-	elseif (!$hbok) $add('coordinator', 'Load balancer (coordinator)', $grouped ? false : null, 'Not running: last heartbeat ' . oev_sys_ago($hbage) . ($cs !== '' ? " (container: " . oev_sys_v($cs) . ")" : '') . '. Units keep charging at their saved current, but new cars are not balanced.', (int)$hb['time']);
+	elseif (!$hbok) $add('coordinator', 'Load balancer (coordinator)', $grouped ? false : null, 'Not running: last heartbeat ' . oev_sys_ago($hbage) . ($cs !== '' ? " (container: " . oev_sys_v($cs) . ")" : '') . '. Units keep their last temporary limit, but new cars are not balanced. A unit that loses power comes back on its pilot setting, which can put the group over the limit until the balancer is back.', (int)$hb['time']);
 	else $add('coordinator', 'Load balancer (coordinator)', true, 'Running (' . oev_sys_v(($hb['mode'] ?? '') === 'live' ? 'live' : 'dry run') . '), heartbeat ' . oev_sys_ago($hbage) . '.', (int)$hb['time']);
 
 	// 4. MQTT listener: the load balancer's MQTT connection + last message from a unit

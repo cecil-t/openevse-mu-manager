@@ -12,7 +12,7 @@ require_once "$tmp/collector/session_logic.php";
 if (!function_exists('evse_state_text')) { function evse_state_text($c){ return "state $c"; } }
 
 function mkdb(){ $d = new PDO('sqlite::memory:'); $d->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $d->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC); sess_schema($d); return $d; }
-$unit = array('id'=>2, 'name'=>'N Penn: 3R 120v', 'breaker'=>16, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
+$unit = array('id'=>2, 'name'=>'Garage: Bay 4 120v', 'breaker'=>16, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
 // idle reading; $c = array(gfci, nognd, stuck), null = not in the reading
 function rd($c, $uptime = null){ return array('ok'=>true, 'api'=>'http', 'state'=>1, 'connected'=>0, 'charging'=>0, 'amps'=>0,
 	'pilot'=>16, 'cmax'=>null, 'temp_c'=>25, 'lifetime_wh'=>null, 'session_wh'=>null, 'volts'=>120, 'elapsed'=>null, 'vflags'=>null, 'limit_sleep'=>false, 'limit'=>false, 'timer_active'=>null,
@@ -21,7 +21,7 @@ function evs($d){ return $d->query("SELECT detail, from_val, to_val FROM events 
 function counts($d){ return array_values($d->query('SELECT gfci_count, nognd_count, stuck_count FROM unit_state WHERE unit_id = 2')->fetch(PDO::FETCH_NUM)); }
 function run($seq){ global $unit; $d = mkdb(); $t = 1790000000; foreach ($seq as $s) { sess_process($d, $unit, rd($s[0], $s[1] ?? null), $t); $t += 60; } return $d; }
 
-// the 3R 120v pattern: 5/6 seen, then 0 after a WiFi restart, then 5/6 again (repeatedly)
+// the 120v pattern: 5/6 seen, then 0 after a WiFi restart, then 5/6 again (repeatedly)
 $d = run(array(array(array(5, 6, 1)), array(array(0, 0, 0), 20), array(array(5, 6, 1), 80), array(array(0, 0, 0), 15), array(array(5, 6, 1), 200), array(array(0, 0, 0))));
 ck('5 -> 0 -> 5 -> 0 -> 5 -> 0: no trip events at all (first reading is the starting count)', count(evs($d)) === 0);
 ck('... and the stored counts never went down (5 / 6 / 1)', counts($d) === array(5, 6, 1));

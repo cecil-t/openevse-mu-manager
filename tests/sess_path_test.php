@@ -124,7 +124,7 @@ ck('htaccess Deny from all', strpos($ht, 'Deny from all') !== false);
 ck('htaccess mod_authz_core gated', strpos($ht, 'mod_authz_core.c') !== false);
 $apache = trim((string)shell_exec('command -v apache2 || command -v httpd || true'));
 if ($apache === '') {
-	echo "NOTE htaccess runtime: no Apache binary on this host; content checks only (deploy uses Synology WebStation/Apache).\n";
+	echo "NOTE htaccess runtime: no Apache binary on this host; content checks only (deploy uses Apache).\n";
 	ck('htaccess runtime caveat documented', true);
 } else {
 	echo "NOTE htaccess runtime: Apache present at $apache — not spinning a vhost here; content checks suffice.\n";

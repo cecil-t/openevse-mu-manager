@@ -2,14 +2,14 @@
 
 Prepared Nov 7, 2026. Not done on production yet; needs an approved window.
 
-## Where things are (NAS, file metadata only)
+## Where the files are (metadata only)
 | DB | Now | After | Owner / mode | Sidecars |
 |---|---|---|---|---|
-| sessions.db (readings) | data/sessions.db | unchanged | http 1023:1023, 640 | none at rest (rollback journal) |
-| openevse.db (config) | openevse.db (site root) | data/openevse.db | http 1023:1023, 644 (kept) | none at rest |
+| sessions.db (readings) | data/sessions.db | unchanged | web user, 640 | none at rest (rollback journal) |
+| openevse.db (config) | openevse.db (site root) | data/openevse.db | web user, 644 (kept) | none at rest |
 | mosquitto.db | loadbalancer/mosquitto/data/ | **leave** (broker persistence, not app SQLite; owned 1883, Docker bind) | 1883:1883, 600 | n/a |
 
-data/ is http:http 750 with a deny-all .htaccess. `backups/` is not touched.
+data/ is owned by the web user, mode 750, with a deny-all .htaccess (`www-data` on Debian, often `http` on a Synology NAS). The uid and gid are `RUN_UID` and `RUN_GID` in `loadbalancer/.env`. `backups/` is not touched.
 `phpliteadmin.config.php` (directory ".") is left over; there is no phpliteadmin.php, so nothing uses it.
 
 ## Code (deploy first; works before AND after the move)
@@ -22,13 +22,13 @@ Switched: settings_lib, auth_lib, volts_lib, connection, include_v5 (EVSE_DB), i
 coordinator (re-resolves on every 60-s config reload).
 
 ## Who writes openevse.db (all go through oev_cfg_db_open)
-- Web (PHP as http): sign-in (login_fails, auth_tokens, users.last_login_at, rehash), token / public-link
+- Web (PHP as the web user): sign-in (login_fails, auth_tokens, users.last_login_at, rehash), token / public-link
   `last_used_at` touches on page views, logout, Settings saves (settings, units, groups, users,
   public links, jobs queue, reminders), account.php.
-- Task Scheduler as http, every minute: collector/jobs.php and collector/notifier.php
-  ("OpenEVSE jobs and notifications" -> private/jobs_root.sh). collector/collector.php only reads it.
+- cron or a systemd timer as the web user, every minute: collector/jobs.php and collector/notifier.php
+  ("OpenEVSE jobs and notifications" -> private/jobs_root.sh). On a Synology NAS that is a DSM Task Scheduler task, and the web user is often `http`. collector/collector.php only reads it.
 - collector/setup_auth.php (setup / upgrades; the only code allowed to create the file).
-- Coordinator container (uid 1023): READ-ONLY, reopens on every 60-s reload and re-resolves the path
+- Coordinator container (`RUN_UID` from `loadbalancer/.env`): READ-ONLY, reopens on every 60-s reload and re-resolves the path
   (needs the new coordinator.php, i.e. one restart; its heartbeat then carries cfg_resolver=1).
 
 ## Writer exclusion (what the code enforces)
@@ -55,17 +55,17 @@ coordinator (re-resolves on every 60-s config reload).
 - A non-contract writer that starts writing after the BEGIN IMMEDIATE check is not caught by it.
   SQLite refuses writes from a handle whose file was renamed (SQLITE_READONLY_DBMOVED) only for
   transactions that start after the rename.
-- So the plan relies on: no human edits during the window (Greg agreed: no Settings changes), and the
+- So the plan relies on: no human edits during the window (no Settings changes), and the
   known background writers being drained/paused by the flag and lock.
 
-## Minimal plan (each step needs Greg's approval)
-1. Deploy the code (backups, owner 1023:1023). Behaviour unchanged: still ./openevse.db.
+## Minimal plan (each step needs your approval)
+1. Deploy the code (backups owned by the web user). Behaviour unchanged: still ./openevse.db.
    sessions.db is not touched by any of this.
 2. Restart the coordinator container once (Mosquitto untouched). Needed: the running coordinator reads
    ./openevse.db by a fixed path and would fail its reloads after the move; the new one re-resolves.
    Load balancing pauses only while the container restarts. Do it when no test charge needs it.
-3. Greg makes no Settings changes. (No fixed wait; the script checks open handles instead.)
-4. `sudo -n -u http php private/cfg_db_move.php --check`, then `--move`. Usually a few seconds; longer
+3. Make no Settings changes. (No fixed wait; the script checks open handles instead.)
+4. `sudo -n -u www-data php private/cfg_db_move.php --check`, then `--move` (`http` on a Synology NAS). Usually a few seconds; longer
    only if a page/job is mid-write (bounded by --lock-wait=120, then aborts safely).
 5. Check System status shows data/openevse.db; /openevse/openevse.db -> 404; /openevse/data/ -> 403.
    Later `--verify`, then delete data/openevse.db.premove-* when happy. No symlink exists.
