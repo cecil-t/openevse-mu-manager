@@ -31,7 +31,7 @@ function broker_port(){ foreach (@file(OEV_LB . '/.env', FILE_IGNORE_NEW_LINES) 
 function broker_ip(){ foreach (@file(OEV_LB . '/.env', FILE_IGNORE_NEW_LINES) ?: array() as $l) if (preg_match('/^MQTT_BIND=(\S+)/', $l, $m)) return $m[1]; return ''; }
 function finish($id, $ok, $msg){ jdb()->prepare("UPDATE jobs SET status = ?, msg = ?, done_at = ? WHERE id = ?")->execute(array($ok ? 'done' : 'failed', $msg, time(), $id)); jlog("job $id " . ($ok ? 'done' : 'FAILED') . ": $msg"); }
 
-function is_v5($c){ return (int)ltrim((string)$c['version'], 'vV') >= 4; }
+function is_v5($c){ return evse_config_is_v5($c); }   // version 4+, or max_current_soft (local/dev builds)
 
 function job_emon($u, $mode){
 	$id = (int)$u['id'];

@@ -21,6 +21,7 @@ require_once __DIR__ . '/util_lib.php';     // h(), oev_sess_ro()
 chdir($__v5_cwd);
 
 require_once __DIR__ . '/db_path.php';     // OEV_DB_FILE
+require_once __DIR__ . '/evse_v5.php';    // evse_config_is_v5()
 define('EVSE_DB', 'sqlite:' . OEV_DB_FILE);
 // Our client id for claims (load balancing). Must stay below 2^31: the WiFi
 // firmware parses the id with String::toInt(), which saturates bigger values.
@@ -136,6 +137,7 @@ function evse_get($unit, $path){ $r = evse_http($unit, 'GET', $path); return $r[
 /*------------------------------------------------------------------------------
  * API detection. WiFi v4+/v5 (ESP32) => 'http'. WiFi 2.x/3.x (ESP8266) =>
  * 'rapi'. No answer => 'offline'. Cached per unit for the request.
+ * evse_config_is_v5() (evse_v5.php) is the version / max_current_soft rule.
  *----------------------------------------------------------------------------*/
 function evse_detect($unit, $refresh = false){
 	$cache = &$GLOBALS['__evse_detect_cache'];
@@ -148,8 +150,7 @@ function evse_detect($unit, $refresh = false){
 		$ver = isset($r['json']['version']) ? (string)$r['json']['version'] : '';
 		$info['version'] = $ver;
 		$info['config']  = $r['json'];
-		$major = (int)ltrim($ver, 'vV');
-		$info['api'] = ($major >= 4 || isset($r['json']['max_current_soft'])) ? 'http' : 'rapi';
+		$info['api'] = evse_config_is_v5($r['json']) ? 'http' : 'rapi';
 	} elseif ($r['code'] == 200) {
 		$info['api'] = 'rapi';   // answered, but not with JSON: assume old firmware
 	}
@@ -1010,7 +1011,7 @@ function evse_par_summary_gen($unit){
 	if ($r['ok'] && is_array($r['json'])) {
 		$ver = isset($r['json']['version']) ? (string)$r['json']['version'] : '';
 		$info['version'] = $ver; $info['config'] = $r['json'];
-		$info['api'] = ((int)ltrim($ver, 'vV') >= 4 || isset($r['json']['max_current_soft'])) ? 'http' : 'rapi';
+		$info['api'] = evse_config_is_v5($r['json']) ? 'http' : 'rapi';
 	} elseif ($r['code'] == 200) {
 		$info['api'] = 'rapi';
 	}

@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if (!$hw && $c && !empty($c['max_current_hard'])) $hw = (int)$c['max_current_hard'];
 		if (!$c && $gc === null) $out(false, 'Something answered at ' . $V($url) . ' (' . $V('HTTP ' . $r['code']) . "), but it doesn't look like an OpenEVSE unit.");
 		if (!$ctl) { $gv = sess_rapi($unit, '$GV'); if (is_string($gv)) $ctl = strtok($gv, ' '); }
-		$esp = $wv !== '' ? ((int)ltrim($wv, 'vV') >= 4 ? 'ESP32' : 'ESP8266, legacy') : '';
+		$esp = ($c && evse_config_is_v5($c)) ? 'ESP32' : ($wv !== '' ? 'ESP8266, legacy' : '');
 		$lines = array('Reached the unit' . ($unit['username'] !== '' ? ' and logged in' : '') . '.');
 		$lines[] = 'Firmware: WiFi ' . ($wv !== '' ? $V($wv) . ' (' . $V($esp) . ')' : 'unknown') . ($ctl !== '' ? ', controller ' . $V($ctl) : '') . '.';
 		$lines[] = $hw ? 'Maximum current the unit allows (hardware): ' . $V("$hw A") . '.' : "Couldn't read the unit's maximum current.";
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$hlog = function($m) use ($id, $me){ @file_put_contents(__DIR__ . '/collector/jobs.log', date('Y-m-d H:i:s') . " hostname u$id: $m (by " . $me['email'] . ")\n", FILE_APPEND | LOCK_EX); };
 		$r = evse_http($u, 'GET', 'config');
 		if (!$r['ok'] || !is_array($r['json'])) $done(false, "Couldn't read the unit's settings (" . oev_v($r['code'] ? 'HTTP ' . $r['code'] : 'no answer') . '). Nothing was changed.');
-		$c = $r['json']; $v5 = (int)ltrim((string)($c['version'] ?? ''), 'vV') >= 4; $old = (string)($c['hostname'] ?? '');
+		$c = $r['json']; $v5 = evse_config_is_v5($c); $old = (string)($c['hostname'] ?? '');
 		if ($old === $want) $done(true, 'The unit already has the hostname ' . oev_v($want) . '. Nothing was changed.');
 		$w = evse_http($u, 'POST', 'config', array('hostname' => $want), false);
 		if (!$v5 && !($w['code'] >= 200 && $w['code'] < 300)) $w = evse_http($u, 'POST', 'saveadvanced?hostname=' . rawurlencode($want), null, false);   // older 2.x
