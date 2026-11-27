@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run sqlite3 against the resolved sessions.db as the web user only.
-# Never open the live DB as grokbot/root/your login — that creates -wal/-shm
+# Never open the live DB as root or your own login. That creates -wal/-shm
 # owned by the wrong account and can stop the collector.
 # Usage:
 #   private/sess_sqlite.sh 'SELECT count(*) FROM sessions;'
@@ -14,7 +14,7 @@ for p in php8.4 php84 php8.3 php83 php8.2 php82 php; do
 done
 WU=${OEV_WEB_USER:-}
 if [ -z "$WU" ]; then
-	# Synology web user is usually "http"; Debian "www-data"
+	# web user: www-data on Debian, often http on a Synology NAS. First match.
 	for u in http www-data nginx apache; do id "$u" >/dev/null 2>&1 && WU=$u && break; done
 fi
 [ -n "$WU" ] || { echo "sess_sqlite: set OEV_WEB_USER to the PHP/web account" >&2; exit 1; }

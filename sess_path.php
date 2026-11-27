@@ -36,7 +36,7 @@ if (!defined('SESS_DB_PATH')) define('SESS_DB_PATH', oev_sess_db_path());
 /**
  * Writers pause switch (maintenance). Presence of private/sess_writers_pause
  * (any content; no secrets) makes collector / receiver / jobs skip sessions.db
- * writes. Do NOT create this file on production until Greg approves a window.
+ * writes. Do NOT create this file on production until you approve a window.
  * Pages keep serving (read-only); coordinator/MQTT are unaffected.
  */
 if (!function_exists('oev_sess_writers_paused')) {

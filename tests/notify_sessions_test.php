@@ -27,7 +27,7 @@ function us($d, $unit, $ok, $charging = 0, $conn = 1, $state = 2, $push = null, 
 	$d->prepare('INSERT OR REPLACE INTO unit_state (unit_id, last_ok_at, charging, connected, state, last_push_at, lifetime_wh, boot_at) VALUES (?,?,?,?,?,?,?,?)')->execute(array($unit, $ok, $charging, $conn, $state, $push, $lw, $boot));
 }
 function limev($d, $sid, $ts, $type, $v){ $d->prepare("INSERT INTO events (unit_id, session_id, ts, kind, detail, to_val, reason) VALUES (4, ?, ?, 'limit', ?, ?, 'limit set')")->execute(array($sid, $ts, "$type limit $v" . ($type == 'time' ? ' min' : ' kWh'), $v)); }
-$units = array(4 => array('name'=>'N Penn: 1F', 'loadgroupid'=>1), 5 => array('name'=>'Other: 9X', 'loadgroupid'=>2), 2 => array('name'=>'Loose', 'loadgroupid'=>null));
+$units = array(4 => array('name'=>'Garage: Bay 1', 'loadgroupid'=>1), 5 => array('name'=>'Other: 9X', 'loadgroupid'=>2), 2 => array('name'=>'Loose', 'loadgroupid'=>null));
 $T0 = 1790000000;
 $USERS0 = array(
 	array('id'=>1, 'email'=>'admin@example.test', 'role'=>'admin', 'scope_all'=>1, 'n_sessions'=>1, 'n_stops'=>1, 'n_stops_since'=>$T0 - 99999, 'groups'=>array()),
@@ -43,7 +43,7 @@ function got($pat){ global $OUT; return count(array_filter($OUT, function($m) us
 function fresh(){ global $OUT, $FAIL, $HOOK, $users, $USERS0; $OUT = array(); $FAIL = array(); $HOOK = null; $users = $USERS0; }
 
 // real collector flow: feed readings through sess_process (the code that stores stop reasons)
-$unitA = array('id'=>4, 'name'=>'N Penn: 1F', 'breaker'=>48, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
+$unitA = array('id'=>4, 'name'=>'Garage: Bay 1', 'breaker'=>48, 'evseurl'=>'x', 'volts_override'=>null, 'voltmeter'=>null);
 function rd($api, $st, $x = array()){ return array_merge(array('ok'=>true, 'api'=>$api, 'state'=>$st, 'connected'=>$st == 1 ? 0 : 1, 'charging'=>$st == 3 ? 1 : 0, 'amps'=>$st == 3 ? 16 : 0,
 	'pilot'=>16, 'cmax'=>null, 'temp_c'=>25, 'lifetime_wh'=>null, 'session_wh'=>null, 'volts'=>240, 'elapsed'=>null, 'vflags'=>null, 'limit_sleep'=>false, 'limit'=>false, 'timer_active'=>null,
 	'override'=>null, 'our_claim'=>null, 'sched_disabled'=>null, 'gfci'=>0, 'nognd'=>0, 'stuck'=>0, 'error'=>'', 'temp1_c'=>null, 'temp2_c'=>null, 'temp3_c'=>null, 'src'=>'poll'), $x); }
@@ -139,7 +139,7 @@ $a = sess($d, 4, $T0 - 9000, 0, $T0 - 8000); $b = sess($d, 4, $T0 - 7000, 1); se
 $c = sess($d, 5, $T0 - 5000, 0, $T0 - 4000); us($d, 4, $T0, 0, 1, 254);
 run($d, $st, $T0); ck('baseline: nothing about the past', count($OUT) === 0 && $st['sum_floor'] === $b - 1);
 $d->exec("UPDATE sessions SET open = 0, unplug_at = " . ($T0 + 100) . " WHERE id = $b"); run($d, $st, $T0 + 160);
-ck('older session closed after a newer one: summary sent', got('/1F: session done/') === 1);
+ck('older session closed after a newer one: summary sent', got('/Bay 1: session done/') === 1);
 ck('its stop happened before the baseline: no stop email', got('/charging stopped/') === 0);
 // the reviewer's race: while mailing, another session closes (new id); it must still be mailed later
 fresh(); $d = mkdb(); $st = array(); run($d, $st, $T0 - 10);
@@ -147,7 +147,7 @@ $x = sess($d, 4, $T0, 0, $T0 + 100); $y = sess($d, 4, $T0 + 200, 0, $T0 + 300);
 $HOOK = function($to, $subj) use ($d, $T0, &$HOOK){ $HOOK = null; sess($d, 5, $T0 + 400, 0, $T0 + 450); };
 run($d, $st, $T0 + 460);
 ck('race: session closed during the mailing pass is not skipped by the floor', (int)$st['sum_floor'] === $y);
-run($d, $st, $T0 + 520); ck('race: it is mailed on the next pass (3 summaries, no repeats)', got('/session done/') === 4);   // 1F x2 (admin), 9X x2 (admin + viewer2)
+run($d, $st, $T0 + 520); ck('race: it is mailed on the next pass (3 summaries, no repeats)', got('/session done/') === 4);   // Bay 1 x2 (admin), 9X x2 (admin + viewer2)
 
 /* ===== recipients re-checked at every attempt ===== */
 fresh(); $d = mkdb(); $st = array(); run($d, $st, $T0 - 10);

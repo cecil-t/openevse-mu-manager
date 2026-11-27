@@ -46,4 +46,4 @@ node tools/preview/sheet.mjs --out tools/preview/out --dest /workspace/preview-f
 
 ## Fixture naming notes
 
-Units include short (`A1`, `Bay3`, `Shop`), Greg-length (`N Penn: 2F (NACS)`), longer phrases (`Visitor Lot Level 2 Charger 12`), and an unbroken token (`WarehouseDockChargerNorth`). Groups: `Lot`, `N Penn Garage`, `Employee Parking Structure B`, plus ungrouped.
+Units include short (`A1`, `Bay3`, `Shop`), a medium name with punctuation (`Garage: Bay 2 (NACS)`), longer phrases (`Visitor Lot Level 2 Charger 12`), and an unbroken token (`WarehouseDockChargerNorth`). Groups: `Lot`, `Main Garage`, `Employee Parking Structure B`, plus ungrouped.

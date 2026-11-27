@@ -8,8 +8,8 @@ if (!function_exists('oev_is_public')) { function oev_is_public(){ return false;
 if (!function_exists('oev_is_admin')) { function oev_is_admin(){ return false; } }
 
 $now = time();
-// MQTT-off monitor unit: mqtt_seen ~27h old, HTTP last_ok fresh (the 3R 120v case)
-$u2 = array('id'=>2,'name'=>'N Penn: 3R 120v','ok'=>true,'state'=>1,'plugged'=>false,'amps'=>0,'setting'=>12,'saved'=>12,
+// MQTT-off monitor unit: mqtt_seen ~27h old, HTTP last_ok fresh (a 120 V unit)
+$u2 = array('id'=>2,'name'=>'Garage: Bay 4 120v','ok'=>true,'state'=>1,'plugged'=>false,'amps'=>0,'setting'=>12,'saved'=>12,
 	'mqtt_seen'=>$now - 98632, 'last_ok'=>$now - 5, 'charging'=>false,'monitor'=>true);
 $v = evse_lb_view($u2);
 ck('mqtt-off checkin age uses last_ok', $v['checkin'] !== null && $v['checkin'] <= 10);
@@ -31,7 +31,7 @@ $vn = evse_lb_view($n);
 ck('never seen null checkin+stale', $vn['checkin'] === null && $vn['stale'] === true);
 
 // wide initial paint: logger last_ok_at alone is enough when no heartbeat unit
-$unit = array('id'=>2,'name'=>'N Penn: 3R 120v','evseurl'=>'http://192.168.1.158/','breaker'=>16);
+$unit = array('id'=>2,'name'=>'Garage: Bay 4 120v','evseurl'=>'http://192.0.2.158/','breaker'=>16);
 $e = array('statecode'=>1,'state'=>'Ready','connected'=>0,'pilot'=>12,'amps'=>0,'api'=>'http','lifetimeKWH'=>0,'sched'=>false,'lim'=>null);
 $us = array('last_ok_at'=>$now - 8, 'last_poll_at'=>$now - 8, 'temp_max_c'=>25.5, 'srssi'=>-56, 'wifi_uptime'=>100000, 'level'=>1, 'volts'=>120);
 $w = idx_wide_unit($unit, $e, null, null, 0, array(), $us, 120, 'unit.php?unitid=2');
